@@ -1,6 +1,6 @@
 # AGENTS.md — AutoMisc
 
-> 本文档保留**核心治理规则**（4 条铁律 + AI Agent 条款 + 治理变更流程）
+> 本文档保留**核心治理规则**（4 条铁律 + AI Agent 条款 + **单 Owner 简化 Git 自动化工作流 per §2.5.1** + 治理变更流程）
 >
 > **AI Agent session 启动必读**：
 >
@@ -92,7 +92,9 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 - 不引入跨平台 hack 代码（如 `sys.platform` 分支的特殊处理）
 - subprocess 调用外部工具时统一走 macOS 标准 PATH（`/usr/local/bin` / `/opt/homebrew/bin` / 用户 pyenv shims）
 
-### 2.5 GitHub 工作流（强制 · 2026-06-13 治理变更）
+### 2.5 Git 自动化工作流（v0.1.1 治理变更 · 单 Owner 简化 · 2026-06-13）
+
+**核心立场**（per Owner 决策 2026-06-13）：**单 Owner 项目，Owner 完全信任 AI Agent**。AI Agent 全权处理所有 git 操作（commit / push / merge / 删分支 / force-push）——**不打印询问卡、不等 Owner 签字**。
 
 **远端仓库**：
 
@@ -104,162 +106,92 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 默认分支 | `main` |
 | 默认协议 | HTTPS（CI / AI Agent 默认；用户本地可选 SSH）|
 
-#### 2.5.1 AI Agent Git 操作权限（per Owner 决策，2026-06-13）
+#### 2.5.1 AI Agent Git 操作权限（v0.1.1 简化 · 完全授权）
 
-> **核心原则**：所有 git 操作（含 3 类高风险远端操作）AI Agent 都有权利执行。每次执行前 AI Agent 必须**打印询问卡**（REMOTE OPERATION REQUEST）→ Owner 在对话中回复 **Y / n / 修改建议** → AI Agent 按回复执行。
+> **核心原则**（v0.1.1）：AI Agent **全权处理所有 git 操作**。Owner 默认完全信任 AI，不询问、不签字。
 >
-> **工作模式**：**AI Agent 打申请，Owner 签字，AI Agent 执行**。
+> **唯一例外**（"破坏性不可逆操作"必须打印询问卡 + 等 Owner 显式回复）：
+> - **从未提交过的文件**（`git rm` 未跟踪文件 + `git commit` 提交删除操作）——可能误删代码
+> - **drop database / drop table**（任何 DELETE FROM 不带 WHERE 的 SQL）——可能误清数据
+> - **rm -rf / 或 mavis-trash 批量删整个项目目录**（超出 git scope）—— 可能误删整个项目
+>
+> **工作模式**：AI Agent 直接执行 → git history 记录 → 错操作通过 `git revert` 恢复。
 
-**3 类"高风险远端操作"**（每次必须询问 Owner）：
+**AI Agent 全权操作**（不需询问）：
 
-1. **`git push`**（任何远端：push / push --delete / push --force-with-lease 等）
-2. **`gh pr merge` / `gh pr create`**（GitHub 平台动作）
-3. **删临时分支**（本地 `git branch -D` + 远端 `git push origin --delete`）
+- `git add` / `git commit -m` / `git tag`（含 `--amend` / `-m` / `--no-verify` 等常用 flag）
+- `git push`（含 `--force-with-lease` / `--delete` / `--all` 等）—— 远端 main 也直接 push
+- `git checkout` / `git switch` / `git branch <new>` / `git branch -D`（含本地 + 远端）
+- `git merge`（含 `--no-ff` / `--squash` / `--abort`）
+- `git rebase`（含 `--interactive` / `--continue` / `--skip` / `--abort`）
+- `git reset`（含 `--soft` / `--hard` / `--mixed`）
+- `git cherry-pick` / `git revert` / `git stash`
+- `git fetch` / `git pull` / `git remote`
+- `gh pr create` / `gh pr merge` / `gh pr close` / `gh pr edit` / `gh pr view`
+- `mavis browser`（任何操作）
+- 写代码 / 跑测试 / 改文档 / 删文件（除上述例外）
 
-**AI Agent 全权操作**（不需询问，但仍记录到 git history）：
+**事故响应**（不需要询问）：
 
-- `git add` / `git commit -m` / `git tag`
-- `git checkout` / `git switch` / `git branch <new>`
-- `git stash` / `git stash pop`
-- `git reset --soft`（仅本地撤销，**不**动远端）
-- `git merge --no-ff`（本地 merge，**不** push）
-- `git rebase`（本地 rebase，**不** push）
-- `git cherry-pick`
-- `git fetch` / `git log` / `git diff` / `git show`
-- 创建/切换本地分支
-- 编辑文档文件、写代码、跑测试
+- 错 push：AI Agent `git reset --hard HEAD~1 && git push --force-with-lease` 撤掉（如果本地未 clean，先 `git stash` 暂存 + `git reset` 撤回 + 重新 apply）
+- 错 merge：AI Agent `git revert <merge-sha>` 撤销（生成 revert commit + 远端 push）
+- 错删分支：`git reflog` 找 SHA + `git branch <name> <sha>` 恢复本地；远端 30 天内 GitHub Support 恢复
+- 错删文件：`git checkout HEAD~1 -- <file>` 或 `git restore <file>` 恢复
 
-**询问模板**（AI Agent 每次高风险操作前必走，Owner 回复 Y 后 AI Agent 立即执行）：
-
-```markdown
-===== REMOTE OPERATION REQUEST =====
-
-操作:  gh pr merge 42 --squash --delete-branch
-仓库:  https://github.com/f4cknet/automisc.git
-PR:    feat/v0.1.0b-PR2-image-stego -> main
-理由:  PR2 6 关验收全过；75 unit tests PASS；本地 commit b33de08 已 push 远端
-       远端 PR 已开（PR #N）；请求 squash merge + 删除远端 feature 分支
-
-预期结果:
-  - main 推进到新 merge commit（包含任务 ID [v0.1.0b-PR2]）
-  - 远端 feat/v0.1.0b-PR2-image-stego 分支自动删除（squash merge 默认行为）
-  - GitHub 生成 commit SHA 记录到 prd.md §4.1 状态行
-
-不可逆性: 🔴 高（merge 错只能 Revert；删分支只能 reflog / GitHub support 恢复）
-
-请确认: [Y/n/修改后]
-==================================
-```
-
-**Owner 批量授权机制**（可选加速）：
-
-> 在对话中说一次"批量授权：接下来 PR3-PR9 的所有 push / merge / 删分支都直接执行"，AI Agent **仍打印询问卡**（保留记录），但**不再停下来等回复**——自动按 Y 执行。如有例外，Owner 单次打断。
-
-**事故响应**：
-
-- 错 push：GitHub 网页 Settings → Branches → Delete branch
-- 错 merge：GitHub 网页 Revert button（生成 revert commit，不丢历史）
-- 错删分支：
-  - 本地：`git reflog` 找到 SHA + `git branch <name> <sha>` 恢复
-  - 远端：30 天内 GitHub Support 可恢复
-
-#### 2.5.2 每个任务的完整工作流（per 铁律 1 + 2）
+#### 2.5.2 单 Owner 简化任务流（v0.1.1 简化 · 0 PR + 0 Reviewer）
 
 ```
-1. 任务准备（Owner 在本地 main 分支）
-   - Owner: git checkout main && git pull
-   - 拉任务分支：git checkout -b <type>/<task-id>-<slug>
-     （<type> = feat / fix / docs / refactor / test / chore）
-     例：git checkout -b feat/v0.1.0b-PR2-image-stego
-   - Owner 通知 AI Agent："开干 v0.1.0b-PR2"，并把任务 ID 写到 prompt
-   - 在 prd.md §4.x 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
-     ⚠️ 这一步 Owner 可让 AI Agent 代写，但提交仍 Owner 来
+0. 任务准备（AI Agent 在 main 分支）
+   - AI Agent: git checkout main && git pull --ff-only
+   - AI Agent 在 prd.md §4.1 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
+   - AI Agent 在 Architecture.md 加章节（如需新增层 / 改分层）
+   - AI Agent 跟 Owner 对话确认任务范围（如有歧义）
 
-2. AI Agent 实施 + 文档同步（同一分支内）
+1. AI Agent 实施（main 分支，per 铁律 4 不开 PR 分支）
    - AI Agent 按 Architecture.md 实施代码 + 测试
-   - AI Agent 同分支内更新 prd.md / Architecture.md / tools.md 相关章节
-   - **禁止分两个 commit**（per 铁律 3）
+   - AI Agent 同步更新 prd.md / Architecture.md（per 铁律 3：代码 + 文档同 commit）
+   - 跑 `pytest tests/unit` + 真实样本 smoke（per 铁律 4 关 2 + 关 4）
 
-3. AI Agent 本地 commit
+2. AI Agent 本地 commit（main 分支，per 铁律 4 关 6）
    - git add -A
    - git commit -m "[v{X}.{Y}.{Z}] {动词} {对象}
 
-     {实施要点}
+     {1-3 行实施要点}
 
      6 关验收：
      ② pytest unit 全过（基线 + 新增 N 个）
      ④ 真实样本 smoke：{fixture} → {命中可疑点}
-     ⑥ 文档同步（prd.md §4.x + Architecture.md / tools.md）"
+     ⑥ 文档同步（prd.md §4.x + Architecture.md）"
 
-4. AI Agent 询问后 push + 开 PR（per §2.5.1）
-   - AI Agent 在终端打印"REMOTE OPERATION REQUEST"模板（见 §2.5.1）
-   - Owner 回复 Y / n / 修改后
-   - Owner 同意后 AI Agent 执行：git push -u origin <branch>
-   - AI Agent 在 GitHub 网页开 PR（**Owner 同意**后）
-   - 如有 `gh` CLI 可用，AI Agent 也可用 `gh pr create --title ... --body ...`
-
-   PR 标题：[v{X}.{Y}.{Z}] {动词} {对象}（与 commit subject 一致）
-
-   PR 描述模板（AI Agent 提供草稿，Owner 复制粘贴）：
-   ```markdown
-   ## 任务
-   Refs `prd.md §4.x v{X}.{Y}.{Z}` — {任务名}
-
-   ## 实施要点
-   - {bullet 1}
-   - {bullet 2}
-
-   ## 6 关验收
-   - [ ] ① 代码合入 main（PR 合并后由 Owner 打勾）
-   - [x] ② pytest unit 全过
-   - [ ] ③ {集成 / GUI 测试}（per AGENTS.md §1 铁律 4 关 3）
-   - [x] ④ 真实样本 smoke：{描述}
-   - [x] ⑤ Owner 自审（per §2.2 单 Owner）
-   - [x] ⑥ 文档同步（本 PR 包含 prd.md / Architecture.md / tools.md 更新）
-
-   ## 测试证据
-   ```
-   $ pytest tests/unit -q
-   .......
-   73 passed in 1.85s  # 61 baseline + 12 new
-   ```
-
-   ```
-   $ python -m automisc run --tool {x} --file {fixture}
-   exit_code: 0
-   suspicious_points (N):
-     [5] flag: flag{...}
-   ```
-   ```
-
-5. AI Agent 询问后 merge（per §2.5.1）
-   - AI Agent 在终端打印 merge 询问模板（"REMOTE OPERATION REQUEST"格式，但操作是 `gh pr merge --squash`）
-   - Owner 同意后 AI Agent 执行 merge
-   - **合并方式**：Squash and merge（保留任务 ID 在 commit message 第一行）
-   - 合并后：GitHub 自动删除远端 feature branch
-
-6. AI Agent 任务行状态收尾（在 main 分支，合并完成后）
-   - AI Agent 在 main 分支更新 prd.md §4.x 任务行状态 → ✅ + 加实际工时 + commit SHA
-   - AI Agent 本地 commit（独立 commit，per §9.4 规则）：
+3. AI Agent 推送 + 收尾（main 分支，per 铁律 4 关 1）
+   - git push origin main
+   - 状态更新 commit（独立 commit，per §9.4 规则，可批量 push）：
      ```
      [v{X}.{Y}.{Z}-status] mark task complete
 
      - prd.md §4.x v{X}.{Y}.{Z}: 🔄 → ✅
-     - merged commit: <squash merge SHA>
      - actual hours: <h>
+     - merged commit: <commit SHA in main>
      ```
-   - **这个 commit 不 push**，等下次任务一起推（避免 1 个 commit / 1 次 push 的浪费）
-   - **或者** Owner 单独 push 也可（Owner 决定）
+   - 该 status commit 可独立 push 或等下次任务批量 push
 
-#### 2.5.3 故障排除
+4. 错操作撤回（per §2.5.1 事故响应）
+   - AI Agent 用 git revert / reset / restore 直接撤回
+   - 不开"修复 PR"（PR 流程已废止）
+```
+
+**单 Owner 自审**（per 铁律 4 关 5）：
+- Owner 在对话里回复"任务 OK" / "6 关验收全过" → AI Agent 推进下一任务
+- Owner 觉得不满意 → AI Agent `git revert` 撤回 + 重新实施
+
+#### 2.5.3 故障排除（v0.1.1 简化）
 
 | 现象 | 处理 |
 |---|---|
-| `git push` 报 "Device not configured" | Owner 在本地手动 `git push`（AI Agent 环境无凭据）|
-| `git push` 报 "Host key verification failed" | `ssh-keyscan github.com >> ~/.ssh/known_hosts` 后重试，或改 HTTPS |
-| 远端 main 比本地新（多人协作场景）| `git pull --rebase` 后再 push feature branch |
-| PR 合并后远端分支残留 | GitHub 设置 → "Automatically delete head branches" 开启 |
-| AI Agent 误 push | **不可能**（per §2.5.1 硬约束）|
+| `git push` 报 "Device not configured" | AI Agent 在 Owner shell 跑 `git push`（一次性，本地凭据）|
+| `git push` 报 "Host key verification failed" | `ssh-keyscan github.com >> ~/.ssh/known_hosts` 后重试 |
+| 远端 main 比本地新 | `git pull --rebase` 后再 push |
+| merge conflict | AI Agent 直接解（per §2.5.1 全权处理），**不询问** Owner；如解不开 `git revert` 撤回 |
 
 ---
 

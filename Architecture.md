@@ -99,6 +99,7 @@
 - **框架**：PySide6（Qt 6.x 官方 Python 绑定）
 - **平台**：macOS only（per `AGENTS.md §2.4`）
 - **测试**：pytest-qt
+- **依赖分组**：`pyproject.toml` 把 `PySide6>=6.6` 放 `[gui]` optional extra —— `pip install -e ".[gui]"` 装 GUI，`pip install -e ".[dev]"` 装测试，无 GUI 跑 headless CI
 
 ### 2.2 主窗口结构
 
