@@ -147,7 +147,7 @@
 
 | 优先级 | ID | 任务 | 状态 | 预估 | 备注 |
 |---|---|---|---|---|---|
-| **P0** | `v0.1.0b-cleanup` | **文档重整（PR0 · 阻塞后续）**：合并 prd.md §4.1 两套体系为单一一套；清理 `Architecture.md §4.4 / §4.5` 中尚未落地的"假目录"（forensics/ misc/ encoders/ gui/）；标记 `extend_tools/` 处置（png_crc_check / F5 / volatility2 是历史遗留杂物，按铁律 2 列入后续清理 PR，不在本 PR 删代码）；新增 §4.5 重排优先级表说明本次决策 | 🔄 | 1h | **当前任务**；**不引入代码改动**；**依赖**：无（最先做）|
+| **P0** | `v0.1.0b-cleanup` | **文档重整（PR0 · 阻塞后续）**：合并 prd.md §4.1 两套体系为单一一套；清理 `Architecture.md §4.4 / §4.5` 中尚未落地的"假目录"（forensics/ misc/ encoders/ gui/）；标记 `extend_tools/` 处置（png_crc_check / F5 / volatility2 是历史遗留杂物，按铁律 2 列入后续清理 PR，不在本 PR 删代码）；新增 §4.5 重排优先级表说明本次决策 | ✅ | 1h | **已完成**（commit `b1643bc`，2026-06-13 14:07）；**不引入代码改动**；**6 关验收**：② N/A（无单测）；③ N/A（无 GUI）；④ N/A（无 Core 工具行为）；⑥ ✅ 文档同步（本 PR 即文档）；①/⑤ 本地 commit + 单 Owner 自审 = 等 Owner push 后再勾 |
 | P1 | `v0.1.0b-PR9` | **Python 包基座补完**：pyproject.toml 已写但 `python -m automisc` 未验证；补 `src/automisc/__main__.py` 入口 + dev install smoke + console_script 跑通 | ⏳ | 1.5h | **依赖**：cleanup；**所有后续 PR 跑 smoke 的前置** |
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump adapter）| ⏳ | 3h | **依赖**：PR9；按 PR1 模板复制；2 adapter + 单元测试 |
 | P3 | `v0.1.0b-PR4` | Stego/Audio + Video（ffmpeg_audio + ffprobe + ffmpeg_video + sox）| ⏳ | 4h | **依赖**：PR9；⚠️ sox 需 `brew install sox`（v0.1 必装）|
