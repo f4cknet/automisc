@@ -463,7 +463,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ✅ done | commit `da0f5a6`（feat 分支本地，未 push）|
 | P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox + steghide_audio）| ✅ done | commit `2a3d0fa`（feat 分支本地，未 push）|
-| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
+| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `待定`（feat 分支本地，未 push）|
 | P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 依赖 PR9 |
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
 | P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
@@ -488,6 +488,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 17:05 | **1.12** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 探测伪加密。10 单测 + 2 fixture。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：伪加密命中 [4]；正常 zip 命中 file count。详见本次 commit。 |
 | 2026-06-13 16:55 | **1.11** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter）。ffmpeg 共享 binary，audio/video 各自独立 name。17 单测 + 2 fixture。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio/ffprobe/steghide_audio 全命中。详见本次 commit。 |
 | 2026-06-13 16:08 | **1.10** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（tshark + tcpdump）。tshark 用 `-T fields` CSV 模式 + webshell 关键字白名单。10 单测 + hand-write pcap fixture。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke 命中 flag [5] + webshell [4]。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.9** | **v0.1.0b-PR9 实施完成**：包基座 smoke（`pip install -e ".[dev]"` + `python -m automisc` + console_script `automisc` 全跑通）。新增 22 单测（包元数据 / 子包 import / CLI main / subprocess），总计 **97 unit tests PASS**（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |

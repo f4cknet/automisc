@@ -36,3 +36,8 @@ from automisc.tools.steganography.video import ffprobe  # noqa: F401
 # forensics/network/ 的 2 个 adapter（v0.1.0b-PR3）
 from automisc.tools.forensics.network import tcpdump  # noqa: F401
 from automisc.tools.forensics.network import tshark  # noqa: F401
+
+# misc/archive/ 的 3 个 adapter（v0.1.0b-PR5）
+from automisc.tools.misc.archive import john  # noqa: F401
+from automisc.tools.misc.archive import sevenz  # noqa: F401
+from automisc.tools.misc.archive import unzip  # noqa: F401
