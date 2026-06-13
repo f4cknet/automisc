@@ -104,92 +104,121 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 默认分支 | `main` |
 | 默认协议 | HTTPS（CI / AI Agent 默认；用户本地可选 SSH）|
 
-**每个任务的完整工作流（per 铁律 1 + 2）**：
+#### 2.5.1 AI Agent 硬约束（per 2026-06-13 Owner 决策）
+
+> **AI Agent 只在本地做 `git commit`，任何远端操作必须 Owner 人工执行。**
+
+| 操作 | AI Agent | Owner 人工 |
+|---|---|---|
+| `git add` | ✅ | — |
+| `git commit -m` | ✅ | — |
+| `git tag` | ✅ | — |
+| `git branch` (本地操作) | ✅ | — |
+| `git push` (**远端**) | ❌ **禁止** | ✅ |
+| `gh pr create` / web 开 PR | ❌ **禁止** | ✅ |
+| `gh pr merge` / web merge | ❌ **禁止** | ✅ |
+| `gh repo delete` / 删远端分支 | ❌ **禁止** | ✅ |
+
+> **为什么硬约束**：AI Agent 不持有 GitHub 凭据（也不应持有）；push/PR/merge 涉及对远端的不可逆写操作，必须由 Owner 在本地交互式终端完成。AI Agent 误 push / 误 merge 的后果不可回滚（force push 会污染 git history）。
+
+#### 2.5.2 每个任务的完整工作流（per 铁律 1 + 2）
 
 ```
-1. 任务准备（在 main 分支）
-   - Owner：本地 `git checkout main && git pull`
-   - 拉任务分支：`git checkout -b <type>/<task-id>-<slug>`
-     （`<type>` = `feat` / `fix` / `docs` / `refactor` / `test` / `chore`）
-     例：`git checkout -b feat/v0.1.0b-PR2-image-stego`
-   - 在 `prd.md §4.x` 加任务行 + 状态 `🔄`（per 铁律 2 步骤 2）
+1. 任务准备（Owner 在本地 main 分支）
+   - Owner: git checkout main && git pull
+   - 拉任务分支：git checkout -b <type>/<task-id>-<slug>
+     （<type> = feat / fix / docs / refactor / test / chore）
+     例：git checkout -b feat/v0.1.0b-PR2-image-stego
+   - Owner 通知 AI Agent："开干 v0.1.0b-PR2"，并把任务 ID 写到 prompt
+   - 在 prd.md §4.x 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
+     ⚠️ 这一步 Owner 可让 AI Agent 代写，但提交仍 Owner 来
 
-2. 实施 + 文档同步（同一分支内）
-   - 按 `Architecture.md` 实施代码 + 测试
-   - 同分支内更新 `prd.md` / `Architecture.md` / `tools.md` 相关章节
-   - **禁止分两个 commit / 两个 PR**（per 铁律 3）
+2. AI Agent 实施 + 文档同步（同一分支内）
+   - AI Agent 按 Architecture.md 实施代码 + 测试
+   - AI Agent 同分支内更新 prd.md / Architecture.md / tools.md 相关章节
+   - **禁止分两个 commit**（per 铁律 3）
 
-3. 提交 + push
-   - `git add -A`
-   - `git commit -m "[v{X}.{Y}.{Z}] {动词} {对象}
+3. AI Agent 本地 commit
+   - git add -A
+   - git commit -m "[v{X}.{Y}.{Z}] {动词} {对象}
 
      {实施要点}
 
      6 关验收：
-     ① 代码合入 main（PR 合并后）
-     ② pytest unit 全过
-     ③ {集成测试 / GUI 测试结果}
+     ② pytest unit 全过（基线 + 新增 N 个）
      ④ 真实样本 smoke：{fixture} → {命中可疑点}
-     ⑤ Owner 自审
-     ⑥ 文档同步（prd.md §4.x + Architecture.md + tools.md）"`
-   - `git push -u origin <branch>`
+     ⑥ 文档同步（prd.md §4.x + Architecture.md + tools.md）"
 
-4. 开 PR（在 GitHub 网页）
-   - PR 标题：`[v{X}.{Y}.{Z}] {动词} {对象}`（与 commit message subject 一致）
-   - PR 描述模板：
-     ```markdown
-     ## 任务
-     Refs `prd.md §4.x v{X}.{Y}.{Z}` — {任务名}
-
-     ## 实施要点
-     - {bullet 1}
-     - {bullet 2}
-
-     ## 6 关验收
-     - [x] ① 代码合入 main（PR 合并后由 Owner 打勾）
-     - [x] ② pytest unit 全过
-     - [x] ③ {集成 / GUI 测试}
-     - [x] ④ 真实样本 smoke：{描述}
-     - [x] ⑤ Owner 自审（per §2.2 单 Owner）
-     - [x] ⑥ 文档同步（本 PR 包含 prd.md / Architecture.md / tools.md 更新）
-
-     ## 测试证据
+   - AI Agent 在终端打印：
      ```
-     $ pytest tests/unit -q
-     .......
-     61 passed in 1.74s
+     ===== READY FOR OWNER =====
+     分支：feat/v0.1.0b-PR2-image-stego
+     commit: <SHA>
+     6 关验收：② ✅ / ④ ✅ / ⑥ ✅
+     ===== NEXT STEP =====
+     请在本地人工执行：
+       git push -u origin feat/v0.1.0b-PR2-image-stego
+     然后在 GitHub 网页开 PR，target = main
+     PR 描述模板见下方
      ```
 
-     ```
-     $ python -m automisc run --tool {x} --file {fixture}
-     exit_code: 0
-     suspicious_points (N):
-       [5] flag: flag{...}
-     ```
-     ```
+4. Owner 人工 push + 开 PR
+   - git push -u origin <branch>
+   - 在 GitHub 网页开 PR（AI Agent 可提供 PR 描述草稿）
 
-5. 合并（Owner 自审）
+   PR 标题：[v{X}.{Y}.{Z}] {动词} {对象}（与 commit subject 一致）
+
+   PR 描述模板（AI Agent 提供草稿，Owner 复制粘贴）：
+   ```markdown
+   ## 任务
+   Refs `prd.md §4.x v{X}.{Y}.{Z}` — {任务名}
+
+   ## 实施要点
+   - {bullet 1}
+   - {bullet 2}
+
+   ## 6 关验收
+   - [ ] ① 代码合入 main（PR 合并后由 Owner 打勾）
+   - [x] ② pytest unit 全过
+   - [ ] ③ {集成 / GUI 测试}（per AGENTS.md §1 铁律 4 关 3）
+   - [x] ④ 真实样本 smoke：{描述}
+   - [x] ⑤ Owner 自审（per §2.2 单 Owner）
+   - [x] ⑥ 文档同步（本 PR 包含 prd.md / Architecture.md / tools.md 更新）
+
+   ## 测试证据
+   ```
+   $ pytest tests/unit -q
+   .......
+   73 passed in 1.85s  # 61 baseline + 12 new
+   ```
+
+   ```
+   $ python -m automisc run --tool {x} --file {fixture}
+   exit_code: 0
+   suspicious_points (N):
+     [5] flag: flag{...}
+   ```
+   ```
+
+5. Owner 人工合并
    - 单 Owner 项目（per §2.2）→ Owner 直接 merge
-   - **合并方式**：**Squash and merge**（保留任务 ID 在 commit message 第一行）
-   - 合并后：**自动删除远端 feature branch**
+   - **合并方式**：Squash and merge（保留任务 ID 在 commit message 第一行）
+   - 合并后：GitHub 自动删除远端 feature branch
 
-6. 任务行状态收尾
-   - 合并后在 main 拉最新：`git checkout main && git pull`
-   - 更新 `prd.md §4.x` 任务行状态 → `✅` + 加实际工时 + commit SHA
-   - 独立 commit（per `AGENTS.md §6.1` 修复记录文件结构 —— 状态更新**不**进原 PR commit）
+6. AI Agent 任务行状态收尾（在 main 分支，合并完成后）
+   - AI Agent 在 main 分支更新 prd.md §4.x 任务行状态 → ✅ + 加实际工时 + commit SHA
+   - AI Agent 本地 commit（独立 commit，per §9.4 规则）：
+     ```
+     [v{X}.{Y}.{Z}-status] mark task complete
 
-**AI Agent 在 PR 工作流中的边界**：
+     - prd.md §4.x v{X}.{Y}.{Z}: 🔄 → ✅
+     - merged commit: <squash merge SHA>
+     - actual hours: <h>
+     ```
+   - **这个 commit 不 push**，等下次任务一起推（避免 1 个 commit / 1 次 push 的浪费）
+   - **或者** Owner 单独 push 也可（Owner 决定）
 
-| ❌ AI Agent **不**做 | ✅ AI Agent **做** |
-|---|---|
-| 替你 `git push`（凭据属于 Owner）| 帮你写 commit message / PR 描述 |
-| 替你 `gh pr create`（凭据属于 Owner）| 帮你改代码 + 跑测试 + 更新文档 |
-| 合并 PR | 提示"现在可以 push + 开 PR" |
-| 删除远端分支 | 提示合并后删除本地 feature branch |
-
-> **凭据隔离原则**：AI Agent 永远不持有 GitHub 凭据。push / open PR / merge 由 Owner 在本地完成（或用 GitHub 网页）。
-
-**故障排除**：
+#### 2.5.3 故障排除
 
 | 现象 | 处理 |
 |---|---|
@@ -197,6 +226,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | `git push` 报 "Host key verification failed" | `ssh-keyscan github.com >> ~/.ssh/known_hosts` 后重试，或改 HTTPS |
 | 远端 main 比本地新（多人协作场景）| `git pull --rebase` 后再 push feature branch |
 | PR 合并后远端分支残留 | GitHub 设置 → "Automatically delete head branches" 开启 |
+| AI Agent 误 push | **不可能**（per §2.5.1 硬约束）|
 
 ---
 
@@ -246,7 +276,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 跨多个任务 ID 同时改代码 | 一次只动一个任务 ID |
 | 把现有代码逻辑"复述"而不抽到新层 | 严格遵守 `Architecture.md §1` 的分层依赖方向 |
 | **引入 LLM / 云端服务 / 在线编排决策**（违反 `prd.md §2` 非范围约束） | 仅在 `prd.md §10` 治理变更流程通过后实施 |
-| **`git push` 到 GitHub / `gh pr create` / merge PR**（AI Agent 不持有凭据，per §2.5）| 帮 Owner 写 commit message / PR 描述 / 提示"可以 push 了" |
+| **`git push` 到 GitHub / `gh pr create` / merge PR / 删远端分支**（AI Agent 只做本地 commit，**任何远端写操作 Owner 人工**，per §2.5.1）| 帮 Owner 写 commit message / PR 描述草稿 / 终端打印"READY FOR OWNER"提示 |
 
 > **关键自检**：每次输出代码前，AI Agent 必须在内部回答"这个改动对应 `prd.md §3` 哪一行？对应 `Architecture.md` 哪一节？"，回答不出就停手。
 
@@ -380,21 +410,24 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 
 ### 9.4 任务状态看板同步规则
 
-| 状态变更 | 时机 | 谁来做 |
-|---|---|---|
-| `⏳` → `🔄` | PR 创建（push 完成 + 开 PR）| Owner |
-| `🔄` → `👀` | PR 开完等自审 | Owner |
-| `👀` → `✅` | PR squash merge 进 main + 6 关全过 | Owner |
-| `⏳` / `🔄` → `❌` | 任务不再需要 | Owner |
-| 任意 → `⚠️` | 阻塞 | Owner |
+| 状态变更 | 时机 | 谁来做 | push |
+|---|---|---|---|
+| `⏳` → `🔄` | PR 创建（Owner 推 + 开 PR）| AI Agent 改状态 + commit | Owner 推 |
+| `🔄` → `👀` | PR 开完等自审 | AI Agent 改状态 + commit | Owner 推 |
+| `👀` → `✅` | PR squash merge 进 main + 6 关全过 | AI Agent 改状态 + commit | Owner 推 |
+| `⏳` / `🔄` → `❌` | 任务不再需要 | AI Agent 改状态 + commit | Owner 推 |
+| 任意 → `⚠️` | 阻塞 | AI Agent 改状态 + commit | Owner 推 |
 
 > **状态更新与代码 commit 分离**（per §6.1 + `Architecture.md §10`）：状态更新是独立 commit，不进原 PR 的 commit message。这样 git blame 能清楚看到任务看板的演进历史。
+>
+> **状态更新 commit 可积累**：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。Owner 想立即推也 OK。
 
 ### 9.5 当前任务状态（snapshot · 2026-06-13）
 
-| 任务 ID | 标题 | 状态 | 分支 | 远端 PR |
+| 任务 ID | 标题 | 状态 | 本地分支 | 远端 PR |
 |---|---|---|---|---|
-| `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | （已 merge 到 main）| ⚠️ **Owner 待 push**（AI Agent 环境无凭据）|
+| `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done（main 已 commit）| （直接 in main）| ⚠️ **Owner 待 push main 到 GitHub** |
+| `v0.1.0b-docs` | GitHub workflow 治理变更 | ✅ done（branch commit）| `docs/v0.1.0b-add-github-workflow` | ⚠️ **Owner 待 push branch + 开 PR** |
 | `v0.1.0b-PR2` | Stego/Image | ⏳ next | — | — |
 | `v0.1.0b-PR3` | Forensics/Network | ⏳ | — | — |
 | `v0.1.0b-PR4` | Stego/Audio+Video | ⏳ | — | — |
@@ -406,6 +439,8 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 
 ---
 
+---
+
 ## 8. 变更日志
 
 | 日期 | 版本 | 变更 |
@@ -413,6 +448,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 2026-06-13 | 1.0 | 初版：4 条铁律 + L1/L2/L3 违规分级 + 紧急通道 + AI Agent 精简条款（3 条核心）+ macOS only 约束（§2.4）+ 治理变更流程。骨架参考 `pwn/autopwn/AGENTS.md v1.7`，按 automisc 特性调整：铁律 4 完成判定改写（不追求 flag 匹配）；文档契约改为 `AGENTS.md` + `prd.md` + `Architecture.md` 三件套（无独立 `upgraded.md`，任务看板合并入 `prd.md §3`）；明确不引入 LLM / 不桥接 skill 体系 |
 | 2026-06-13 | 1.1 | **v0.1.0b-PR1 实施完成**（per `prd.md §4.1 v0.1.0b-PR1`）：实现 core/ + tools/shared/ 6 个 adapter + 61 unit tests 100% PASS + 真实样本 smoke 通过 6 关验收。**文档契约首次实战**：任务状态 🔄 → ✅ + `Architecture.md §10` + `tools.md §8` + 本表同步更新；代码与文档严格同 PR 落地 |
 | 2026-06-13 | **1.2** | **GitHub 工作流治理变更**：新增 §2.5（GitHub 工作流强制规范）+ §9（Git 仓库 & 工作流速查）。**关键约束**：（1）远端仓库 `https://github.com/f4cknet/automisc.git`（per 用户 2026-06-13 决策）；（2）每个任务必须在 feature 分支实施，PR target = `main`；（3）PR 标题 = `[v{X}.{Y}.{Z}] {动词} {对象}`；（4）PR 描述必须含 6 关验收 checklist；（5）合并方式 = Squash and merge；（6）**AI Agent 边界**：AI 不持有 GitHub 凭据，`git push` / `gh pr create` / merge 由 Owner 在本地完成。**当前状态**：仓库已创建但 Owner 本地 push 未完成（AI Agent 环境无 SSH/HTTPS 凭据）|
+| 2026-06-13 | **1.3** | **GitHub 工作流强化（per Owner 决策）**：§2.5 重写为"AI Agent 硬约束"模式——**AI Agent 只做本地 commit，所有远端写操作（push / PR / merge / 删远端分支）Owner 人工**。理由：AI Agent 不应持有 GitHub 凭据；远端写操作不可逆。§5 同步强化对应行。§9.4 状态同步表新增"commit 由 AI Agent 做 / push 由 Owner 做"明确分工。§9.5 snapshot 更新"本地分支 / 远端 PR"两列 |
 
 ---
 
