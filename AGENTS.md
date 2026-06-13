@@ -2,27 +2,30 @@
 
 > 本文档保留**核心治理规则**（4 条铁律 + AI Agent 条款 + **单 Owner 简化 Git 自动化工作流 per §2.5.1** + 治理变更流程）
 >
-> **AI Agent session 启动必读**：
+> **AI Agent session 启动必读**（治理变更 v2.0 · 2026-06-13，per Owner 指示）：
 >
-> 1. 完整读 `AGENTS.md`（本文件）
-> 2. 读 `prd.md`
-> 3. 读 `Architecture.md`
+> 1. 完整读 `AGENTS.md`（本文件）— 治理 + Git 流程
+> 2. 读 `STRUCTURE.md` — 项目结构 + 模块作用（**取代已删的 STRUCTURE.md**）
+> 3. 读 `upgrade.md` 索引 + 当前迭代的 `upgrade/<id>.md` 详细
+> 4. （可选）查 `fix.md` + `upgrade.md`（🟡 frozen 历史 reference）
+>
+> **本次治理变更**：`STRUCTURE.md` 已删（架构已落地到代码），`upgrade.md` frozen（v0.1 交付后不再更新）。详细见 `STRUCTURE.md §6`。
 
 ---
 
 ## 0. 项目一句话
 
-`misc/automisc` 是一个**macOS 平台**、**完全离线**、**PySide6 GUI** 的 CTF Misc 半自动化辅助工具箱。核心交互：拖入题目文件 → 工具菜单触发分析 → 可疑点高亮打印 + journal 自动记录 → 人工决策下一步。架构分层：GUI 层 / Core 调度层 / 工具池层 / 外部工具，**单向依赖**。详细需求见 `prd.md`，架构设计见 `Architecture.md`。
+`misc/automisc` 是一个**macOS 平台**、**完全离线**、**PySide6 GUI** 的 CTF Misc 半自动化辅助工具箱。核心交互：拖入题目文件 → 工具菜单触发分析 → 可疑点高亮打印 + journal 自动记录 → 人工决策下一步。架构分层：GUI 层 / Core 调度层 / 工具池层 / 外部工具，**单向依赖**。架构详见 `STRUCTURE.md`，当前迭代详见 `upgrade.md`。
 
 ---
 
 ## 1. 铁律（不可绕过）
 
-### 铁律 1：实施以 `Architecture.md` 为准
+### 铁律 1：实施以 `STRUCTURE.md` 为准
 
-- 任何代码改动必须对应 `prd.md §3` 中的一个任务行（或 Owner 现场新立任务行）
-- 在 `prd.md §3` 找不到对应项 ⇒ **该任务不存在**
-- 如果你觉得要做的事在 `prd.md` 中没有：先 grep 关键字（确认不是漏看）⇒ 该项是**新需求** ⇒ 立即停手，走铁律 2
+- 任何代码改动必须对应 `upgrade.md` 中的一项迭代（或 Owner 现场新立的迭代）
+- 在 `upgrade.md` 找不到对应项 ⇒ **该任务不存在**
+- 如果你觉得要做的事在 `upgrade.md` 中没有：先 grep 关键字（确认不是漏看）⇒ 该项是**新需求** ⇒ 立即停手，走铁律 2
 
 ### 铁律 2：新需求先更新文档，再实施
 
@@ -36,17 +39,17 @@
 - 新增工具适配器 / 新增支持的入口分流类型 / 新增可疑点模式
 
 **强制流程（缺一步都不算完成）**：
-1. **架构层**（如需）：加一节或修改既有节（`Architecture.md`），说明为什么 / 影响哪些层 / 哪些模块
-2. **执行层**（`prd.md §3`）：加一行任务，含 ID / 状态 / 预估 / Owner
+1. **架构层**（如需）：修改 `STRUCTURE.md §2-§5`（目录/模块作用/工具池/链），说明为什么 / 影响哪些层 / 哪些模块
+2. **执行层**（`upgrade.md`）：加一行迭代 ID + 状态，含预估 / Owner
 3. **风险层**（如需）：评估风险，写缓解措施
 4. **评审**：Owner 自审（单 Owner 项目，per §2.2 简化）
 5. **实施**：上述 4 步完成并通过后，才能写代码
-6. **追溯**：PR 标题格式 `[v{X}.{Y}.{Z}] {动词} {对象}`，描述必须链接到 `prd.md §3` 章节锚点
+6. **追溯**：PR 标题格式 `[v{X}.{Y}.{Z}] {动词} {对象}`，描述必须链接到 `upgrade.md` 锚点
 
 ### 铁律 3：任务必须有状态
 
-- `prd.md §3` 中**每一行**任务都必须有状态（⏳🔄👀✅⚠️❌ 之一）
-- 状态定义：`⏳` 待办 / `🔄` 进行中 / `👀` 待 Review / `✅` 完成 / `⚠️` 阻塞 / `❌` 取消
+- `upgrade.md` 中**每一行**迭代都必须有状态（⏳🔄✅⚠️❌ 之一）
+- 状态定义：`⏳` 待办 / `🔄` 进行中 / `✅` 完成 / `⚠️` 阻塞 / `❌` 取消
 - 每次代码合并后，必须在**同一 PR** 中更新文档（任务状态 + 实施记录）
 - 文档更新与代码改动**禁止分两个 PR**
 
@@ -73,18 +76,18 @@
 
 - 单个 PR ≤ 400 行 diff（不含 lock 文件）
 - 单个 PR 不跨多个任务 ID
-- 任务粒度过大 ⇒ 在 `prd.md §3` 中拆分（用 `v{X}.{Y}.{Z}a` / `v{X}.{Y}.{Z}b` 标注）
+- 任务粒度过大 ⇒ 在 `upgrade.md` 中拆分（用 `v{X}.{Y}.{Z}a` / `v{X}.{Y}.{Z}b` 标注）
 - GUI 改动和 Core 改动应当分离在不同 PR（GUI 涉及视觉调试，独立 review 周期）
 
 ### 2.2 单 Owner 项目简化
 
 - Owner 自审 = Reviewer（不需要第二人签字）
-- Owner 转让 = 直接修改 `prd.md §3` 中 Owner 字段并在 PR 描述中说明
+- Owner 转让 = 直接修改 `upgrade.md` 中 Owner 字段并在 PR 描述中说明
 - main 是唯一长期分支
 
 ### 2.3 Reviewer 责任
 
-Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒度。
+Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `upgrade.md` 任务粒度。
 
 ### 2.4 macOS only 约束
 
@@ -143,13 +146,13 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 ```
 0. 任务准备（AI Agent 在 main 分支）
    - AI Agent: git checkout main && git pull --ff-only
-   - AI Agent 在 prd.md §4.1 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
-   - AI Agent 在 Architecture.md 加章节（如需新增层 / 改分层）
+   - AI Agent 在 upgrade.md 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
+   - AI Agent 在 STRUCTURE.md 加章节（如需新增层 / 改分层）
    - AI Agent 跟 Owner 对话确认任务范围（如有歧义）
 
 1. AI Agent 实施（main 分支，per 铁律 4 不开 PR 分支）
-   - AI Agent 按 Architecture.md 实施代码 + 测试
-   - AI Agent 同步更新 prd.md / Architecture.md（per 铁律 3：代码 + 文档同 commit）
+   - AI Agent 按 STRUCTURE.md 实施代码 + 测试
+   - AI Agent 同步更新 upgrade.md / STRUCTURE.md（per 铁律 3：代码 + 文档同 commit）
    - 跑 `pytest tests/unit` + 真实样本 smoke（per 铁律 4 关 2 + 关 4）
 
 2. AI Agent 本地 commit（main 分支，per 铁律 4 关 6）
@@ -161,7 +164,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
      6 关验收：
      ② pytest unit 全过（基线 + 新增 N 个）
      ④ 真实样本 smoke：{fixture} → {命中可疑点}
-     ⑥ 文档同步（prd.md §4.x + Architecture.md）"
+     ⑥ 文档同步（upgrade.md + STRUCTURE.md）"
 
 3. AI Agent 推送 + 收尾（main 分支，per 铁律 4 关 1）
    - git push origin main
@@ -169,7 +172,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
      ```
      [v{X}.{Y}.{Z}-status] mark task complete
 
-     - prd.md §4.x v{X}.{Y}.{Z}: 🔄 → ✅
+     - upgrade.md v{X}.{Y}.{Z}: 🔄 → ✅
      - actual hours: <h>
      - merged commit: <commit SHA in main>
      ```
@@ -226,41 +229,44 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 任何参与本项目的 AI Agent **在每个 session 启动时必须按序执行**：
 
 1. 读取本文件（`AGENTS.md`）——完整
-2. 读取 `prd.md` 整个 §0-§9 —— 完整
-3. 读取 `Architecture.md §1 分层模型` + `§3 Core 调度层` —— 完整
-4. 读取 `prd.md §3` 中**当前任务**相关行
+2. 读取 `upgrade.md` 整个 §0-§9 —— 完整
+3. 读取 `STRUCTURE.md §1 分层模型` + `§3 Core 调度层` —— 完整
+4. 读取 `upgrade.md` 中**当前任务**相关行
 
 **硬性约束**：
 
 | ❌ 禁止 | ✅ 允许 |
 |---|---|
-| 主动修改 `prd.md` / `Architecture.md` 之外的文件 | 对未识别的需求做"需求澄清"提问（不实施，先问） |
-| 跳过 `prd.md §3` 直接生成代码 | 建议"这看起来是新需求，建议走铁律 2" |
-| 在 PR 描述 / commit message 中遗漏任务 ID | 引用 `prd.md §3` 任务行 |
-| 推测 / 编造文件路径、函数名、任务 ID | 引用 `Architecture.md §3 Core 调度层` + `§6 plug-in 机制` 文件路径速查 |
+| 主动修改 `upgrade.md` / `STRUCTURE.md` 之外的文件 | 对未识别的需求做"需求澄清"提问（不实施，先问） |
+| 跳过 `upgrade.md` 直接生成代码 | 建议"这看起来是新需求，建议走铁律 2" |
+| 在 PR 描述 / commit message 中遗漏任务 ID | 引用 `upgrade.md` 任务行 |
+| 推测 / 编造文件路径、函数名、任务 ID | 引用 `STRUCTURE.md §3 Core 调度层` + `§6 plug-in 机制` 文件路径速查 |
 | 跨多个任务 ID 同时改代码 | 一次只动一个任务 ID |
-| 把现有代码逻辑"复述"而不抽到新层 | 严格遵守 `Architecture.md §1` 的分层依赖方向 |
-| **引入 LLM / 云端服务 / 在线编排决策**（违反 `prd.md §2` 非范围约束） | 仅在 `prd.md §10` 治理变更流程通过后实施 |
+| 把现有代码逻辑"复述"而不抽到新层 | 严格遵守 `STRUCTURE.md §2` 的分层依赖方向 |
+| **引入 LLM / 云端服务 / 在线编排决策**（违反 `STRUCTURE.md §1` "项目一句话" + 完全离线约束）| 仅在治理变更流程通过后实施 |
 | **`git push` / `gh pr merge` / 删临时分支**（AI Agent 全权处理所有 git 操作，但**这 3 类高风险远端操作每次执行前必须先询问 Owner**，per §2.5.1 "AI 打申请 / Owner 签字 / AI 执行" 工作模式）| 帮 Owner 写 commit message / PR 描述草稿 / 终端打印"REMOTE OPERATION REQUEST"等待 Owner 确认 |
 
-> **关键自检**：每次输出代码前，AI Agent 必须在内部回答"这个改动对应 `prd.md §3` 哪一行？对应 `Architecture.md` 哪一节？"，回答不出就停手。
+> **关键自检**：每次输出代码前，AI Agent 必须在内部回答"这个改动对应 `upgrade.md` 哪行迭代？对应 `STRUCTURE.md §2-§5` 哪一节？"，回答不出就停手。
 
 ---
 
-## 6. 文档引用速查
+## 6. 文档引用速查（治理变更 v2.0 · 2026-06-13）
+
+> **本次治理变更**（per Owner 2026-06-13 22:53）：  
+> - `STRUCTURE.md` **已删除**（架构已落地到代码，文档冗余）  
+> - `upgrade.md` **frozen**（v0.1 已交付，不再更新，作为历史 reference）  
+> - `STRUCTURE.md` **新建**（项目目录清单 + 模块作用表 + 链速查）  
+> - 文档入口从"三件套（1900+ 行）"压缩到"AGENTS.md + STRUCTURE.md + upgrade.md（按需）"（< 800 行）
 
 | 你想做什么 | 查 |
 |---|---|
-| 怎么开发 automisc | `prd.md` §0-§9 |
-| 找当前任务 | `prd.md §3` 任务看板 |
-| 理解 4 层架构 | `Architecture.md §1 分层模型` |
-| 工具池清单 + 适配器说明 | `tools.md`（待 Owner 整理外部工具清单后建立）+ `Architecture.md §6 plug-in` |
-| 入口分流规则（文件类型 → subflow） | `prd.md §5` |
-| 可疑点统一 schema | `prd.md §6` |
-| 演进路线图 | `prd.md §9` |
-| GUI 设计要点 | `Architecture.md §2` |
-| Core 调度层 API | `Architecture.md §3` |
-| 与 skill 体系的关系 | `Architecture.md §5`（明确**不桥接**） |
+| 项目结构 + 模块作用 | `STRUCTURE.md` |
+| 治理 / 铁律 / Git 流程 | `AGENTS.md`（本文件）|
+| 当前迭代 + 历史 | `upgrade.md` 索引 + `upgrade/<id>.md` 详细 |
+| 修复记录 | `fix.md` 索引 + `fix_<bug_name>.md` 详细 |
+| 历史需求 / 范围 | `upgrade.md`（🟡 frozen，不更新，仅参考）|
+| Core 调度层 API | `STRUCTURE.md §3` |
+| 与 skill 体系的关系 | `STRUCTURE.md §5`（明确**不桥接**） |
 | **修复记录索引** | `fix.md`（v0.1+ 治理，**只**列已 merge fix） |
 | **单 fix 详细记录** | `fix_<bug_name>.md`（per §6.1） |
 
@@ -272,7 +278,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 
 - **`fix.md` = 索引**（~50 行）—— 只列已 merge 的 fix（含 fix ID / 关联任务行 / 文件链接 / 一句话描述 / 状态）
 - **`fix_<bug_name>.md` = 单 fix 完整记录**（~80-200 行）—— 类比 git feature branch 命名
-- **未做 / TODO** → 走 `prd.md §3` 任务看板，**不进** `fix.md`
+- **未做 / TODO** → 走 `upgrade.md` 任务看板，**不进** `fix.md`
 
 **命名约定**：
 - `bug_name` 用 snake_case（如 `pyside6_drag_drop` / `binwalk_adapter_parse`）
@@ -280,9 +286,9 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 
 **新增流程**（per 铁律 2）：
 
-1. fix 立项：在 `prd.md §3` 加任务行（状态 `⏳`），同时在 `fix.md` 索引加占位行（status=`⏳ TODO`，文件可暂不创建）
+1. fix 立项：在 `upgrade.md` 加任务行（状态 `⏳`），同时在 `fix.md` 索引加占位行（status=`⏳ TODO`，文件可暂不创建）
 2. fix 实施：完成代码 + 6 关验收后，在 squash merge 提交里**同时**写 `fix_<bug_name>.md` + 更新 `fix.md` 索引（status=`✅`）
-3. 任务行状态同步：fix merge 后，`prd.md §3` 任务行状态改 `✅`
+3. 任务行状态同步：fix merge 后，`upgrade.md` 任务行状态改 `✅`
 
 **删除规则**：
 - `fix_<bug_name>.md` 不删除（永久保留 — fix 是事实记录，git blame / 未来 audit 追溯用）
@@ -291,7 +297,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 **例外**（不新建 `fix_<bug_name>.md` 的 fix）：
 - 单行 typo / 注释错别字
 - 测试 fixture 调整
-- 文档勘误（`AGENTS.md` / `prd.md` / `Architecture.md` 自身）
+- 文档勘误（`AGENTS.md` / `upgrade.md` / `STRUCTURE.md` 自身）
 - 治理变更本身（per §7）
 - GUI 视觉细节微调（颜色 / 间距）
 —— 这些直接 squash merge 进 main，不进 `fix.md` 索引
@@ -306,7 +312,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 2. 在 PR 描述中写明 **"治理变更"** + 原因
 3. Owner 自审（**单 Owner 项目** per §2.2 — 跳过"其他维护者 Review"）
 4. 合并后**立即通知**所有 Owner（issue / 群通知；单 Owner 项目 no-op）
-5. 重要变更应回填到 `prd.md` / `Architecture.md`
+5. 重要变更应回填到 `upgrade.md` / `STRUCTURE.md`
 
 > 治理变更记录保留在本文件 §8"变更日志"，不允许只写在 PR 描述里。
 > 治理变更在**主干开发**模式下合并即可（PR target=`main`）——不需要"dev 集成分支"中间层。
@@ -383,7 +389,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | `⏳` / `🔄` → `❌` | 任务不再需要 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
 | 任意 → `⚠️` | 阻塞 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
 
-> **状态更新与代码 commit 分离**（per §6.1 + `Architecture.md §10`）：状态更新是独立 commit，不进原 PR 的 commit message。这样 git blame 能清楚看到任务看板的演进历史。
+> **状态更新与代码 commit 分离**（per §6.1 + `STRUCTURE.md §10`）：状态更新是独立 commit，不进原 PR 的 commit message。这样 git blame 能清楚看到任务看板的演进历史。
 >
 > **状态更新 commit 可积累**（per §2.5.1）：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。push 前必须先询问 Owner。
 
@@ -428,7 +434,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 2026-06-13 16:55 | **1.11** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter）。ffmpeg 共享 binary，audio/video 各自独立 name。17 单测 + 2 fixture。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio/ffprobe/steghide_audio 全命中。详见本次 commit。 |
 | 2026-06-13 16:08 | **1.10** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（tshark + tcpdump）。tshark 用 `-T fields` CSV 模式 + webshell 关键字白名单。10 单测 + hand-write pcap fixture。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke 命中 flag [5] + webshell [4]。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.9** | **v0.1.0b-PR9 实施完成**：包基座 smoke（`pip install -e ".[dev]"` + `python -m automisc` + console_script `automisc` 全跑通）。新增 22 单测（包元数据 / 子包 import / CLI main / subprocess），总计 **97 unit tests PASS**（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
-| 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `prd.md §4.1` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `Architecture.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
+| 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `upgrade.md` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `STRUCTURE.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
 | 2026-06-13 | **1.7** | **§2.5.1 升级 v4**：完全纳入 AI 询问流程（merge 不再 Owner 自助）；批量授权机制启用（per Owner 决策 2026-06-13 12:54）。详见 git history。 |
 | 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
 

@@ -1,13 +1,20 @@
 # prd.md — AutoMisc 产品需求文档
 
-> **角色**：automisc 的**需求 + 任务看板 + 工具池 + 演进路线**单一事实来源
-> **状态**：v0.1 启动（2026-06-13）
-> **配套文档**：
-> - [`AGENTS.md`](./AGENTS.md) — 项目治理（4 条铁律 + 违规分级 + 紧急通道 + AI Agent 条款）
-> - [`Architecture.md`](./Architecture.md) — 系统架构设计（4 层分层 + 模块依赖 + plug-in 机制 + 验证方法）
-> - [`tools.md`](./tools.md) — 外部 misc 工具清单（待 Owner 整理后建立） + adapter 适配说明
+> **🟡 FROZEN · 2026-06-13 22:53**（治理变更 v2.0）
 >
-> **本文档章节**：
+> **本文档已冻结，不再更新**。v0.1 已交付，所有任务状态在 `upgrade.md` 跟踪。
+> 本文件**仅作为历史 reference**保留，新任务 / 需求 / 演进路线请走：
+> - 当前迭代 / 新需求 → [`upgrade.md`](./upgrade.md) + `upgrade/<id>.md`
+> - 项目结构 / 模块作用 → [`STRUCTURE.md`](./STRUCTURE.md)
+> - 治理 / 铁律 / Git 流程 → [`AGENTS.md`](./AGENTS.md)
+>
+> 历史角色：v0.1 阶段 automisc 的**需求 + 任务看板 + 工具池 + 演进路线**单一事实来源
+> 历史配套文档：
+> - [`AGENTS.md`](./AGENTS.md) — 项目治理（4 条铁律 + 违规分级 + 紧急通道 + AI Agent 条款）
+> - ~~[`Architecture.md`](./Architecture.md)~~ — **已删除**（2026-06-13 治理变更，架构已落地到代码）
+> - [`tools.md`](./tools.md) — 外部 misc 工具清单（待清理） + adapter 适配说明
+>
+> **本文档章节**（历史快照，不更新）：
 > - §0 产品定位
 > - §1 用户故事
 > - §2 范围 & 非范围（含硬约束）
