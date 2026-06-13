@@ -347,7 +347,7 @@ class MainWindow(QMainWindow):
         run_menu.addAction(self.auto_run_action)
 
         # Chain menu (v0.5 chain 系列, 同步 CLI)
-        # 5 个入口: zip / zip-full / binwalk / foremost / lsb
+        # 5 链 + 4 快捷 action = 9 入口
         chain_menu = menubar.addMenu("&Chain")
         for chain_name in _CHAIN_NAMES:
             action = QAction(f"Run &{chain_name} chain", self)
@@ -355,6 +355,19 @@ class MainWindow(QMainWindow):
                 lambda checked=False, name=chain_name: self._run_chain(name)
             )
             chain_menu.addAction(action)
+        chain_menu.addSeparator()
+        # v0.5 快捷 action (Owner GUI 工具栏需求)
+        for action_name, display in (
+            ("fix_pseudo_zip", "Fix Zip 伪加密"),
+            ("bruteforce_zip", "Zip 暴力破解 (4-6 位)"),
+            ("lsb_extract", "PNG LSB 智能提取"),
+            ("bruteforce_rar", "RAR 暴力破解 (4-6 位)"),
+        ):
+            act = QAction(f"Run {display}", self)
+            act.triggered.connect(
+                lambda checked=False, name=action_name: self._run_chain(name)
+            )
+            chain_menu.addAction(act)
         chain_menu.addSeparator()
         # bruteforce 限制 (testing)
         bf_action = QAction("Run &zip-full (limit=5000)…", self)

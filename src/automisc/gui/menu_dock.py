@@ -1,4 +1,4 @@
-"""菜单树（左 QDockWidget）— 22 adapter 按 6 类分类。
+"""菜单树（左 QDockWidget）— 22 adapter 按 6 类分类 + 4 快捷工具 (v0.5 Actions).
 
 分类（按 prd.md §4.1）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
@@ -9,6 +9,7 @@
 - Forensics/Log (PR6) — grep / evtx_dump
 - Misc/Brainteaser (PR8) — zbar
 - Forensics/Memory (PR7) — vol
+- 快捷工具 (v0.5 Actions) — fix_pseudo_zip / bruteforce_zip / lsb_extract / bruteforce_rar
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 
 
-# 工具 → 分类映射（v0.1 frozen 22 adapter）
+# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action）
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "steghide"],
@@ -35,6 +36,21 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     "Forensics/Log (PR6)": ["grep", "evtx_dump"],
     "Misc/Brainteaser (PR8)": ["zbar"],
     "Forensics/Memory (PR7)": ["vol"],
+    "快捷工具 (v0.5 Actions)": [
+        "fix_pseudo_zip",  # zip 伪加密破解 (FixPseudoEncryptionAction)
+        "bruteforce_zip",  # zip 暴力破解 (BruteforceZipAction)
+        "lsb_extract",  # PNG LSB 抽出 (LSBExtractAction)
+        "bruteforce_rar",  # rar 暴力破解 (BruteforceRarAction)
+    ],
+}
+
+
+# 快捷 action 显示名（v0.5 GUI 同步）
+ACTION_DISPLAY_NAMES = {
+    "fix_pseudo_zip": "🔓 修复 Zip 伪加密",
+    "bruteforce_zip": "🔨 Zip 暴力破解 (4-6 位)",
+    "lsb_extract": "🎨 PNG LSB 智能提取",
+    "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
 }
 
 
@@ -80,8 +96,10 @@ class ToolMenuDock(QDockWidget):
             self.tree.addTopLevelItem(cat_item)
 
             for tool in tools:
+                # 快捷 action 用中文显示名
+                display = ACTION_DISPLAY_NAMES.get(tool, tool)
                 marker = "✓" if tool in available_set else "✗"
-                child = QTreeWidgetItem([f"{marker} {tool}"])
+                child = QTreeWidgetItem([f"{marker} {display}"])
                 child.setData(0, Qt.UserRole, tool)
                 cat_item.addChild(child)
 

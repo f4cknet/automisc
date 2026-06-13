@@ -19,6 +19,7 @@ from automisc.core.actions.zip_chain import (
     _generate_passwords,
     _is_pseudo_encrypted,
 )
+from pathlib import Path
 from automisc.core.dag import Action, ActionResult, DAG, DAGNode
 
 
@@ -192,6 +193,117 @@ class TestForemostExtract:
     def test_foremost_extract_nonexistent_dir(self, tmp_path):
         """output dir 不存在 → empty list."""
         assert find_foremost_extract(tmp_path / "no_such_dir") == []
+
+
+# ---------- v0.5 4 快捷 action (GUI 工具栏入口) ----------
+class TestQuickActions:
+    """Owner 需求: 工具栏加 4 入口 (lsb / fix_pseudo / bruteforce_zip / bruteforce_rar).
+
+    通过 ChainRunner 跑 (single action mode) — 验证 GUI 端到端.
+    """
+
+    def test_fix_pseudo_zip_action(self, qtbot, tmp_path):
+        """FixPseudoEncryptionAction: 伪加密 zip → 修复 OK."""
+        from automisc.gui.chain_runner import ChainRunner
+        import zipfile
+
+        p = tmp_path / "pseudo.zip"
+        with zipfile.ZipFile(p, "w", zipfile.ZIP_STORED) as zf:
+            zf.writestr("flag.txt", "flag{fix_pseudo_test}\n")
+        # 改加密位 → 伪加密
+        data = bytearray(open(p, "rb").read())
+        for i in range(len(data) - 4):
+            if data[i:i+4] == b"PK\x03\x04":
+                data[i+6] |= 0x1
+            elif data[i:i+4] == b"PK\x01\x02":
+                data[i+8] |= 0x1
+        open(p, "wb").write(data)
+
+        results = {}
+        runner = ChainRunner(chain_name="fix_pseudo_zip", file_path=str(p))
+        runner.finished_with_context.connect(
+            lambda cn, fp, ctx: results.setdefault("ctx", ctx)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "ctx" in results, timeout=10_000)
+        runner.wait()
+
+        log = results["ctx"].get("__log__", [])
+        assert log[0]["node"] == "fix_pseudo_encryption"
+        assert log[0]["success"] is True
+        assert results["ctx"]["__last_result__"].data.get("fixed_count") == 2
+
+    def test_bruteforce_zip_action(self, qtbot, tmp_path):
+        """BruteforceZipAction: 真加密 zip (4位密码) → 找到密码."""
+        from automisc.gui.chain_runner import ChainRunner
+        import zipfile
+        import subprocess
+
+        # 7z 造真加密 zip
+        p = tmp_path / "real.zip"
+        subprocess.run(
+            ["7z", "a", "-tzip", "-mem=ZipCrypto", "-p7531", str(p), "/etc/hosts"],
+            capture_output=True,
+            check=True,
+        )
+
+        results = {}
+        runner = ChainRunner(
+            chain_name="bruteforce_zip", file_path=str(p),
+            bruteforce_limit=10000,  # 7531 < 10000
+        )
+        runner.finished_with_context.connect(
+            lambda cn, fp, ctx: results.setdefault("ctx", ctx)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "ctx" in results, timeout=60_000)
+        runner.wait()
+
+        log = results["ctx"].get("__log__", [])
+        assert log[0]["node"] == "bruteforce_zip"
+        assert log[0]["success"] is True
+        assert results["ctx"]["__last_result__"].data.get("password") == "7531"
+
+    def test_lsb_extract_action(self, qtbot):
+        """LSBExtractAction: PNG LSB text → flag_candidate."""
+        from automisc.gui.chain_runner import ChainRunner
+        if not Path("Challenge/steg.png").exists():
+            pytest.skip("Challenge/steg.png 不存在")
+
+        results = {}
+        runner = ChainRunner(chain_name="lsb_extract", file_path="Challenge/steg.png")
+        runner.finished_with_context.connect(
+            lambda cn, fp, ctx: results.setdefault("ctx", ctx)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "ctx" in results, timeout=30_000)
+        runner.wait()
+
+        log = results["ctx"].get("__log__", [])
+        assert log[0]["node"] == "lsb_extract"
+        assert log[0]["success"] is True
+        last = results["ctx"]["__last_result__"]
+        assert last.data.get("flag_candidate")  # 整段 text
+        assert "st3g0_saurus_wr3cks" in last.data["flag_candidate"]
+
+    def test_bruteforce_rar_action_no_rar(self, qtbot, tmp_path):
+        """BruteforceRarAction: rar 文件不存在 → graceful fail."""
+        from automisc.gui.chain_runner import ChainRunner
+
+        p = tmp_path / "no.rar"
+        results = {}
+        runner = ChainRunner(chain_name="bruteforce_rar", file_path=str(p))
+        runner.finished_with_context.connect(
+            lambda cn, fp, ctx: results.setdefault("ctx", ctx)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "ctx" in results, timeout=5_000)
+        runner.wait()
+
+        log = results["ctx"].get("__log__", [])
+        assert log[0]["node"] == "bruteforce_rar"
+        assert log[0]["success"] is False
+        assert "not found" in log[0]["message"]
 
 
 # ---------- zip_chain: detection ----------

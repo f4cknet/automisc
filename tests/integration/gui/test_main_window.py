@@ -63,20 +63,20 @@ class TestMainWindow:
 # ---------- 2. Menu dock ----------
 class TestToolMenuDock:
     def test_menu_categories(self, qtbot):
-        """8 个分类（PR1~PR8 + encoders 不在 menu）。"""
+        """8 个分类 + 1 快捷工具分类 = 9（v0.5+）."""
         dock = ToolMenuDock(on_tool_selected=lambda _: None)
         qtbot.addWidget(dock)
-        assert dock.tree.topLevelItemCount() == 8
+        assert dock.tree.topLevelItemCount() == 9
 
     def test_menu_total_tools(self, qtbot):
-        """所有分类下的工具数 == 22（v0.1 frozen）."""
+        """22 adapter + 4 快捷 action = 26."""
         dock = ToolMenuDock(on_tool_selected=lambda _: None)
         qtbot.addWidget(dock)
         count = 0
         for i in range(dock.tree.topLevelItemCount()):
             cat = dock.tree.topLevelItem(i)
             count += cat.childCount()
-        assert count == 22  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1
+        assert count == 26  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 (v0.5 快捷)
 
     def test_menu_callback(self, qtbot):
         """点击工具项触发 callback."""
@@ -90,10 +90,33 @@ class TestToolMenuDock:
         assert selected == ["file"]  # PR1 第一个是 file
 
     def test_menu_tool_categories_constant(self):
-        """TOOL_CATEGORIES 字典含 8 分类 22 工具（避免漏写）."""
-        assert len(TOOL_CATEGORIES) == 8
+        """TOOL_CATEGORIES 字典含 9 分类 26 工具（22 adapter + 4 快捷 action）."""
+        assert len(TOOL_CATEGORIES) == 9
         total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
-        assert total == 22
+        assert total == 26
+
+    def test_menu_v5_shortcut_actions(self, qtbot):
+        """v0.5 快捷工具 4 个: lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar."""
+        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        qtbot.addWidget(dock)
+
+        # 找 "快捷工具 (v0.5 Actions)" 分类
+        shortcut_cat = None
+        for i in range(dock.tree.topLevelItemCount()):
+            cat = dock.tree.topLevelItem(i)
+            if "快捷工具" in cat.text(0):
+                shortcut_cat = cat
+                break
+        assert shortcut_cat is not None, "快捷工具分类未找到"
+
+        # 4 个 action
+        action_names = []
+        for i in range(shortcut_cat.childCount()):
+            child = shortcut_cat.child(i)
+            action_names.append(child.data(0, Qt.UserRole))
+
+        for expected in ("lsb_extract", "fix_pseudo_zip", "bruteforce_zip", "bruteforce_rar"):
+            assert expected in action_names, f"快捷工具缺 {expected}; 实际: {action_names}"
 
 
 # ---------- 3. Output view ----------
