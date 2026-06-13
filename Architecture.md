@@ -510,7 +510,7 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
     └── output_view.py                   # ⏳ GUI PR
 ```
 
-#### 4.4.2 当前落地（2026-06-13 14:00 snapshot）
+#### 4.4.2 当前落地（2026-06-13 19:35 v0.1 frozen snapshot · main `c682f5c`）
 
 ```bash
 $ tree src/automisc/
@@ -522,25 +522,48 @@ src/automisc/
 │   ├── orchestrator.py
 │   ├── registry.py
 │   ├── result.py
-│   └── suspicious.py
+│   ├── suspicious.py
+│   └── encoders/              ← v0.1.0b-encoders 落地 3 模块
+│       ├── __init__.py
+│       ├── base.py            # 9 种 base 编码 + try_decode
+│       ├── classical.py       # 8 种古典密码 + auto_try_caesar
+│       └── custom.py          # 5 种自定义 + multi_layer_decode
 └── tools/
     ├── __init__.py
-    ├── base.py
-    ├── shared/      ← PR1 落地 6 adapter
-    └── steganography/image/  ← PR2 落地 2 adapter
+    ├── base.py                # ToolAdapter 基类
+    ├── shared/                ← PR1 6 adapter
+    │   ├── file.py strings.py binwalk.py
+    │   └── foremost.py exiftool.py xxd.py
+    ├── forensics/             ← PR3/PR6/PR7 落地
+    │   ├── network/  tshark.py tcpdump.py
+    │   ├── log/       grep.py  evtx_dump.py
+    │   └── memory/    vol.py
+    ├── steganography/         ← PR2/PR4 落地
+    │   ├── image/     zsteg.py  steghide.py
+    │   ├── audio/     ffmpeg_audio.py  sox.py  steghide_audio.py
+    │   └── video/     ffprobe.py  ffmpeg_video.py
+    └── misc/                  ← PR5/PR8 落地
+        ├── archive/   sevenz.py  unzip.py  john.py
+        └── brainteaser/ zbar.py
 ```
 
-**未落地**（按 §4.4.1 目标 vs 当前 diff）：
-- `core/router.py` / `core/journal.py` / `core/exceptions.py` / `core/encoders/`
-- `tools/forensics/{memory,disk,network,log}/`
-- `tools/steganography/{audio,video}/`
-- `tools/misc/{archive,office,brainteaser}/`
-- `gui/`
+**v0.1 frozen 落地计数（2026-06-13 19:35）**：
+- **22 个 adapter**（PR1 6 + PR2 2 + PR3 2 + PR4 5 + PR5 3 + PR6 2 + PR7 1 + PR8 1）
+- **3 个 encoders 模块**（base / classical / custom；22 个函数，46 单测全过）
+- **6 个 core 模块**（orchestrator / registry / result / suspicious + encoders ×3）
+- **199 unit tests PASS in 16.31s**（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10 + PR7 4 + PR8 5 + encoders 46）
+
+**v0.1 未落地**（v0.5+ 范围）：
+- `core/router.py` / `core/journal.py` / `core/exceptions.py` — GUI 集成时一并写（per `prd.md §6`）
+- `tools/forensics/disk/`（yara / bulk_extractor / photorec — v0.5+ 范围）
+- `tools/misc/office/`（olevba / oledump — v0.5+ 范围）
+- `gui/` — P9 v0.1.0b-gui 唯一未完成项（per `prd.md §4.1`）
+- `tests/fixtures/real_vmem.vmem` — 体积大，v0.5+ 准备
 
 **extend_tools/ 处置**（per `prd.md §4.1 v0.1.0b-cleanup`）：
 - `extend_tools/png_crc_check.py` — 散落脚本，待 v0.1.x 评估是否收入 `tools/shared/` 或删除
 - `extend_tools/F5-steganography/` — Java 第三方源码，**不要入包**；考虑 `docs/references/` 或删除
-- `extend_tools/volatility2/` — vol2 源码备份，**不要入包**；待 PR7-envfix 决策后处置
+- `extend_tools/volatility2/` — vol2 源码备份，**不要入包**；per `docs/decisions/v0.1.0b-PR7-vol-environment.md` v0.5+ docker 化
 - **本 PR（cleanup）不删代码**——仅在文档标记，后续 PR 按"逐项评估"原则处置
 
 #### 4.4.3 PR9 增量落地（2026-06-13 15:13）
