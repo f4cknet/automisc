@@ -24,12 +24,13 @@ class TestAutomiscError:
 
     def test_message_only(self):
         e = AutomiscError("simple")
-        assert str(e) == "simple"
+        assert str(e) == "AutomiscError: simple"
         assert e.message == "simple"
         assert e.context == {}
 
     def test_message_with_context(self):
         e = AutomiscError("failed", context={"tool": "strings", "file": "x.txt"})
+        assert "AutomiscError" in str(e)
         assert "failed" in str(e)
         assert "tool=" in str(e)
         assert "file=" in str(e)

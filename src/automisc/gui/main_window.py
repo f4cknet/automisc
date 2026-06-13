@@ -24,10 +24,12 @@ from PySide6.QtWidgets import (
 
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.registry import list_tools
+from automisc.core.router import FileRouter
 
 from .journal_panel import JournalPanel
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
+from .runner import ToolRunner
 
 
 class MainWindow(QMainWindow):
@@ -42,6 +44,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.core = core or CoreOrchestrator()
         self.current_file: Optional[Path] = None
+        self._runner: Optional[ToolRunner] = None  # 当前 async runner
 
         self.setWindowTitle("automisc — CTF Misc 半自动化辅助工具箱")
         self.resize(1200, 800)
@@ -84,13 +87,25 @@ class MainWindow(QMainWindow):
         self.current_file = Path(local_path)
         self.statusBar().showMessage(f"已选文件: {self.current_file.name}")
 
-        # v0.1 简化：显示工具列表（v0.5+ Core.route(file) 智能推荐）
-        tools = list_tools()
-        self.output_view.append_text(
-            f"[drop] file={self.current_file}\n"
-            f"        size={self.current_file.stat().st_size} bytes\n"
-            f"        available tools: {len(tools)}\n"
-        )
+        # v0.1.1：FileRouter 智能推荐（per Architecture §3.5）
+        try:
+            route = FileRouter().route(self.current_file)
+            self.output_view.append_text(
+                f"[drop] file={self.current_file}\n"
+                f"        size={route.file_size} bytes\n"
+                f"        magic={route.detected_magic or 'unknown'}\n"
+                f"        recommendations:\n"
+            )
+            for rec in route.recommendations[:5]:
+                self.output_view.append_text(
+                    f"          {rec.score:3d}  {rec.tool_name:15s}  {rec.reason}\n"
+                )
+        except Exception as e:  # noqa: BLE001
+            # 路由失败（如文件不可读）→ 兜底
+            self.output_view.append_text(
+                f"[drop] file={self.current_file}\n"
+                f"        router error: {e}\n"
+            )
         event.acceptProposedAction()
 
     # ---------- menu actions ----------
@@ -139,28 +154,34 @@ class MainWindow(QMainWindow):
             "22 adapter + 3 encoders",
         )
 
-    # ---------- tool runner ----------
+    # ---------- tool runner (async) ----------
     def _run_tool(self, tool_name: str) -> None:
-        """调 Core.run_tool 同步跑 + 写 output + 写 journal."""
+        """异步跑工具（QThread 包装，不阻塞 GUI）."""
         if not self.current_file:
             self.statusBar().showMessage("请先拖入或打开文件")
             self.output_view.append_text("[!] no file selected\n")
             return
 
-        self.statusBar().showMessage(f"running {tool_name} on {self.current_file.name}…")
+        # 防止并发跑：检查是否已有 runner 在跑
+        if self._runner and self._runner.isRunning():
+            self.statusBar().showMessage("前一个工具还在跑，请稍等…")
+            return
+
+        self.statusBar().showMessage(f"running {tool_name} on {self.current_file.name} (async)…")
         self.output_view.append_text(f"\n=== {tool_name} ===\n")
 
-        try:
-            result = self.core.run_tool(tool_name, str(self.current_file))
-        except FileNotFoundError as e:
-            self.output_view.append_text(f"[!] file not found: {e}\n")
-            self.statusBar().showMessage("error: file not found")
-            return
-        except Exception as e:  # noqa: BLE001
-            self.output_view.append_text(f"[!] error: {e}\n")
-            self.statusBar().showMessage(f"error: {e}")
-            return
+        # 起 QThread 跑
+        self._runner = ToolRunner(self.core, tool_name, str(self.current_file))
+        self._runner.started_run.connect(self._on_runner_started)
+        self._runner.finished_with_result.connect(self._on_runner_finished)
+        self._runner.failed_with_error.connect(self._on_runner_failed)
+        self._runner.start()
 
+    def _on_runner_started(self, tool_name: str, file_path: str) -> None:
+        self.statusBar().showMessage(f"running {tool_name} on {Path(file_path).name}…")
+
+    def _on_runner_finished(self, result) -> None:
+        """ToolRunner 跑成功 → 写 output + journal."""
         # 输出 stdout（前 2000 字符，避免卡顿）
         stdout = result.stdout or ""
         if len(stdout) > 2000:
@@ -179,8 +200,12 @@ class MainWindow(QMainWindow):
 
         # journal 累积
         for sp in result.suspicious_points:
-            self.journal_panel.add_suspicious(tool_name, self.current_file, sp)
+            self.journal_panel.add_suspicious(result.tool_name, self.current_file, sp)
 
         self.statusBar().showMessage(
-            f"done: {tool_name} → {sp_count} suspicious point(s)"
+            f"done: {result.tool_name} → {sp_count} suspicious point(s)"
         )
+
+    def _on_runner_failed(self, error_msg: str) -> None:
+        self.output_view.append_text(f"[!] runner error: {error_msg}\n")
+        self.statusBar().showMessage(f"error: {error_msg}")

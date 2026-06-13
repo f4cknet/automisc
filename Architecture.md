@@ -469,9 +469,9 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   ├── registry.py                      # @register_tool 装饰器                  ✅ PR1
 │   ├── result.py                        # ToolResult dataclass                   ✅ PR1
 │   ├── suspicious.py                    # SuspiciousPoint + SUSPICIOUS_PATTERNS  ✅ PR1
-│   ├── router.py                        # FileRouter 入口分流                    ⏳  v0.1.x
-│   ├── journal.py                       # Journal 自动记录                       ⏳  v0.1.x
-│   ├── exceptions.py                    # AutomiscError / ToolNotFound          ⏳  v0.1.x
+│   ├── router.py                        # FileRouter 入口分流                    ✅ v0.1.1-router
+│   ├── journal.py                       # Journal 自动记录                       ✅ v0.1.1-journal
+│   ├── exceptions.py                    # AutomiscError / ToolNotFound          ✅ v0.1.1-exceptions
 │   └── encoders/                        # Encoding 内置实现（**非工具池层**）
 │       ├── __init__.py
 │       ├── base.py                      # base16/32/58/62/64/85/91/2048/32768/65536 ⏳ encoders PR

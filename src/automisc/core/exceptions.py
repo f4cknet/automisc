@@ -31,10 +31,11 @@ class AutomiscError(Exception):
         self.context = context or {}
 
     def __str__(self) -> str:
+        cls_name = type(self).__name__
         if self.context:
             ctx = ", ".join(f"{k}={v!r}" for k, v in self.context.items())
-            return f"{self.message} ({ctx})"
-        return self.message
+            return f"{cls_name}: {self.message} ({ctx})"
+        return f"{cls_name}: {self.message}"
 
 
 # === 配置类 ===

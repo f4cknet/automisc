@@ -224,8 +224,10 @@ class TestEndToEnd:
         )
         w.dropEvent(event)
 
-        # 选 strings（PR1）
+        # 选 strings（PR1）→ 走 ToolRunner QThread 异步
         w._run_tool("strings")
+        # 等 finished_with_result signal（runner 写 output + journal）
+        qtbot.waitUntil(lambda: w.journal_panel.tree.topLevelItemCount() >= 1, timeout=5000)
         text = w.output_view.toPlainText()
         assert "strings" in text
         assert "flag{smoke_test_pr9_xyz}" in text
