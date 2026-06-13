@@ -23,3 +23,7 @@ from automisc.tools.shared import xxd  # noqa: F401
 # steganography/image/ 的 2 个 adapter（v0.1.0b-PR2）
 from automisc.tools.steganography.image import steghide  # noqa: F401
 from automisc.tools.steganography.image import zsteg  # noqa: F401
+
+# forensics/network/ 的 2 个 adapter（v0.1.0b-PR3）
+from automisc.tools.forensics.network import tcpdump  # noqa: F401
+from automisc.tools.forensics.network import tshark  # noqa: F401
