@@ -517,3 +517,4 @@ v0.1（当前）              v0.5（中期）              v1.0（远期）
 > **最后一条**：
 > 本文档是 automisc 的**需求 + 演进**单一事实来源。任何"今天起要做什么"问题先查这里。
 > 历史决策在 [`AGENTS.md §8`](./AGENTS.md) + `git log`（永不删除）。
+> v0.5+ 频繁迭代走 [`upgrade.md`](./upgrade.md) + `upgrade/{desc}.md` 模式。
