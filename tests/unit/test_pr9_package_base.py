@@ -157,7 +157,7 @@ def test_console_script_help_subprocess():
     assert result.returncode == 0
     # parser.print_help 输出含 prog 名 + 子命令列表
     assert "usage:" in result.stdout
-    assert "{tools,run,gui,chain}" in result.stdout
+    assert "{tools,run,gui,decode,chain}" in result.stdout
 
 
 # ---------- 6. __main__ 模块自身 ----------

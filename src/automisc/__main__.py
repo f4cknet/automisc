@@ -79,6 +79,38 @@ def main_gui() -> int:
     return app.exec()
 
 
+def cmd_decode_base64_image(args: argparse.Namespace) -> int:
+    """CLI: base64 -> 图片（v0.5+ standalone）.
+
+    决策树: data URL 头 -> 直接 decode; 无头 -> 加 image/* 头尝试;
+            解出 tmp -> file 命令验证是 image; 否则报"转图片失败".
+    """
+    from automisc.core.decoders.base64_image import (
+        Base64ImageError,
+        decode_file_to_image,
+    )
+
+    try:
+        r = decode_file_to_image(
+            args.file,
+            output_dir=args.out_dir,
+            keep_output=args.keep,
+        )
+    except FileNotFoundError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    except Base64ImageError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+
+    print("=== base64 -> image ===")
+    print(f"output_path:   {r.output_path}")
+    print(f"detected_mime: {r.detected_mime}")
+    print(f"source_hint:   {r.source_mime_hint or '(no data: header)'}")
+    print(f"raw_size:      {r.raw_size}")
+    return 0
+
+
 def cmd_chain(args: argparse.Namespace) -> int:
     """CLI: 跑预定义 DAG chain (v0.5-DAG).
 
@@ -188,6 +220,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui = sub.add_parser("gui", help="启动 PySide6 GUI 主窗口（macOS only）")
     p_gui.set_defaults(func=cmd_gui)
 
+    p_decode = sub.add_parser("decode", help="解码器（v0.5+ standalone）")
+    p_decode_sub = p_decode.add_subparsers(dest="decode_cmd")
+    p_decode_b64 = p_decode_sub.add_parser(
+        "base64-image", help="base64 -> 图片（自动识别 data: 头 + file 验证）"
+    )
+    p_decode_b64.add_argument("--file", required=True, help="含 base64 的文件路径")
+    p_decode_b64.add_argument(
+        "--out-dir", default=None, help="输出目录 (None = /tmp)"
+    )
+    p_decode_b64.add_argument(
+        "--keep", action="store_true", help="保留 output 文件（默认删）"
+    )
+    p_decode_b64.set_defaults(func=cmd_decode_base64_image)
+
     p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")
     p_chain.add_argument(
         "--chain",
@@ -224,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_gui(args)
     if args.cmd == "chain":
         return cmd_chain(args)
+    if args.cmd == "decode" and getattr(args, "decode_cmd", None) == "base64-image":
+        return cmd_decode_base64_image(args)
 
     parser.print_help()
     return 0

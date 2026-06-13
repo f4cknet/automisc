@@ -50,6 +50,8 @@
 | governance-v2.0 | 删 Architecture.md + prd.md frozen + 新建 STRUCTURE.md | ✅ done | main `895f54e` | [`STRUCTURE.md`](../STRUCTURE.md) |
 | governance-v3.0 | AGENTS.md + prd.md 压到 200 行内 | ✅ done | main `0daeaac` | [`AGENTS.md`](../AGENTS.md) |
 | v0.5-GUI-shortcuts | 工具栏 4 快捷入口: lsb / fix_pseudo / bruteforce_zip / bruteforce_rar | ✅ done | main `b9226c1` | [`upgrade/v0.5-session-summary-2026-06-13.md`](upgrade/v0.5-session-summary-2026-06-13.md) |
+| v0.5-lsb-bug | 修 LSBExtractAction 抽 raw 含 0xff 抛 UnicodeDecodeError | ✅ done | main `f1a55ca` | [`upgrade/2026-06-14-new-fixtures.md`](upgrade/2026-06-14-new-fixtures.md) |
+| v0.5-base64-image | base64 -> 图片工具 (CLI `automisc decode base64-image`) | ✅ done | main (待 push) | [`upgrade/v0.5-base64-image.md`](upgrade/v0.5-base64-image.md) |
 
 ---
 
