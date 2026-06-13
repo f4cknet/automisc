@@ -468,10 +468,14 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
 | P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | commit `79d4c1b`（feat 分支本地，未 push）|
 <<<<<<< HEAD
+<<<<<<< HEAD
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ✅ done | commit `7eed6c4`（feat 分支本地，未 push）|
 =======
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ✅ done | commit `待定`（feat 分支本地，未 push）|
+=======
+| P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ✅ done | commit `63fb531`（feat 分支本地，未 push）|
+>>>>>>> 5f40b08 ([v0.1.0b-PR7-status] fill commit SHA 63fb531)
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ⏳ | 依赖 PR9；可与 PR3~PR8 并行 |
 >>>>>>> 63fb531 ([v0.1.0b-PR7] add Forensics/Memory adapter (vol3 via CLI wrapper))
 | P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
