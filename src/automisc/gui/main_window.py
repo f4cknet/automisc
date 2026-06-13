@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from automisc.core.chains import (
     build_zip_chain_dag,
+    build_zip_chain_with_bruteforce,
     find_embedded_archives,
 )
 from automisc.core.dag import DAG
@@ -276,15 +277,39 @@ class MainWindow(QMainWindow):
         # 对每个 zip 跑 chain
         for zip_path in zip_files[:3]:  # 限制 3 个
             self.output_view.append_text(
-                f"\n[DAG] running zip_chain on {Path(zip_path).name}...\n"
+                f"\n[DAG] running zip-full chain on {Path(zip_path).name} (含 bruteforce)...\n"
             )
-            dag: DAG = build_zip_chain_dag()
+            # v0.5-GUI-fix: 用 zip-full (含 bruteforce) 而非 zip (无 bruteforce)
+            # 之前用 build_zip_chain_dag 遇到真加密 zip 永远 fail
+            dag: DAG = build_zip_chain_with_bruteforce()
             ctx = dag.execute({"file_path": zip_path})
             log = ctx.get("__log__", [])
             for step in log:
                 self.output_view.append_text(
                     f"  [{step['step']}] {step['node']}: {step['message']}\n"
                 )
+            # 渲染 flag_candidate (如果 lsb chain 抽到) - 但 zip chain 没这字段
+            last_result = ctx.get("__last_result__")
+            if last_result and last_result.data:
+                extracted_to = last_result.data.get("extracted_to")
+                if extracted_to:
+                    self.output_view.append_text(
+                        f"  → 解出到: {extracted_to}\n"
+                    )
+                    # 检查解出的目录里有没有 flag{}
+                    extracted_path = Path(extracted_to)
+                    if extracted_path.is_dir():
+                        for f in extracted_path.rglob("*"):
+                            if f.is_file():
+                                try:
+                                    content = f.read_text(errors="replace")
+                                    if "flag{" in content or "CTF{" in content:
+                                        self.output_view.append_flag_candidate(
+                                            content.strip()[:200],
+                                            channel=f"zip_chain/{f.name}",
+                                        )
+                                except Exception:
+                                    pass
 
     def _on_auto_chain_failed(self, tool_name: str, error_msg: str) -> None:
         self.output_view.append_text(
