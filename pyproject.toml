@@ -16,9 +16,13 @@ keywords = ["ctf", "misc", "steganography", "forensics", "security"]
 dependencies = [
     "python-evtx>=0.8.1",  # PR6: Forensics/Log Windows EVTX 日志解析
 <<<<<<< HEAD
+<<<<<<< HEAD
     "volatility3>=2.0",     # PR7-envfix: Forensics/Memory（vol3 官方 Python 3 port；vol2 留 v0.5+ docker）
     "base91>=1.0.1",        # encoders: base91 编解码（自实现易出 bug，用 PyPI 库）
 =======
+=======
+    "volatility3>=2.0",     # PR7-envfix: Forensics/Memory（vol3 官方 Python 3 port；vol2 留 v0.5+ docker）
+>>>>>>> 79d4c1b ([v0.1.0b-PR7-envfix] vol.py 环境决策：vol3 (PR7 adapter) + vol2 保留源码 (v0.5+ docker))
 ]
 
 [project.optional-dependencies]
