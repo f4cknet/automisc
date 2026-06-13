@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from automisc import __version__
 
@@ -78,6 +79,86 @@ def main_gui() -> int:
     return app.exec()
 
 
+def cmd_chain(args: argparse.Namespace) -> int:
+    """CLI: 跑预定义 DAG chain (v0.5-DAG).
+
+    支持的 chain:
+    - zip: try_unzip -> fix_pseudo (默认)
+    - zip-full: try_unzip -> fix_pseudo -> bruteforce
+    - binwalk: binwalk_extract
+    """
+    from automisc.core.chains import (
+        build_binwalk_extract_dag,
+        build_zip_chain_dag,
+        build_zip_chain_with_bruteforce,
+    )
+    from automisc.core.router import FileRouter
+
+    chain_name = args.chain
+    file_path = args.file
+
+    # 1) router 推荐
+    print(f"=== chain: {chain_name} ===")
+    print(f"=== file:  {file_path} ===")
+    try:
+        route = FileRouter().route(file_path)
+        print(f"\n[router] ext={route.detected_extension} magic={route.detected_magic or 'unknown'}")
+        for rec in route.recommendations[:5]:
+            print(f"  {rec.score:3d}  {rec.tool_name:15s}  {rec.reason}")
+    except Exception as e:  # noqa: BLE001
+        print(f"[router] error: {e}")
+        return 1
+
+    # 2) 选 chain
+    if chain_name == "zip":
+        dag = build_zip_chain_dag()
+    elif chain_name == "zip-full":
+        dag = build_zip_chain_with_bruteforce()
+    elif chain_name == "binwalk":
+        dag = build_binwalk_extract_dag()
+    else:
+        print(f"unknown chain: {chain_name}")
+        return 1
+
+    # 3) 跑
+    context: dict = {"file_path": file_path}
+    if args.bruteforce_limit:
+        context["__bruteforce_limit__"] = args.bruteforce_limit
+
+    print(f"\n=== executing {chain_name} chain ===\n")
+    result_ctx = dag.execute(context)
+    log = result_ctx.get("__log__", [])
+
+    # 4) 打印结果
+    success_count = sum(1 for step in log if step["success"])
+    fail_count = sum(1 for step in log if not step["success"])
+    print(f"--- chain log ({len(log)} steps) ---")
+    for step in log:
+        marker = "OK" if step["success"] else "FAIL"
+        print(f"  [{step['step']}] {step['node']:25s} {marker:5s}  {step['message'][:80]}")
+    print(f"\n--- summary ---")
+    print(f"  total:   {len(log)} steps")
+    print(f"  success: {success_count}")
+    print(f"  failure: {fail_count}")
+
+    # 5) 拿最终 ToolResult
+    last_result = result_ctx.get("__last_result__")
+    if last_result and last_result.success:
+        print(f"\n--- last action data ---")
+        for k, v in last_result.data.items():
+            if isinstance(v, str) and len(v) > 100:
+                v = v[:100] + "..."
+            print(f"  {k}: {v}")
+
+    # 6) cleanup backup（如果 fix_pseudo 跑了）
+    backup = Path(file_path).with_suffix(Path(file_path).suffix + ".bak")
+    if backup.exists() and not args.keep_backup:
+        backup.unlink()
+        print(f"  [cleanup] removed {backup}")
+
+    return 0 if success_count > 0 else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="automisc",
@@ -99,6 +180,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui = sub.add_parser("gui", help="启动 PySide6 GUI 主窗口（macOS only）")
     p_gui.set_defaults(func=cmd_gui)
 
+    p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")
+    p_chain.add_argument(
+        "--chain",
+        required=True,
+        choices=["zip", "zip-full", "binwalk"],
+        help="chain 类型: zip (try_unzip+fix_pseudo) / zip-full (+bruteforce) / binwalk",
+    )
+    p_chain.add_argument("--file", required=True, help="目标文件路径")
+    p_chain.add_argument(
+        "--bruteforce-limit",
+        type=int,
+        default=None,
+        help="bruteforce 字典上限 (测试用; 8.4M 完整字典太慢)",
+    )
+    p_chain.add_argument(
+        "--keep-backup",
+        action="store_true",
+        help="保留 fix_pseudo 的 .bak 备份 (默认清理)",
+    )
+    p_chain.set_defaults(func=cmd_chain)
+
     return parser
 
 
@@ -112,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_run(args)
     if args.cmd == "gui":
         return cmd_gui(args)
+    if args.cmd == "chain":
+        return cmd_chain(args)
 
     parser.print_help()
     return 0

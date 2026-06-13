@@ -215,6 +215,10 @@ class TestZipChainDAG:
         assert log[0]["success"] is True
 
     def test_pseudo_zip_chain(self, pseudo_zip):
+        # 关键: 跑完 chain 后修复 fixture 回伪加密状态（避免影响下次测试）
+        # 保存原始 bytes
+        original_bytes = pseudo_zip.read_bytes()
+
         try_node = DAGNode(TryUnzipAction())
         fix_node = DAGNode(FixPseudoEncryptionAction())
         try_node.on_failure = fix_node
@@ -227,6 +231,22 @@ class TestZipChainDAG:
         assert len(log) == 2
         assert log[0]["node"] == "try_unzip" and log[0]["success"] is False
         assert log[1]["node"] == "fix_pseudo_encryption" and log[1]["success"] is True
+
+        # 验证解压后能读到
+        import zipfile
+        with zipfile.ZipFile(pseudo_zip) as zf:
+            data = zf.read("flag{pseudo}.txt")
+            assert b"pseudo_zip_test_xyz" in data
+
+        # 还原 fixture: 删除 .bak + 重新设 flag bit 0 = 1
         backup = pseudo_zip.with_suffix(pseudo_zip.suffix + ".bak")
         if backup.exists():
             backup.unlink()
+        # 重新构造伪加密
+        data = bytearray(pseudo_zip.read_bytes())
+        for i in range(len(data) - 4):
+            if data[i : i + 4] == b"PK\x03\x04":
+                data[i + 6] |= 0x1
+            elif data[i : i + 4] == b"PK\x01\x02":
+                data[i + 8] |= 0x1
+        pseudo_zip.write_bytes(data)

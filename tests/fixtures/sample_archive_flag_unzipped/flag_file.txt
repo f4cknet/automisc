@@ -1,0 +1,2 @@
+flag{pr5_smoke_archive_zip_abc}
+secret=hidden
