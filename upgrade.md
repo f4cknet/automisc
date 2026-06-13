@@ -5,15 +5,19 @@
 
 ---
 
-## 状态
+## 状态（snapshot · 2026-06-13 23:23 · 收官）
 
 | 字段 | 值 |
 |---|---|
-| **当前 main HEAD** | `6e4e14f`（v0.1.1-auto-run）|
-| **当前版本** | v0.1.1 |
-| **下一个 milestone** | v0.5（per `prd.md §9` 演进路线）|
-| **主分支** | main（per `AGENTS.md §2.5.1` v0.1.1 简化流程：直接 main commit）|
-| **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.5.1 v1.20 治理变更）|
+| **当前 main HEAD** | `b9226c1`（v0.5-GUI-shortcuts）|
+| **当前版本** | v0.5+（频繁迭代模式，已 8 迭代）|
+| **下一个 milestone** | v0.5+ 真实题库回归（≥ 5 题）/ 递归链 / GUI 进度条（**owner 自由选**）|
+| **主分支** | main（per `AGENTS.md §2.4` 单 Owner 简化：直接 main commit）|
+| **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.4 v1.20 治理变更）|
+| **3 件套行数** | AGENTS 101 + prd 93 + STRUCTURE 186 = **380 行**（v3.0 治理）|
+| **测试** | **349 passed**（306 v0.1.1 基线 + 43 v0.5+ 增量）|
+| **今晚 commit 数** | 8 (4b4af51 → b9226c1) |
+| **真 flag 命中** | 2 (Challenge/QR_code.png `CTF{vjpw_wnoei}` + Challenge/steg.png `st3g0_saurus_wr3cks`) |
 
 ---
 
@@ -39,7 +43,12 @@
 | v0.5-DAG-chain-realtest | CLI 实测 Challenge/QR_code.png 拿 flag `CTF{vjpw_wnoei}` | ✅ done | main `e2b9587` | [`upgrade/v0.5-DAG-chain-realtest.md`](upgrade/v0.5-DAG-chain-realtest.md) |
 | v0.5-DAG-chain-refactor | foremost 工具模块化（binwalk delegate to foremost） | ✅ done | main `4b4af51` | [`upgrade/v0.5-DAG-chain-refactor.md`](upgrade/v0.5-DAG-chain-refactor.md) |
 | v0.5-DAG-stress-test | 6 道压力测试（伪加密/真加密/foremost/套娃/多嵌/纯 png） | ✅ done | main `c3617f1` | [`upgrade/v0.5-DAG-stress-test.md`](upgrade/v0.5-DAG-stress-test.md) |
-| v0.5-LSB-router | LSB 抽取后智能路由（text 终止 / file 二次 router） | ✅ done | main (待 push) | [`upgrade/v0.5-LSB-router.md`](upgrade/v0.5-LSB-router.md) |
+| v0.5-LSB-router | LSB 抽取后智能路由（text 终止 / file 二次 router） | ✅ done | main `bdb0b4e` | [`upgrade/v0.5-LSB-router.md`](upgrade/v0.5-LSB-router.md) |
+| v0.5-LSB-router-GUI | Chain 菜单 + 5 chain GUI 入口同步 CLI | ✅ done | main `6597842` | [`upgrade/v0.5-LSB-router.md`](upgrade/v0.5-LSB-router.md)（同文件）|
+| v0.5-gui-zip-full | GUI `_maybe_trigger_zip_chain_from_binwalk` 走 zip-full (bug 修) | ✅ done | main `1cf4850` | [`fix_gui_zip_trigger_no_bruteforce.md`](../fix_gui_zip_trigger_no_bruteforce.md) |
+| governance-v2.0 | 删 Architecture.md + prd.md frozen + 新建 STRUCTURE.md | ✅ done | main `895f54e` | [`STRUCTURE.md`](../STRUCTURE.md) |
+| governance-v3.0 | AGENTS.md + prd.md 压到 200 行内 | ✅ done | main `0daeaac` | [`AGENTS.md`](../AGENTS.md) |
+| v0.5-GUI-shortcuts | 工具栏 4 快捷入口: lsb / fix_pseudo / bruteforce_zip / bruteforce_rar | ✅ done | main `b9226c1` | [`upgrade/v0.5-session-summary-2026-06-13.md`](upgrade/v0.5-session-summary-2026-06-13.md) |
 
 ---
 
