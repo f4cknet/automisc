@@ -13,7 +13,9 @@ authors = [{ name = "Minzhi Zhou" }]
 keywords = ["ctf", "misc", "steganography", "forensics", "security"]
 
 # v0.1 阶段：仅声明核心依赖；GUI / 隐写 / 取证 Python 包在后续 PR 追加
-dependencies = []
+dependencies = [
+    "python-evtx>=0.8.1",  # PR6: Forensics/Log Windows EVTX 日志解析
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-mock>=3.12"]
