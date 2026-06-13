@@ -488,6 +488,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 17:48 | **1.14** | **v0.1.0b-PR8 实施完成**：Misc/Brainteaser adapter 落地（zbar QR/条码识别）。5 单测 + 2 fixture（flag QR + URL QR）。149 unit tests PASS。flag QR 命中 [5]；URL QR 命中 [2]。详见本次 commit。 |
 | 2026-06-13 17:15 | **1.13** | **v0.1.0b-PR6 实施完成**：Forensics/Log adapter 落地（grep + evtx_dump）。grep 17 关键字含严重度分级；evtx_dump 集成 python-evtx 0.8.1 + 8 类可疑 EventID + 进程命令行关键字。pyproject.toml 添加 python-evtx 依赖。10 单测 + 1 fixture。144 unit tests PASS。grep 真实样本 smoke 命中 6 个 log_keyword。详见本次 commit。 |
 | 2026-06-13 17:05 | **1.12** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 探测伪加密。10 单测 + 2 fixture。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：伪加密命中 [4]；正常 zip 命中 file count。详见本次 commit。 |
 | 2026-06-13 16:55 | **1.11** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter）。ffmpeg 共享 binary，audio/video 各自独立 name。17 单测 + 2 fixture。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio/ffprobe/steghide_audio 全命中。详见本次 commit。 |

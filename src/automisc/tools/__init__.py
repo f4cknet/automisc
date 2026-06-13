@@ -45,3 +45,6 @@ from automisc.tools.misc.archive import unzip  # noqa: F401
 # forensics/log/ 的 2 个 adapter（v0.1.0b-PR6）
 from automisc.tools.forensics.log import evtx_dump  # noqa: F401
 from automisc.tools.forensics.log import grep  # noqa: F401
+
+# misc/brainteaser/ 的 1 个 adapter（v0.1.0b-PR8）
+from automisc.tools.misc.brainteaser import zbar  # noqa: F401
