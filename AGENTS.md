@@ -460,7 +460,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | 优先级 | 任务 ID | 标题 | 状态 | 备注 |
 |---|---|---|---|---|
 | **P0** | `v0.1.0b-cleanup` | 文档重整（PR0）| ✅ done | commit `b1643bc`（main 本地，未 push）|
-| P1 | `v0.1.0b-PR9` | Python 包基座 | ⏳ next | 依赖 cleanup |
+| P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ⏳ | 依赖 PR9 |
 | P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox）| ⏳ | 依赖 PR9 |
 | P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
@@ -488,11 +488,11 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 15:13 | **1.9** | **v0.1.0b-PR9 实施完成**：包基座 smoke（`pip install -e ".[dev]"` + `python -m automisc` + console_script `automisc` 全跑通）。新增 22 单测（包元数据 / 子包 import / CLI main / subprocess），总计 **97 unit tests PASS**（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `prd.md §4.1` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `Architecture.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
 | 2026-06-13 | **1.7** | **§2.5.1 升级 v4**：完全纳入 AI 询问流程（merge 不再 Owner 自助）；批量授权机制启用（per Owner 决策 2026-06-13 12:54）。详见 git history。 |
 | 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
 | 2026-06-13 | **1.5** | **§2.5.1 升级 v2**：AI Agent 有 push/merge 权利但每次需询问 Owner。详见 git history。 |
-| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**：`tools/steganography/image/{zsteg,steghide}.py` adapter 落地；75 unit tests PASS（PR1 61 + PR2 14）；详见 commit `4ca05e5`（PR #2）。 |
 
 ---
 

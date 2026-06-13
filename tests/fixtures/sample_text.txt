@@ -1,0 +1,2 @@
+hello world
+flag{smoke_test_pr9_xyz}
