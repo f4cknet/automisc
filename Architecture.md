@@ -292,9 +292,57 @@ class CoreOrchestrator:
         self.journal.export(path)
 ```
 
-### 3.5 可疑点扫描器（`core/suspicious.py`）
+### 3.5 LSB 抽取后智能路由（`core/actions/lsb_extract.py` · `core/encoding_detector.py`）
 
-实现关键字 / 正则集合（per `prd.md §7`），所有 adapter 共用同一组规则：
+> **v0.5-LSB-router 引入**（per Owner 触发 Challenge/steg.png 实测）。
+
+LSB 隐写**抽出后要当 router 用**——判断"抽出来的东西"是 text / file / 编码特殊形态，路由到对应处理。
+
+**流程**：
+
+```
+LSBExtractAction.run(file_path)
+  1. 调 zsteg <file> 找出所有 text / file 行
+  2. text 行优先级 (b1,rgb,lsb,xy 等 LSB 优先):
+     a) 抽 raw text (zsteg -e <channel> <file>)
+     b) 分类 (encoding_detector.score_text_severity):
+        - 含 secret/key/flag/ctf → severity=5 + 打印 + 终止 (Q3)
+        - base64/binary/hex 串 → severity=4 + 打印 + 终止
+        - 普通 text → severity=3 + 打印
+  3. file 行 (file: <magic>):
+     a) 抽 raw file (zsteg -e <channel> <file>)
+     b) 写 tmp + router.route(tmp) 二次分诊
+     c) 触发 zip_chain (伪加密+bruteforce) / rar (john) / png (递归)
+  4. 递归深度保护: max_depth=3 (ctx['_lsb_depth'])
+  5. 都没找到 → "LSB 通道无敏感内容"
+```
+
+**模块清单**：
+
+- `core/actions/lsb_extract.py` — `LSBExtractAction`（调 zsteg -e 抽 raw + 分类 + 路由）
+- `core/encoding_detector.py` — `score_text_severity(text) -> 3|4|5` + `is_base64` / `is_binary_string` / `is_hex_string` / `has_sensitive_keyword`
+- 复用 `core/router.py:detect_magic()` 做 file magic 检测（504B0304=ZIP / 526172=RAR / 89504E47=PNG）
+
+**链集成**：
+
+```python
+# chains.py 新增
+def build_lsb_extract_chain() -> DAG:
+    """binwalk 检测 + foremost 提取 + LSB 抽取后路由 (text 终止 / file 二次 router)."""
+    binwalk_node = DAGNode(BinwalkExtractAction())
+    lsb_node = DAGNode(LSBExtractAction(max_depth=3))
+    binwalk_node.on_success = lsb_node
+    binwalk_node.on_failure = lsb_node  # binwalk 无嵌入也跑 LSB
+    lsb_node.on_success = None
+    lsb_node.on_failure = None
+    return DAG(start_node=binwalk_node)
+```
+
+**真实题验证**：`Challenge/steg.png` → `automisc chain --chain lsb` → 自动打印 `flag{st3g0_saurus_wr3cks}` 候选 + 终止。
+
+**详细设计**：见 [`upgrade/v0.5-LSB-router.md`](../upgrade/v0.5-LSB-router.md)。
+
+### 3.6 可疑点扫描器（`core/suspicious.py`）
 
 ```python
 SUSPICIOUS_PATTERNS = {
@@ -319,7 +367,7 @@ SUSPICIOUS_PATTERNS = {
 }
 ```
 
-### 3.6 journal（`core/journal.py`）
+### 3.7 journal（`core/journal.py`）
 
 每次工具调用追加一段，格式沿用 misc-skill `solve_journal.md` 约定（per [`prd.md §1.3`](./prd.md)）：
 
@@ -344,7 +392,7 @@ DECIMAL       HEXADECIMAL     DESCRIPTION
 - 🟢 [severity=1] `keyword: hidden` @ offset 3072 — 包含敏感关键字
 ```
 
-### 3.7 Core 模块文件清单
+### 3.8 Core 模块文件清单
 
 ```
 core/

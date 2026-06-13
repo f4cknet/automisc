@@ -87,10 +87,12 @@ def cmd_chain(args: argparse.Namespace) -> int:
     - zip-full: try_unzip -> fix_pseudo -> bruteforce
     - binwalk: binwalk 检测 + foremost 提取
     - foremost: foremost 单独提取 (skip binwalk detection)
+    - lsb: binwalk 提取 + LSB 智能路由 (text 终止 / file 二次 router)
     """
     from automisc.core.chains import (
         build_binwalk_extract_dag,
         build_foremost_extract_dag,
+        build_lsb_extract_chain,
         build_zip_chain_dag,
         build_zip_chain_with_bruteforce,
     )
@@ -120,6 +122,8 @@ def cmd_chain(args: argparse.Namespace) -> int:
         dag = build_binwalk_extract_dag()
     elif chain_name == "foremost":
         dag = build_foremost_extract_dag()
+    elif chain_name == "lsb":
+        dag = build_lsb_extract_chain()
     else:
         print(f"unknown chain: {chain_name}")
         return 1
@@ -188,7 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_chain.add_argument(
         "--chain",
         required=True,
-        choices=["zip", "zip-full", "binwalk", "foremost"],
+        choices=["zip", "zip-full", "binwalk", "foremost", "lsb"],
         help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取)",
     )
     p_chain.add_argument("--file", required=True, help="目标文件路径")

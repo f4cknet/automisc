@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from automisc.core.actions.binwalk_extract import BinwalkExtractAction
 from automisc.core.actions.foremost_extract import ForemostExtractAction
+from automisc.core.actions.lsb_extract import LSBExtractAction
 from automisc.core.actions.zip_chain import (
     BruteforceZipAction,
     FixPseudoEncryptionAction,
@@ -55,6 +56,23 @@ def build_foremost_extract_dag() -> DAG:
     return DAG(start_node=DAGNode(ForemostExtractAction()))
 
 
+def build_lsb_extract_chain() -> DAG:
+    """LSB 抽取后智能路由链（v0.5-LSB-router）:
+    binwalk_extract → (success/failure → lsb_extract → 终止)
+
+    - binwalk 检测 binwalk/foremost 提取嵌入文件
+    - lsb_extract: zsteg 抽 LSB 内容, 分类 (text 终止 / file 二次 router)
+    - max_depth=3 防 LSB 死循环
+    """
+    binwalk_node = DAGNode(BinwalkExtractAction())
+    lsb_node = DAGNode(LSBExtractAction(max_depth=3))
+    binwalk_node.on_success = lsb_node
+    binwalk_node.on_failure = lsb_node  # binwalk 无嵌入也跑 LSB
+    lsb_node.on_success = None
+    lsb_node.on_failure = None
+    return DAG(start_node=binwalk_node)
+
+
 # ---------- 检测 binwalk 输出含 ZIP / 7z / rar / tar 等 ----------
 def find_embedded_archives(binwalk_stdout: str) -> list[str]:
     """从 binwalk 输出找出 archive offsets (e.g. "12345: ZIP archive")."""
@@ -71,5 +89,6 @@ __all__ = [
     "build_zip_chain_with_bruteforce",
     "build_binwalk_extract_dag",
     "build_foremost_extract_dag",
+    "build_lsb_extract_chain",
     "find_embedded_archives",
 ]
