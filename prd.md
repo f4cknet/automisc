@@ -1,0 +1,494 @@
+# prd.md — AutoMisc 产品需求文档
+
+> **角色**：automisc 的**需求 + 任务看板 + 工具池 + 演进路线**单一事实来源
+> **状态**：v0.1 启动（2026-06-13）
+> **配套文档**：
+> - [`AGENTS.md`](./AGENTS.md) — 项目治理（4 条铁律 + 违规分级 + 紧急通道 + AI Agent 条款）
+> - [`Architecture.md`](./Architecture.md) — 系统架构设计（4 层分层 + 模块依赖 + plug-in 机制 + 验证方法）
+> - [`tools.md`](./tools.md) — 外部 misc 工具清单（待 Owner 整理后建立） + adapter 适配说明
+>
+> **本文档章节**：
+> - §0 产品定位
+> - §1 用户故事
+> - §2 范围 & 非范围（含硬约束）
+> - §3 任务看板（v0.1 / v0.5 / v1.0）
+> - §4 工具池初版（占位）
+> - §5 入口分流表（文件类型 → subflow）
+> - §6 可疑点格式（统一 schema）
+> - §7 完成判定
+> - §8 GUI 形态
+> - §9 演进路线图
+> - §10 治理变更流程
+
+---
+
+## 0. 阅读指引
+
+| 你是谁 | 先看哪一节 |
+|---|---|
+| **第一次接触本项目** | **必读 [`AGENTS.md`](./AGENTS.md) §1 铁律** → 本文件 §0 → §2 → §3 → §9 → [`Architecture.md §1`](./Architecture.md) |
+| **想认领任务** | §3 任务看板 → §9 演进路线 |
+| **正在做某个任务** | §3 当前任务 → [`Architecture.md §7 验证方法`](./Architecture.md) |
+| **理解 4 层架构** | [`Architecture.md §1`](./Architecture.md) + §3 Core 调度层 |
+| **AI Agent session 启动** | [`AGENTS.md §5`](./AGENTS.md) 4 步启动 → 本文件 §0-§9 |
+| **理解为什么 automisc 不桥接 skill** | [`Architecture.md §5`](./Architecture.md) |
+
+---
+
+## 1. 产品定位
+
+`misc/automisc` 是一个**macOS 平台**、**完全离线**、**PySide6 GUI** 的 CTF Misc 半自动化辅助工具箱。
+
+### 1.1 一句话定位
+
+> **拖入题目文件 → 工具菜单触发分析 → 可疑点高亮打印 + journal 自动记录 → 人工决策下一步。**
+
+### 1.2 与"随波逐流"等传统 misc 工具的关系
+
+| 维度 | 随波逐流 | automisc（本项目）|
+|---|---|---|
+| 形态 | Windows GUI | macOS GUI（PySide6）|
+| 工具池 | 50+ 编码/隐写/取证工具 | 同等规模 + 可扩展 |
+| 入口分流 | 用户手动选工具 | **自动路由**（文件类型 → subflow）|
+| 可疑点提示 | 文本展示 | **高亮 + 结构化**（统一 schema）|
+| 多步编排 | 无（纯手动）| **预留路线**：v0.5 模板 → v1.0 DAG |
+| journal 记录 | 无 | **自动积累**（每次工具调用 = 一段）|
+
+### 1.3 与 autopwn 的根本差异
+
+| 维度 | autopwn | automisc |
+|---|---|---|
+| 目标 | 全自动拿 root shell | 半自动化找 flag 线索 |
+| 完成判定 | `verify_shell` 真拿到 `uid=0` | 可疑点列表 + journal（**不**追求 flag 匹配）|
+| 决策路径 | 优先级排序的策略链 | 人工决策（GUI 触发 → 可疑点 → 用户决定下一步）|
+| 工具调用深度 | 链式（strategy 内部多次调用）| 单次（一次工具 = 一次可疑点扫描）|
+| 报告产物 | docx 报告（CTF 提交用）| solve_journal.md（per misc-skill 约定）|
+
+---
+
+## 2. 用户故事
+
+### US-1：比赛场景（核心场景）
+
+> **作为 CTF 参赛选手，我在比赛现场拿到一个 misc 题目附件，希望：**
+> 1. 把附件拖入 automisc 主窗口
+> 2. 看到 automisc 自动识别文件类型 + 推荐初始 subflow（如"PNG 文件，建议尝试图片隐写"）
+> 3. 在工具菜单里点击 `foremost`（图片隐写分类下），看到输出区实时滚动 foremost 进度
+> 4. foremost 完成，看到输出区高亮显示"分离出 3 个文件：1.zip / 2.png / 3.bin"
+> 5. 把 `1.zip` 拖入新菜单继续（重复 1-4 步）
+> 6. 比赛结束后，从 journal 面板导出完整解题路径
+
+### US-2：练习场景（流量分析）
+
+> **作为 CTF 选手，我在练习 webshell 流量分析题，希望：**
+> 1. 拖入 `attack.pcap`
+> 2. automisc 自动识别"pcap 文件"，引导我到流量分析 subflow
+> 3. 点击工具 `tshark 提取 HTTP`，输出区显示"提取出 47 个 HTTP 请求"
+> 4. 点击工具 `webshell 家族识别`，输出区高亮"识别到 3 个冰蝎 v3.0 payload + 1 个菜刀 payload"
+> 5. 点击 `base64 解码`，选中第 2 个 payload 解码，看到解码后的 webshell 代码
+> 6. journal 自动记录每一步（工具 + 参数 + 结果摘要 + 关联可疑点 ID）
+
+### US-3：赛后复盘
+
+> **作为参赛选手，比赛结束想整理 writeup，希望：**
+> 1. 打开 automisc journal 面板
+> 2. 看到本次比赛所有题目按时间排序的工具调用记录
+> 3. 点击"导出 journal"，生成 `solve_journal.md`
+> 4. 复制 markdown 内容到 writeup
+
+---
+
+## 3. 范围 & 非范围（含硬约束）
+
+### 3.1 范围（v0.1 必须做）
+
+- ✅ PySide6 GUI 主窗口（macOS 单窗口布局）
+- ✅ 文件拖拽接收（单文件 + 多文件）
+- ✅ 工具菜单分类（隐写 / 流量 / 压缩 / 内存 / 编码 / 取证 六大类）
+- ✅ 入口分流（文件类型 → subflow 推荐）
+- ✅ 工具池：至少 5 个 adapter 跑通（binwalk / strings / foremost / tshark / vol.py 之一）
+- ✅ 输出区（实时滚动 + ANSI 高亮）
+- ✅ 可疑点扫描器（统一 schema）
+- ✅ journal 自动记录
+- ✅ 6 关验收（per `AGENTS.md §1` 铁律 4）
+
+### 3.2 非范围（硬约束）
+
+| ❌ 不做 | 原因 |
+|---|---|
+| **不引入 LLM 编排决策** | 完全离线产品，不依赖任何 AI 服务 / 在线 API |
+| **不桥接 `misc/skills/*SKILL.md`** | 那些 skill 是给 AI Agent 用的，automisc 是独立离线工具（per `Architecture.md §5`）|
+| **不做跨平台（仅 macOS）** | macOS only（per `AGENTS.md §2.4`）|
+| **不做全自动拿 flag** | 半自动化辅助，最终决策权在人 |
+| **不追求 flag 匹配作为完成判定** | automisc 验收是"工具调用成功 + 可疑点命中"，不是 flag 正则 |
+| **不做云端同步 / 远程服务 / Web UI** | 完全离线桌面工具 |
+| **v0.1 不打包成 `.app`**（占位章节）| 开发期 `python -m automisc` 启动；v0.3 再评估 py2app（per `AGENTS.md §2.4` 占位）|
+| **v0.1 不做编排模板**（占位章节）| 仅手动菜单触发；v0.5 起引入模板（per §9）|
+
+### 3.3 占位章节（TBD · 待 Owner 决策）
+
+- ⏳ **Q2 打包策略**：v0.1 是否接 py2app 打成 `.app`？（建议先不打包）
+- ⏳ **Q3 GUI 布局**：单窗口 / 多窗口 / MDI？（建议单窗口）
+
+---
+
+## 4. 任务看板
+
+> **任务 ID 格式**：`v{X}.{Y}.{Z}` — 例如 `v0.1.0` / `v0.5.0` / `v1.0.0`
+> - `X` 主版本（架构重大变更）
+> - `Y` 次版本（功能演进，如编排档位升级）
+> - `Z` 修订版本（bug 修复 / 工具池新增）
+
+### 4.1 v0.1 启动（最小可用 GUI · 当前 sprint）
+
+| ID | 任务 | 状态 | 预估 | 备注 |
+|---|---|---|---|---|
+| `v0.1.0` | **项目骨架**：创建 `automisc/` 包 + `__main__.py` + `pyproject.toml` + 基础目录结构（`gui/` / `core/` / `tools/`）| ⏳ | 1h | 必须最先做；架构分层的物理落点（per `Architecture.md §1`）|
+| `v0.1.1` | **GUI 主窗口骨架**：PySide6 `QMainWindow` + 文件拖拽接收 + 菜单树（六大分类占位）| ⏳ | 2h | 依赖 v0.1.0；视觉调试在本地手动跑 |
+| `v0.1.2` | **入口分流器**：`core/router.py` 根据 `file` 命令 + 后缀 + magic bytes 路由到 subflow 推荐 | ⏳ | 2h | 依赖 v0.1.0；见 `Architecture.md §3` |
+| `v0.1.3` | **可疑点扫描器**：`core/suspicious.py` 统一 schema（per §6）+ 关键字 / 正则集合 | ⏳ | 2h | 依赖 v0.1.0；GUI 输出区高亮依赖此 |
+| `v0.1.4` | **journal 自动记录**：`core/journal.py` 每次工具调用 = 一段（per misc-skill `solve_journal.md` 约定）| ⏳ | 1.5h | 依赖 v0.1.0 |
+| `v0.1.5` | **工具 adapter 基类**：`tools/base.py` 定义 `ToolAdapter` 抽象类 + `run(file_path) -> ToolResult` 接口 | ⏳ | 1h | 依赖 v0.1.0；见 `Architecture.md §6` |
+| `v0.1.6` | **5 个核心 adapter 落地**：binwalk / strings / foremost / tshark / vol.py（或 exiftool 二选一）| ⏳ | 4h | 依赖 v0.1.5；输出统一走 `ToolResult` schema |
+| `v0.1.7` | **GUI 集成**：菜单点击 → Core 调用 adapter → 输出区实时渲染 + 高亮 + journal 写入 | ⏳ | 3h | 依赖 v0.1.1 + v0.1.3 + v0.1.6 |
+| `v0.1.8` | **拖拽到 GUI**：拖拽事件 → 自动识别文件类型 → 弹出 subflow 推荐菜单 | ⏳ | 2h | 依赖 v0.1.1 + v0.1.2 |
+| `v0.1.9` | **基础测试**：pytest unit（Core 单测）+ pytest-qt 集成（GUI 拖拽 + 菜单触发）| ⏳ | 3h | 依赖 v0.1.7 + v0.1.8 |
+| `v0.1.10` | **6 关验收**：单元 + 集成 + 真实样本 smoke + Owner 自审 + 文档同步 | ⏳ | 2h | 依赖 v0.1.9；本表状态全部 ✅ |
+| `v0.1.0b` | **重整工具池分类（按分支重排）**：从 9 个 subflow（图片隐写/流量/压缩/内存/编码/二进制/音频/文档/二维码）改为按"用户面对的题目类型"分支：Forensics（Memory/Disk/Network/Log）+ Steganography（Image/Audio/Video）+ Encoding（内置自写）+ Misc Others（Archive/Office/Brainteaser）。**影响**：`tools.md` 全量重写 + `prd.md §5` §6 同步 + `Architecture.md §4.4` 同步 | ⏳ | 1h | **不引入新工具依赖**；仅重组分类 + 新增 4 个 subflow 入口分流规则；**依赖**：先于 v0.1.5 / v0.1.6 / v0.1.7 实施 |
+| `v0.1.0b-PR1` | **v0.1 第一个实施 PR（共享基础工具 6 个 adapter）**：实现 `tools/shared/` 下的 6 个 adapter（`file` / `strings` / `binwalk` / `foremost` / `exiftool` / `xxd`）+ `tools/base.py` ToolAdapter 基类 + `core/suspicious.py` 最小可用可疑点扫描器 + `core/registry.py` 装饰器 + `core/orchestrator.py` 最小调度 + `core/result.py` ToolResult + 单元测试。**不含 GUI**（GUI 是 v0.1.1 范围）| ✅ | 4h | **当前任务**；按 `tools.md §6.2` 实施；**6 关验收**：① 代码合入 `main` 分支（commit 详情见 git log）；② `pytest tests/unit -q` 全过（**61 tests / 100% PASS**）；③ N/A（PR1 无 GUI / 无集成测试）；④ 真实样本 smoke：generated fixture（PNG + base64 + flag 注释）跑 6 个 adapter，关键可疑点命中（flag severity=5 / PNG file_header severity=4 / base64 severity=3）；⑤ Owner 自审（单 Owner 项目）；⑥ 文档同步（本表 + `tools.md §3.12` + `Architecture.md §4.4` + `AGENTS.md §8`）|
+
+**v0.1 总预估**：~23.5h（按 6h/人/天 ≈ 4 天）
+
+### 4.2 v0.5 候选（工具链模板编排）
+
+> **本阶段在 v0.1 完成后 Owner 启动新 sprint 拍板，本表占位**。
+
+| ID | 任务 | 状态 | 预估 | 备注 |
+|---|---|---|---|---|
+| `v0.5.0` | **编排模板引擎**：`core/orchestrator/template.py` 定义 `Template` 抽象类 + 顺序执行工具 | ⏳ | 4h | 见 `Architecture.md §8` 演进路径 |
+| `v0.5.1` | **3 个预设模板**：pcap_webshell_check / image_stego_check / archive_crack | ⏳ | 6h | 每个模板 ≈ 2h |
+| `v0.5.2` | **GUI "自动分析"按钮**：菜单点击 → 选模板 → 自动执行 | ⏳ | 3h | |
+| `v0.5.3` | **macOS 打包评估**：py2app / PyInstaller 二选一实测 | ⏳ | 4h | 视 v0.1-Q2 决策 |
+
+### 4.3 v1.0 候选（DAG 编排）
+
+> **本阶段在 v0.5 完成后 Owner 启动新 sprint 拍板，本表占位**。
+
+| ID | 任务 | 状态 | 预估 | 备注 |
+|---|---|---|---|---|
+| `v1.0.0` | **工具输出 type system**：每个 adapter 声明产出数据类型（`extracted_files` / `text_strings` / `decoded_text` 等）| ⏳ | 6h | DAG 编排的前置 |
+| `v1.0.1` | **DAG 引擎**：`core/orchestrator/dag.py` 根据数据依赖自动触发下一节点 | ⏳ | 8h | |
+| `v1.0.2` | **GUI 编排视图**：可视化当前 DAG 节点状态（pending / running / done / failed）| ⏳ | 4h | |
+| `v1.0.3` | **手动干预**：右键节点跳过 / 重跑 / 标记关键 | ⏳ | 3h | |
+
+### 4.4 open 阻塞（当前 = 0）
+
+_（无 — 2026-06-13 v0.1 启动时无新阻塞）_
+
+---
+
+## 5. 工具池
+
+> **工具池完整清单见 [`tools.md`](./tools.md)**。本节仅说明工具池与 automisc 的整体关系 + adapter 模式约定。
+
+### 5.1 工具池分类（按分支 · per §4.1 v0.1.0b 2026-06-13 重大重整）
+
+> **从"按工具能力分类"改为"按用户面对的题目类型分支"**，详细架构决策见 [`tools.md §2`](./tools.md)。
+
+| 一级分支 | 子分支数 | 工具数（✅/⚠️/❌）| v0.1 P0 | 详情 |
+|---|---|---|---|---|
+| **Forensics（取证）** | 4 | 14（6✅ / 1⚠️ / 7❌）| 6 | [`tools.md §3.1-3.4`](./tools.md) |
+| **Steganography（隐写术）** | 3 | 22（9✅ / 1⚠️ / 12❌）| 8 | [`tools.md §3.5-3.7`](./tools.md) |
+| **Encoding（编码分析）** | 3 | **0**（内置实现）| 9h Python 模块 | [`tools.md §3.8`](./tools.md) |
+| **Misc Others（其他）** | 3 | 10（5✅ / 0⚠️ / 5❌）| 3 | [`tools.md §3.9-3.11`](./tools.md) |
+| **共享基础工具** | — | 8（8✅ / 0⚠️ / 0❌）| 5 | [`tools.md §3.12`](./tools.md) |
+| **合计** | **14** | **54**（28✅ / 2⚠️ / 24❌）| **22** | — |
+
+**11 个 subflow 全清单**（含 Encoding 子分支）：
+- **Forensics** 4：Memory Forensics / Disk Forensics / Network Forensics / Log Forensics
+- **Steganography** 3：Image Stego / Audio Stego / Video Stego
+- **Encoding** 3（**自编写**）：Base 系列 / 古典密码 / 自定义编码
+- **Misc Others** 3：Archive / Office / Brainteaser
+
+**删去的旧 subflow**（per `§2.2` 非范围约束 + 2026-06-13 Owner 决策）：
+- ❌ OSINT（开源情报）—— 与 automisc "完全离线" 产品定位冲突
+- ❌ Blockchain（区块链）—— automisc 不做
+- ❌ Games & VMs（游戏题 / VM 题）—— automisc 不做
+- ❌ 二进制分析（独立 subflow）—— strings / file / binwalk / xxd 等基础工具下沉到各分支共享
+- ❌ 文档分析（独立 subflow）—— 归入 Misc Others / Office
+
+> **P0 = v0.1 必须包含的 adapter**（per §4.1 v0.1.6，要求 ≥5 个）；当前 **22 个 P0 adapter**，分 9 个 PR 实施（per [`tools.md §6.2`](./tools.md)）。
+> 完整 P0 工具列表见 [`tools.md §6`](./tools.md)。
+
+### 5.2 adapter 模式
+
+每个工具 = 一个 Python adapter，结构：
+
+```python
+from automisc.tools.base import ToolAdapter, ToolResult
+
+class BinwalkAdapter(ToolAdapter):
+    name = "binwalk"
+    category = "binary_analysis"
+    description = "扫描并提取文件中的嵌入文件"
+
+    def run(self, file_path: str) -> ToolResult:
+        # subprocess 调 binwalk
+        # 解析输出
+        # 提取可疑点（PK / jpg / rar 等文件头）
+        return ToolResult(
+            tool_name=self.name,
+            exit_code=0,
+            stdout=...,
+            suspicious_points=[...]
+        )
+```
+
+详细 adapter 规范见 [`Architecture.md §6 plug-in 机制`](./Architecture.md)。
+
+### 5.3 工具池治理流程
+
+新增工具 / 修改工具状态 / 调整 P0 优先级，都需要：
+
+1. **更新 [`tools.md`](./tools.md)**：增删改对应工具行（状态 / 路径 / 安装指引）
+2. **更新本文件 §5.1 总表**：分类汇总数同步
+3. **若新增 P0 工具**：在 [`prd.md §4`](./prd.md) 任务看板加对应 adapter 任务行（per `AGENTS.md §1` 铁律 2）
+
+---
+
+## 6. 入口分流表
+
+> **文件类型 → subflow 推荐**。GUI 拖拽文件时，automisc 自动给出推荐。
+> **2026-06-13 重整**（per §4.1 v0.1.0b）：从 9 个旧 subflow 重排为 **11 个新 subflow**（4 Forensics + 3 Stego + 3 Encoding + 3 Misc Others，编码子分支无外部工具依赖）。
+
+### 6.1 主分流表（按分支）
+
+| 文件类型（识别依据）| 一级分支 | subflow | 推荐初始工具 |
+|---|---|---|---|
+| `.vmem / .raw / .dmp / .core` | **Forensics** | Memory Forensics | vol.py imageinfo + strings |
+| `.dd / .img / .E01 / .vmdk / .ova / .vhd` | **Forensics** | Disk Forensics | 7z 解压 / photorec / testdisk |
+| `.pcap / .pcapng / .cap` | **Forensics** | Network Forensics | tshark 提取 HTTP + webshell 家族识别 |
+| `.log / .evtx / .evtx.bz2 / auth.log` | **Forensics** | Log Forensics | grep + awk + sed / evtx_dump |
+| `.png / .jpg / .bmp / .gif / .webp` | **Steganography** | Image Stego | exiftool + zsteg + foremost + binwalk |
+| `.wav / .mp3 / .flac / .ogg / .aac` | **Steganography** | Audio Stego | ffmpeg 频谱 + sox + steghide |
+| `.mp4 / .mkv / .avi / .mov / .flv` | **Steganography** | Video Stego | ffprobe 多 stream 提取 + ffmpeg 帧 |
+| **任何编码可疑文本**（base64/32/58/62/64/85/hex/古典密码）| **Encoding** | Base / 古典 / 自定义 | （**内置实现**）`core/encoders/base.py` + `classical.py` + `custom.py` |
+| `.zip / .rar / .7z / .tar.gz / .tar.bz2 / .tar.xz` | **Misc Others** | Archive | 7z / unzip + 伪加密检查 + john 4-6 位爆破 |
+| `.docx / .pdf / .xlsx / .pptx` | **Misc Others** | Office | exiftool + binwalk + python-docx |
+| **二维码 / 条码**（图片含 QR/Barcode 特征）| **Misc Others** | Brainteaser | zbarimg（缺失）/ pyzbar（fallback）|
+| `.sql / .db / .sqlite` | **Misc Others** | Brainteaser | sqlite3 + strings |
+| **未知 / 无后缀 / magic bytes 异常** | **共享基础** | 通用入口 | file + strings + binwalk + foremost + xxd |
+
+### 6.2 文件 → 一级分支决策树
+
+```
+任意文件
+    │
+    ├── 文件 magic 是 vmem/raw/dmp?  ──→ Forensics / Memory
+    ├── 文件 magic 是 dd/img/E01/vmdk? ──→ Forensics / Disk
+    ├── 文件 magic 是 pcap?       ──→ Forensics / Network
+    ├── 文件 magic 是 log/evtx?   ──→ Forensics / Log
+    │
+    ├── 文件 magic 是 png/jpg/bmp/gif/webp?  ──→ Stego / Image
+    ├── 文件 magic 是 wav/mp3/flac/ogg?      ──→ Stego / Audio
+    ├── 文件 magic 是 mp4/mkv/avi/mov/flv?   ──→ Stego / Video
+    │
+    ├── 文件 magic 是 zip/rar/7z/tar?  ──→ Misc Others / Archive
+    ├── 文件 magic 是 OLE/zip+xml?     ──→ Misc Others / Office (docx/xlsx/pptx)
+    ├── 文件 magic 是 %PDF?           ──→ Misc Others / Office
+    │
+    ├── 文件内容是 base64/32/58/62/64/85/hex 字符串? ──→ Encoding / Base 系列
+    ├── 文件内容是 ROT13/Caesar 等字符替换?    ──→ Encoding / 古典密码
+    ├── 文件内容是 BCD/IEEE754/Unicode Tags?   ──→ Encoding / 自定义编码
+    │
+    ├── 图片含 QR/Barcode 视觉特征?    ──→ Misc Others / Brainteaser
+    │
+    └── 都不匹配?                  ──→ 共享基础（file + strings + binwalk）
+```
+
+**识别优先级**：
+1. `python-magic` 检测 MIME（**优先**，per [`tools.md §4 python-magic-bin`](./tools.md)）
+2. 文件后缀（兜底）
+3. 内容嗅探（识别编码文本 / QR 视觉）
+4. 全部失败 → 共享基础入口
+
+详细实现见 [`Architecture.md §3.2 入口分流器`](./Architecture.md)。
+
+---
+
+## 7. 可疑点格式（统一 schema）
+
+> **所有工具的输出统一通过 `SuspiciousPoint` dataclass 表达，GUI 高亮 + journal 记录都基于此**。
+
+```python
+@dataclass
+class SuspiciousPoint:
+    id: str                  # UUID，自动生成
+    tool_name: str           # 触发的工具（如 "binwalk"）
+    file_path: str           # 原始文件路径
+    category: str            # 分类：flag / webshell / encoded / file_header / keyword / ...
+    offset: int | None       # 字节偏移（None = 不适用）
+    matched_pattern: str     # 匹配到的原始 pattern（如 "PK\x03\x04" / "uid=0" / "eval(base64_decode(...))"）
+    context: str             # 周围上下文（前后 32 字节 hex + ASCII）
+    severity: int            # 1-5（1=提示 / 3=可疑 / 5=强烈可疑）
+    suggested_action: str    # 推荐下一步动作（"建议 foremost 分离" / "建议 base64 解码"）
+    timestamp: datetime      # 触发时间
+```
+
+**category 关键字集合**（v0.1 初始）：
+- `flag` — `flag{...}` / `ctf{...}` / `key{...}` 正则命中
+- `webshell_family` — 冰蝎 / 菜刀 / 哥斯拉 / 变种 payload 特征
+- `file_header` — PK / Rar / 7z / jpg / png / pdf 等 magic bytes
+- `base64_candidate` — 长度 ≥ 16 且字符集匹配的 base64 串
+- `base32_candidate` — 同上
+- `hex_string` — 长度 ≥ 16 的纯 hex 串
+- `keyword` — password / secret / hidden / encrypt 等敏感关键字
+- `suspicious_url` — http:// / https:// 长 URL 含 webshell 关键字
+
+---
+
+## 8. 完成判定
+
+> automisc 的"完成"**不追求 flag 匹配**（per `AGENTS.md §1` 铁律 4 备注）。
+
+### 8.1 单次工具调用的成功标准
+
+- ✅ subprocess 退出码 0（或工具自身的"成功"返回）
+- ✅ 输出被正确解析为 `ToolResult`
+- ✅ 可疑点列表非空（如果有匹配的 pattern）或 显式标注"无可疑点"
+- ✅ journal 写入成功
+
+### 8.2 单任务完成（per `AGENTS.md §1` 铁律 4）
+
+1. ✅ 代码合并 main
+2. ✅ `pytest -m "not integration"` 全绿
+3. ✅ 涉及 GUI：`pytest -m integration` 跑通拖拽 / 菜单触发
+4. ✅ 涉及工具调用：至少 1 个真实 misc 样本 smoke，journal 关键可疑点命中一致
+5. ✅ Owner 自审
+6. ✅ 文档同步
+
+### 8.3 automisc v0.1 GA 标准
+
+- ✅ §4.1 v0.1 任务看板全部 ✅
+- ✅ §5.1 P0 工具池至少 5 个 adapter 跑通
+- ✅ §6 入口分流表全部覆盖
+- ✅ §7 可疑点 schema 在所有 adapter 统一
+- ✅ journal 自动记录 + 导出功能可用
+- ✅ 在至少 3 个真实 misc 样本上完整跑通（图片 / 流量 / 压缩各 1）
+
+---
+
+## 9. GUI 形态
+
+### 9.1 主窗口布局（占位 · 待 Q3 决策）
+
+**默认建议**：单窗口（左侧菜单树 + 右侧输出区 + 底部 journal 标签页）
+
+```
+┌────────────────────────────────────────────────────┐
+│  [文件] [编辑] [工具] [视图] [帮助]                │  ← 菜单栏
+├──────────┬─────────────────────────────────────────┤
+│ 📁 隐写  │  工具输出区（实时滚动 + ANSI 高亮）      │
+│ 📡 流量  │                                         │
+│ 📦 压缩  │  [+] binwalk -e challenge.bin           │
+│ 💾 内存  │  DECIMAL  HEXADECIMAL  DESCRIPTION       │
+│ 🔐 编码  │  0        0x0          PNG image, ...   │
+│ 🔍 取证  │  1024     0x400        Zip archive ...  │
+│          │  ...                                    │
+│ ─────────│                                         │
+│ 📋 自动  │  [?] 可疑点：检测到 PK 文件头，建议 foremost│  ← 高亮
+│   分析  │  [?] 可疑点：识别到 base64 串 ...           │
+├──────────┴─────────────────────────────────────────┤
+│ [输出] [Journal] [可疑点列表] [工具历史]            │  ← 底部标签页
+└────────────────────────────────────────────────────┘
+```
+
+### 9.2 交互约定
+
+- **拖拽接收**：单文件 / 多文件均可；拖入后自动触发入口分流，弹出 subflow 推荐菜单
+- **菜单触发**：点击工具菜单项 → Core 调用 adapter → 输出区实时渲染
+- **可疑点高亮**：所有 `SuspiciousPoint` 在输出区以醒目色块显示 + 底部"可疑点列表"标签页同步
+- **journal 自动**：每次工具调用结束，自动追加一段到 journal 标签页
+- **journal 导出**：菜单 → 文件 → 导出 journal → 保存为 `solve_journal.md`
+
+### 9.3 macOS 集成（v0.5+ 候选）
+
+- 文件拖拽到 Dock 图标直接进 automisc（需 `Info.plist` 配置）
+- 工具完成时 macOS 通知中心提示
+- Touch Bar 快捷触发（如果机器支持）
+
+---
+
+## 10. 演进路线图
+
+```
+v0.1（当前）              v0.5（中期）              v1.0（远期）
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│ GUI + 工具池      │     │ + 工具链模板       │     │ + DAG 编排        │
+│ + 手动菜单触发    │ ──→ │ （固定编排规则）    │ ──→ │ （基于数据依赖）   │
+│ + 可疑点高亮      │     │ pcap/image/archive│     │ 可视化编排视图     │
+│ + journal        │     │ 等预设模板          │     │ 手动干预 + 自动    │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+   纯离线                  纯离线                    纯离线
+   macOS only              macOS only                macOS only
+```
+
+### 10.1 v0.1（当前 · 最小可用 GUI）
+
+- 目标：手动菜单触发 + 可疑点高亮 + journal
+- 工具池：5+ P0 adapter
+- 编排：纯手动
+- 完成：§4.1 全部任务 ✅
+
+### 10.2 v0.5（中期 · 模板编排）
+
+- 目标：固定编排模板（3 个预设）
+- 工具池：P0 + P1 全部覆盖
+- 编排：模板顺序执行
+- 完成：§4.2 全部任务 ✅
+- **不引入**：LLM / 云端 / 跨平台
+
+### 10.3 v1.0（远期 · DAG 编排）
+
+- 目标：基于数据依赖的 DAG 自动编排
+- 编排：DAG 引擎 + 可视化视图 + 手动干预
+- 完成：§4.3 全部任务 ✅
+- **不引入**：LLM / 云端 / 跨平台
+
+### 10.4 明确不演进的方向
+
+| ❌ 不做 | 原因 |
+|---|---|
+| **不引入 LLM 编排决策** | 完全离线产品（per §2.2 硬约束）|
+| **不桥接 `misc/skills/*SKILL.md`** | skill 是给 AI Agent 用的，automisc 不消费（per `Architecture.md §5`）|
+| **不做跨平台** | macOS only |
+| **不做云端同步 / Web UI / 远程服务** | 完全离线桌面工具 |
+| **不做全自动拿 flag** | 半自动化辅助，最终决策权在人 |
+
+---
+
+## 11. 治理变更流程
+
+本文件的修改需要：
+
+1. **Owner 起草**变更提案
+2. 在 PR 描述中写明 **"治理变更"** + 原因 + 影响范围
+3. Owner 自审（单 Owner 项目）
+4. 重要变更应同步更新 [`Architecture.md`](./Architecture.md)
+5. 治理变更记录保留在 [`AGENTS.md §8`](./AGENTS.md) 变更日志
+
+> 任何修改需求的请求 → 走本文档更新流程 → 再实施代码。
+
+---
+
+## 12. 变更日志
+
+| 日期 | 版本 | 变更 |
+|---|---|---|
+| 2026-06-13 | 1.0 | 初版：产品定位 + 用户故事 + 范围/非范围 + 任务看板（v0.1/v0.5/v1.0 三阶段占位）+ 工具池初版 + 入口分流表 + 可疑点 schema + 完成判定 + GUI 形态 + 演进路线图。骨架参考 `pwn/autopwn/upgraded.md`，按 automisc 特性调整：明确不追求 flag 匹配作为完成判定；明确不引入 LLM；明确不桥接 skill 体系；演进路线砍掉 LLM 档位 |
+
+---
+
+> **最后一条**：
+> 本文档是 automisc 的**需求 + 演进**单一事实来源。任何"今天起要做什么"问题先查这里。
+> 历史决策在 [`AGENTS.md §8`](./AGENTS.md) + `git log`（永不删除）。

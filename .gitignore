@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# venv
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# extend_tools：外部 misc 工具源码 / 二进制（不纳入版本控制）
+extend_tools/
+# 例外：保留 png_crc_check.py 作为 PR1 工具池候选参考
+!extend_tools/png_crc_check.py

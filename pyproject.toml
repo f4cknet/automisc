@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "automisc"
+version = "0.1.0b.dev0"
+description = "AutoMisc — macOS GUI 半自动化 CTF Misc 工具箱（v0.1.dev）"
+readme = "../README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Minzhi Zhou" }]
+keywords = ["ctf", "misc", "steganography", "forensics", "security"]
+
+# v0.1 阶段：仅声明核心依赖；GUI / 隐写 / 取证 Python 包在后续 PR 追加
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+
+# GUI 依赖（v0.1.1 范围，不在本 PR 装）
+gui = ["PySide6>=6.6"]
+
+[project.scripts]
+automisc = "automisc.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"automisc" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["src"]
+addopts = "-ra -q"
+markers = [
+    "integration: marks tests as integration (deselect with '-m \"not integration\"')",
+]
