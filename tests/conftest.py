@@ -9,7 +9,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 # 集中触发所有 adapter 注册（per Architecture.md §6.3）
-# 直接 import 6 个 adapter 模块，触发 @register_tool 装饰器
+# 直接 import 所有 adapter 模块，触发 @register_tool 装饰器
 # 这比 import automisc.tools.shared 更可靠（避免 __init__.py 副作用）
 from automisc.tools.shared import binwalk  # noqa: F401, E402
 from automisc.tools.shared import exiftool  # noqa: F401, E402
@@ -17,3 +17,6 @@ from automisc.tools.shared import file  # noqa: F401, E402
 from automisc.tools.shared import foremost  # noqa: F401, E402
 from automisc.tools.shared import strings  # noqa: F401, E402
 from automisc.tools.shared import xxd  # noqa: F401, E402
+# v0.1.0b-PR2：Stego/Image
+from automisc.tools.steganography.image import steghide  # noqa: F401, E402
+from automisc.tools.steganography.image import zsteg  # noqa: F401, E402

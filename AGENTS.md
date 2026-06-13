@@ -92,6 +92,184 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 - 不引入跨平台 hack 代码（如 `sys.platform` 分支的特殊处理）
 - subprocess 调用外部工具时统一走 macOS 标准 PATH（`/usr/local/bin` / `/opt/homebrew/bin` / 用户 pyenv shims）
 
+### 2.5 GitHub 工作流（强制 · 2026-06-13 治理变更）
+
+**远端仓库**：
+
+| 项 | 值 |
+|---|---|
+| 仓库 URL | <https://github.com/f4cknet/automisc.git> |
+| SSH | `git@github.com:f4cknet/automisc.git` |
+| HTTPS | `https://github.com/f4cknet/automisc.git` |
+| 默认分支 | `main` |
+| 默认协议 | HTTPS（CI / AI Agent 默认；用户本地可选 SSH）|
+
+#### 2.5.1 AI Agent 远端操作权限（per 2026-06-13 Owner 决策 v2）
+
+> **AI Agent 拥有 push / merge 权利，但**每次执行前必须先询问 Owner，Owner 显式同意后才能执行**。
+>
+> 绝不允许擅自作主直接 push 或 merge。
+
+| 操作 | AI Agent | Owner 询问 | Owner 同意后 AI Agent 可执行 |
+|---|---|---|---|
+| `git add` | ✅ | — | — |
+| `git commit -m` | ✅ | — | — |
+| `git tag` | ✅ | — | — |
+| `git branch` (本地操作) | ✅ | — | — |
+| `git push` (远端) | 🟡 **需询问** | ✅ | ✅ |
+| `gh pr create` / web 开 PR | 🟡 **需询问** | ✅ | ✅ |
+| `gh pr merge` / web merge | 🟡 **需询问** | ✅ | ✅ |
+| `gh repo delete` / 删远端分支 | 🟡 **需询问** | ✅ | ✅ |
+
+**询问模板**（AI Agent 每次远端操作前必走）：
+
+```markdown
+===== REMOTE OPERATION REQUEST =====
+
+操作:  git push -u origin feat/v0.1.0b-PR2-image-stego
+仓库:  https://github.com/f4cknet/automisc.git
+分支:  feat/v0.1.0b-PR2-image-stego
+理由:  PR2 实施完成，75 tests PASS，6 关验收全过；本地 commit a61b970 待 push
+
+预期结果:
+  - 远端 main 不变（PR 通过 PR 合并，不是直推 main）
+  - 远端新增 feat/v0.1.0b-PR2-image-stego 分支
+
+不可逆性: ⚠️ push 到错误仓库会污染远端 history（但分支可删，主分支 force push 会破协议）
+
+请确认: [Y/n/修改后]
+==================================
+```
+
+**为什么不是"完全禁止"**：
+
+- AI Agent 拥有更精确的环境信息（本地 working tree 状态、git diff、测试结果），能帮 Owner 做更准确的 push 前自检
+- Owner 询问可以"批量授权"（如"PR3-PR9 全部由你 push"），适合节奏快的迭代期
+- 但**默认行为仍是询问**，避免擅自作主
+
+**为什么不是"完全放开"**：
+
+- push 到错误分支 / force push / merge 错 PR 是不可逆操作
+- AI Agent 缺少全局上下文（不知道 Owner 当前在 IDE 上干啥、是不是有未保存工作）
+- 一旦出错，Owner 没法"撤销"
+
+**事故响应**：
+
+- 错 push：Owner 在 GitHub 网页 Settings → Branches → Delete branch
+- 错 merge：GitHub 网页 Revert button（生成 revert commit，不丢历史）
+- force push 污染：联系 GitHub Support（极端情况）
+
+#### 2.5.2 每个任务的完整工作流（per 铁律 1 + 2）
+
+```
+1. 任务准备（Owner 在本地 main 分支）
+   - Owner: git checkout main && git pull
+   - 拉任务分支：git checkout -b <type>/<task-id>-<slug>
+     （<type> = feat / fix / docs / refactor / test / chore）
+     例：git checkout -b feat/v0.1.0b-PR2-image-stego
+   - Owner 通知 AI Agent："开干 v0.1.0b-PR2"，并把任务 ID 写到 prompt
+   - 在 prd.md §4.x 加任务行 + 状态 🔄（per 铁律 2 步骤 2）
+     ⚠️ 这一步 Owner 可让 AI Agent 代写，但提交仍 Owner 来
+
+2. AI Agent 实施 + 文档同步（同一分支内）
+   - AI Agent 按 Architecture.md 实施代码 + 测试
+   - AI Agent 同分支内更新 prd.md / Architecture.md / tools.md 相关章节
+   - **禁止分两个 commit**（per 铁律 3）
+
+3. AI Agent 本地 commit
+   - git add -A
+   - git commit -m "[v{X}.{Y}.{Z}] {动词} {对象}
+
+     {实施要点}
+
+     6 关验收：
+     ② pytest unit 全过（基线 + 新增 N 个）
+     ④ 真实样本 smoke：{fixture} → {命中可疑点}
+     ⑥ 文档同步（prd.md §4.x + Architecture.md + tools.md）"
+
+   - AI Agent 在终端打印：
+     ```
+     ===== READY FOR OWNER =====
+     分支：feat/v0.1.0b-PR2-image-stego
+     commit: <SHA>
+     6 关验收：② ✅ / ④ ✅ / ⑥ ✅
+     ===== NEXT STEP =====
+     请在本地人工执行：
+       git push -u origin feat/v0.1.0b-PR2-image-stego
+     然后在 GitHub 网页开 PR，target = main
+     PR 描述模板见下方
+     ```
+
+4. AI Agent 询问后 push + 开 PR（per §2.5.1 v2）
+   - AI Agent 在终端打印"REMOTE OPERATION REQUEST"模板（见 §2.5.1）
+   - Owner 回复 Y / n / 修改后
+   - Owner 同意后 AI Agent 执行：git push -u origin <branch>
+   - AI Agent 在 GitHub 网页开 PR（**Owner 同意**后）
+   - 如有 `gh` CLI 可用，AI Agent 也可用 `gh pr create --title ... --body ...`
+
+   PR 标题：[v{X}.{Y}.{Z}] {动词} {对象}（与 commit subject 一致）
+
+   PR 描述模板（AI Agent 提供草稿，Owner 复制粘贴）：
+   ```markdown
+   ## 任务
+   Refs `prd.md §4.x v{X}.{Y}.{Z}` — {任务名}
+
+   ## 实施要点
+   - {bullet 1}
+   - {bullet 2}
+
+   ## 6 关验收
+   - [ ] ① 代码合入 main（PR 合并后由 Owner 打勾）
+   - [x] ② pytest unit 全过
+   - [ ] ③ {集成 / GUI 测试}（per AGENTS.md §1 铁律 4 关 3）
+   - [x] ④ 真实样本 smoke：{描述}
+   - [x] ⑤ Owner 自审（per §2.2 单 Owner）
+   - [x] ⑥ 文档同步（本 PR 包含 prd.md / Architecture.md / tools.md 更新）
+
+   ## 测试证据
+   ```
+   $ pytest tests/unit -q
+   .......
+   73 passed in 1.85s  # 61 baseline + 12 new
+   ```
+
+   ```
+   $ python -m automisc run --tool {x} --file {fixture}
+   exit_code: 0
+   suspicious_points (N):
+     [5] flag: flag{...}
+   ```
+   ```
+
+5. AI Agent 询问后 merge（per §2.5.1 v2）
+   - AI Agent 在终端打印 merge 询问模板（"REMOTE OPERATION REQUEST"格式，但操作是 `gh pr merge --squash`）
+   - Owner 同意后 AI Agent 执行 merge
+   - **合并方式**：Squash and merge（保留任务 ID 在 commit message 第一行）
+   - 合并后：GitHub 自动删除远端 feature branch
+
+6. AI Agent 任务行状态收尾（在 main 分支，合并完成后）
+   - AI Agent 在 main 分支更新 prd.md §4.x 任务行状态 → ✅ + 加实际工时 + commit SHA
+   - AI Agent 本地 commit（独立 commit，per §9.4 规则）：
+     ```
+     [v{X}.{Y}.{Z}-status] mark task complete
+
+     - prd.md §4.x v{X}.{Y}.{Z}: 🔄 → ✅
+     - merged commit: <squash merge SHA>
+     - actual hours: <h>
+     ```
+   - **这个 commit 不 push**，等下次任务一起推（避免 1 个 commit / 1 次 push 的浪费）
+   - **或者** Owner 单独 push 也可（Owner 决定）
+
+#### 2.5.3 故障排除
+
+| 现象 | 处理 |
+|---|---|
+| `git push` 报 "Device not configured" | Owner 在本地手动 `git push`（AI Agent 环境无凭据）|
+| `git push` 报 "Host key verification failed" | `ssh-keyscan github.com >> ~/.ssh/known_hosts` 后重试，或改 HTTPS |
+| 远端 main 比本地新（多人协作场景）| `git pull --rebase` 后再 push feature branch |
+| PR 合并后远端分支残留 | GitHub 设置 → "Automatically delete head branches" 开启 |
+| AI Agent 误 push | **不可能**（per §2.5.1 硬约束）|
+
 ---
 
 ## 3. 违规与升级
@@ -140,6 +318,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 跨多个任务 ID 同时改代码 | 一次只动一个任务 ID |
 | 把现有代码逻辑"复述"而不抽到新层 | 严格遵守 `Architecture.md §1` 的分层依赖方向 |
 | **引入 LLM / 云端服务 / 在线编排决策**（违反 `prd.md §2` 非范围约束） | 仅在 `prd.md §10` 治理变更流程通过后实施 |
+| **`git push` 到 GitHub / `gh pr create` / merge PR / 删远端分支**（AI Agent **有权利**但**每次执行前必须先询问 Owner**，per §2.5.1 v2）| 帮 Owner 写 commit message / PR 描述草稿 / 终端打印"REMOTE OPERATION REQUEST"等待 Owner 确认 |
 
 > **关键自检**：每次输出代码前，AI Agent 必须在内部回答"这个改动对应 `prd.md §3` 哪一行？对应 `Architecture.md` 哪一节？"，回答不出就停手。
 
@@ -211,12 +390,111 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 
 ---
 
+## 9. Git 仓库 & 工作流速查
+
+> **本节是 §2.5 的速查表 + 状态看板**。详细流程见 §2.5。
+
+### 9.1 远端仓库
+
+| 项 | 值 |
+|---|---|
+| GitHub URL | <https://github.com/f4cknet/automisc> |
+| Clone (HTTPS) | `git clone https://github.com/f4cknet/automisc.git` |
+| Clone (SSH) | `git clone git@github.com:f4cknet/automisc.git` |
+| 默认分支 | `main` |
+| 协议优先级 | HTTPS（CI / AI Agent）> SSH（Owner 本地） |
+
+### 9.2 分支命名约定
+
+| 前缀 | 用途 | 示例 |
+|---|---|---|
+| `feat/` | 新功能 / 新 adapter | `feat/v0.1.0b-PR2-image-stego` |
+| `fix/` | bug 修复 | `fix/v0.1.0b-fix-zsteg-parsing` |
+| `docs/` | 纯文档变更 | `docs/v0.1.0b-refine-prd-section-5` |
+| `refactor/` | 重构（不改变行为）| `refactor/v0.1.0b-extract-suspicious-module` |
+| `test/` | 仅测试补充 | `test/v0.1.0b-PR2-add-zsteg-tests` |
+| `chore/` | 杂项（CI / 配置 / 依赖）| `chore/v0.1.0b-update-pyproject-deps` |
+
+### 9.3 commit message 格式
+
+**遵循 Conventional Commits 简化版**（per autopwn 实践经验）：
+
+```
+[v{X}.{Y}.{Z}] {动词} {对象}
+
+{1-3 行实施要点}
+
+{可选：6 关验收摘要}
+```
+
+**动词词汇**（避免时态混乱）：
+
+- `add` / `implement` / `support`（新功能）
+- `fix` / `correct` / `patch`（修复）
+- `refactor` / `extract` / `merge`（重构）
+- `update` / `clarify` / `sync`（文档）
+- `remove` / `drop`（删除）
+- `bump` / `upgrade`（依赖升级）
+
+**示例**：
+
+```
+[v0.1.0b-PR2] add zsteg + steghide image stego adapters
+
+- tools/steganography/image/{zsteg,steghide_image}.py
+- 可疑点：image stego (severity=4) + LSB text (severity=3)
+- 12 unit tests / 100% PASS
+
+6 关验收：
+② pytest tests/unit: 73 passed (61 baseline + 12 new)
+④ 真实样本 smoke：fixture 含 steghide 口令，命中
+```
+
+### 9.4 任务状态看板同步规则
+
+| 状态变更 | 时机 | 谁来做 | 远端操作 |
+|---|---|---|---|
+| `⏳` → `🔄` | PR 创建（Owner 推 + 开 PR）| AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
+| `🔄` → `👀` | PR 开完等自审 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
+| `👀` → `✅` | PR squash merge 进 main + 6 关全过 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** merge |
+| `⏳` / `🔄` → `❌` | 任务不再需要 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
+| 任意 → `⚠️` | 阻塞 | AI Agent 改状态 + commit | 🟡 AI Agent **询问后** push |
+
+> **状态更新与代码 commit 分离**（per §6.1 + `Architecture.md §10`）：状态更新是独立 commit，不进原 PR 的 commit message。这样 git blame 能清楚看到任务看板的演进历史。
+>
+> **状态更新 commit 可积累**（per §2.5.1 v2）：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。push 前必须先询问 Owner。
+
+### 9.5 当前任务状态（snapshot · 2026-06-13）
+
+| 任务 ID | 标题 | 状态 | 本地分支 | 远端 PR | push 状态 |
+|---|---|---|---|---|---|
+| `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | main（f2f4a93）| — | 🟡 **待询问** |
+| `v0.1.0b-PR2` | Stego/Image | ✅ done | feat/v0.1.0b-PR2-image-stego（a61b970 + 后续 merge）| — | 🟡 **待询问**（merge docs + v2 升级后）|
+| `v0.1.0b-docs` | GitHub workflow 治理 | ✅ 已 merge 进 PR2 分支 | （已在 PR2 分支内）| — | 🟡 同 PR2 一起 push |
+| `v0.1.0b-PR3` | Forensics/Network | ⏳ next | — | — | — |
+| `v0.1.0b-PR4` | Stego/Audio+Video | ⏳ | — | — | — |
+| `v0.1.0b-PR5` | Misc/Archive | ⏳ | — | — | — |
+| `v0.1.0b-PR6` | Forensics/Log | ⏳ | — | — | — |
+| `v0.1.0b-PR7` | Forensics/Memory（vol.py 恢复 blocker）| ⚠️ blocker | — | — | — |
+| `v0.1.0b-PR8` | Misc/Brainteaser QR | ⏳ | — | — | — |
+| `v0.1.0b-PR9` | Python 包基座 | ⏳ | — | — | — |
+
+> **push 状态列说明**（per §2.5.1 v2）："待询问"表示 AI Agent 已准备好本地 commit，但**未询问 Owner 前不会执行 push**。Owner 可以批量授权（如"PR2-PR9 都由你 push"）也可以单次授权。
+
+---
+
+---
+
 ## 8. 变更日志
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
 | 2026-06-13 | 1.0 | 初版：4 条铁律 + L1/L2/L3 违规分级 + 紧急通道 + AI Agent 精简条款（3 条核心）+ macOS only 约束（§2.4）+ 治理变更流程。骨架参考 `pwn/autopwn/AGENTS.md v1.7`，按 automisc 特性调整：铁律 4 完成判定改写（不追求 flag 匹配）；文档契约改为 `AGENTS.md` + `prd.md` + `Architecture.md` 三件套（无独立 `upgraded.md`，任务看板合并入 `prd.md §3`）；明确不引入 LLM / 不桥接 skill 体系 |
 | 2026-06-13 | 1.1 | **v0.1.0b-PR1 实施完成**（per `prd.md §4.1 v0.1.0b-PR1`）：实现 core/ + tools/shared/ 6 个 adapter + 61 unit tests 100% PASS + 真实样本 smoke 通过 6 关验收。**文档契约首次实战**：任务状态 🔄 → ✅ + `Architecture.md §10` + `tools.md §8` + 本表同步更新；代码与文档严格同 PR 落地 |
+| 2026-06-13 | 1.2 | **GitHub 工作流治理变更**（per Owner 2026-06-13 决策）：新增 §2.5（GitHub 工作流强制规范）+ §9（Git 仓库 & 工作流速查）。**关键约束**：（1）远端仓库 `https://github.com/f4cknet/automisc.git`；（2）每个任务必须在 feature 分支实施，PR target = `main`；（3）PR 标题 = `[v{X}.{Y}.{Z}] {动词} {对象}`；（4）PR 描述必须含 6 关验收 checklist；（5）合并方式 = Squash and merge；（6）AI Agent 不持有 GitHub 凭据，`git push` / `gh pr create` / merge 由 Owner 在本地完成。**注**：本条目同步自 `docs/v0.1.0b-add-github-workflow` 分支（commit 9644a53），因为 main 分支此前未包含 |
+| 2026-06-13 | 1.3 | **GitHub 工作流强化**：§2.5 重写为"AI Agent 硬约束"模式——**AI Agent 只做本地 commit，所有远端写操作 Owner 人工**。理由：AI Agent 不应持有 GitHub 凭据；远端写操作不可逆。§5 同步强化对应行。§9.4 状态同步表新增"commit 由 AI Agent 做 / push 由 Owner 做"明确分工。§9.5 snapshot 更新"本地分支 / 远端 PR"两列。**注**：本条目同步自 `docs/v0.1.0b-add-github-workflow` 分支（commit 9644a53） |
+| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**（per `prd.md §4.1 v0.1.0b-PR2`）：新增 `tools/steganography/image/{zsteg,steghide}.py` 两个 Stego/Image adapter；**75 个 pytest unit tests 100% PASS**（PR1 61 + PR2 14）；端到端 smoke：zsteg 命中 LSB 文本 (`flag{pr2_smoke_lsb_xyz}` severity=4) + steghide 正确识别两种 unavailable 信号（JPEG 编译限制 / 无 tty 环境）。**本地 commit 在 `feat/v0.1.0b-PR2-image-stego` 分支（待 Owner push + 开 PR）**；main 分支未变。**新增 `tools/base.py::_run_subprocess_with_input()`** 助手方法（per steghide 自动应答 prompt 需求）|
+| 2026-06-13 | **1.5** | **远端操作权限升级（per Owner 2026-06-13 12:31 决策）**：§2.5.1 从"硬禁止"升级为"**有权利但必须先询问 Owner**"。AI Agent 拥有 push / merge 权利，但每次执行前必须先询问并获得显式同意才能执行，绝不擅自作主。§9.4 状态同步表同步更新为"commit 由 AI Agent 做 / 远端操作 AI Agent 可做但必须先询问 Owner"。**事故响应流程**：错 push → GitHub 网页删分支；错 merge → Revert button 生成 revert commit。**迁移路径**：docs/v0.1.0b-add-github-workflow 分支内容已 merge 进 feat/v0.1.0b-PR2-image-stego（避免 push 时分两次推）；Owner 合并时合并 PR2 单 PR 即可，docs 分支可删 |
 
 ---
 
