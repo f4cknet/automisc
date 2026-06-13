@@ -542,6 +542,12 @@ src/automisc/
 - `extend_tools/volatility2/` — vol2 源码备份，**不要入包**；待 PR7-envfix 决策后处置
 - **本 PR（cleanup）不删代码**——仅在文档标记，后续 PR 按"逐项评估"原则处置
 
+#### 4.4.3 PR9 增量落地（2026-06-13 15:13）
+
+- `tests/fixtures/sample_text.txt` — 37 bytes，含 `flag{smoke_test_pr9_xyz}`，供 `automisc run --tool strings` smoke
+- `tests/unit/test_pr9_package_base.py` — 22 smoke 单测（包元数据 / 子包 import / CLI main / console_script / subprocess）
+- **未改任何 src/ 代码** — pyproject.toml + __init__.py + __main__.py 已就位，PR9 实质 = 锁定入口
+
 ### 4.5 adapter 文件 vs tools.md 关系（v0.1 P0 重点关注 · 2026-06-13 14:00 重整）
 
 > **修订说明**：原表 PR9 标的是 `python_magic_bin` / `numpy` adapter，但按 `prd.md §4.1` 重整后 PR9 = "Python 包基座"。本表重排：① PR9 改为包基座验证（依赖 `pyproject.toml` 中 optional `gui` / `dev` deps）；② adapter 实施 PR 编号保持 PR1~PR8；③ encoders 不入此表（走 `core/encoders/`，per §4.4）。
@@ -845,6 +851,7 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 15:13 | **1.4** | **v0.1.0b-PR9 实施完成**：包基座验证（`pip install -e ".[dev]"` 跑通 + console_script `automisc` 装到 PATH + `python -m automisc` 真起）。新增 `tests/fixtures/sample_text.txt` (37B smoke fixture) + `tests/unit/test_pr9_package_base.py` (22 smoke 单测)。97 unit tests PASS（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke：`automisc run --tool strings --file tests/fixtures/sample_text.txt` 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.3** | **v0.1.0b-cleanup 治理重整**（per `prd.md §4.1`）：① §4.4 拆"目标布局（target）" + "当前落地（actual）"两栏；② §4.5 PR9 改为包基座验证，移除 `python_magic_bin` / `numpy` adapter 行；③ 标记 `extend_tools/` 处置。详见本次 commit。 |
 | 2026-06-13 | 1.2 | v0.1.0b-PR2 实施落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
 | 2026-06-13 | **1.1** | v0.1.0b-PR1 实施落地（61 tests PASS）。详见 commit `9401f98`。 |
