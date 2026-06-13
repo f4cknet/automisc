@@ -104,7 +104,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | 默认分支 | `main` |
 | 默认协议 | HTTPS（CI / AI Agent 默认；用户本地可选 SSH）|
 
-#### 2.5.1 AI Agent Git 操作权限（per 2026-06-13 Owner 决策 v4）
+#### 2.5.1 AI Agent Git 操作权限（per Owner 决策，2026-06-13）
 
 > **核心原则**：所有 git 操作（含 3 类高风险远端操作）AI Agent 都有权利执行。每次执行前 AI Agent 必须**打印询问卡**（REMOTE OPERATION REQUEST）→ Owner 在对话中回复 **Y / n / 修改建议** → AI Agent 按回复执行。
 >
@@ -151,13 +151,6 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 ==================================
 ```
 
-**v4 vs v3 关键差异**：
-
-| 操作 | v3（之前）| v4（现在）|
-|---|---|---|
-| merge / push / 删临时分支 | 🟡 每次询问 + 等回复 | 🟡 每次询问 + Owner 仍每次回复（不批量授权） |
-| 其他 git 操作 | ✅ 直接 | ✅ 直接 |
-
 **Owner 批量授权机制**（可选加速）：
 
 > 在对话中说一次"批量授权：接下来 PR3-PR9 的所有 push / merge / 删分支都直接执行"，AI Agent **仍打印询问卡**（保留记录），但**不再停下来等回复**——自动按 Y 执行。如有例外，Owner 单次打断。
@@ -169,24 +162,6 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 - 错删分支：
   - 本地：`git reflog` 找到 SHA + `git branch <name> <sha>` 恢复
   - 远端：30 天内 GitHub Support 可恢复
-
-**v4 适用场景**：
-
-- Owner 信任 AI Agent 的本地精确信息（git diff / test result / commit log）
-- Owner 想专注任务本身，不想被频繁 git 操作打断
-- 但仍保留**对每个具体远端动作的最终签字权**——这是 §1 铁律 2 的"执行前必须 Owner 自审"在 git 维度的落地
-
-**v3 → v4 的设计动机**（per Owner 2026-06-13 12:54 决策）：
-
-- Owner 明确表示"所有执行动作都让 AI 执行（你打申请，我签字，你执行）"
-- v3 留了一个空隙——merge 操作默认 Owner 自助
-- v4 把 merge 完全纳入 AI Agent 询问流程（每次仍询问，但 Owner 每次都签字授权）
-
-**为什么 Owner 不能"完全不签字"**：
-
-- AI Agent 看不到全局（不知道 Owner 当前在 IDE 上干啥、是不是有未保存工作、远程 main 是否已被人 push 过）
-- merge / push / 删分支是不可逆操作，必须 Owner 知情同意
-- AI Agent 询问 + Owner 签字 = 最佳人机协作模式（AI 出精确信息 + 人类做不可逆决策）
 
 #### 2.5.2 每个任务的完整工作流（per 铁律 1 + 2）
 
@@ -214,22 +189,9 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
      6 关验收：
      ② pytest unit 全过（基线 + 新增 N 个）
      ④ 真实样本 smoke：{fixture} → {命中可疑点}
-     ⑥ 文档同步（prd.md §4.x + Architecture.md + tools.md）"
+     ⑥ 文档同步（prd.md §4.x + Architecture.md / tools.md）"
 
-   - AI Agent 在终端打印：
-     ```
-     ===== READY FOR OWNER =====
-     分支：feat/v0.1.0b-PR2-image-stego
-     commit: <SHA>
-     6 关验收：② ✅ / ④ ✅ / ⑥ ✅
-     ===== NEXT STEP =====
-     请在本地人工执行：
-       git push -u origin feat/v0.1.0b-PR2-image-stego
-     然后在 GitHub 网页开 PR，target = main
-     PR 描述模板见下方
-     ```
-
-4. AI Agent 询问后 push + 开 PR（per §2.5.1 v2）
+4. AI Agent 询问后 push + 开 PR（per §2.5.1）
    - AI Agent 在终端打印"REMOTE OPERATION REQUEST"模板（见 §2.5.1）
    - Owner 回复 Y / n / 修改后
    - Owner 同意后 AI Agent 执行：git push -u origin <branch>
@@ -270,7 +232,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
    ```
    ```
 
-5. AI Agent 询问后 merge（per §2.5.1 v2）
+5. AI Agent 询问后 merge（per §2.5.1）
    - AI Agent 在终端打印 merge 询问模板（"REMOTE OPERATION REQUEST"格式，但操作是 `gh pr merge --squash`）
    - Owner 同意后 AI Agent 执行 merge
    - **合并方式**：Squash and merge（保留任务 ID 在 commit message 第一行）
@@ -347,7 +309,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | 跨多个任务 ID 同时改代码 | 一次只动一个任务 ID |
 | 把现有代码逻辑"复述"而不抽到新层 | 严格遵守 `Architecture.md §1` 的分层依赖方向 |
 | **引入 LLM / 云端服务 / 在线编排决策**（违反 `prd.md §2` 非范围约束） | 仅在 `prd.md §10` 治理变更流程通过后实施 |
-| **`git push` / `gh pr merge` / 删临时分支**（AI Agent 全权处理所有 git 操作，但**这 3 类高风险远端操作每次执行前必须先询问 Owner**，per §2.5.1 v4 "AI 打申请 / Owner 签字 / AI 执行" 工作模式）| 帮 Owner 写 commit message / PR 描述草稿 / 终端打印"REMOTE OPERATION REQUEST"等待 Owner 确认 |
+| **`git push` / `gh pr merge` / 删临时分支**（AI Agent 全权处理所有 git 操作，但**这 3 类高风险远端操作每次执行前必须先询问 Owner**，per §2.5.1 "AI 打申请 / Owner 签字 / AI 执行" 工作模式）| 帮 Owner 写 commit message / PR 描述草稿 / 终端打印"REMOTE OPERATION REQUEST"等待 Owner 确认 |
 
 > **关键自检**：每次输出代码前，AI Agent 必须在内部回答"这个改动对应 `prd.md §3` 哪一行？对应 `Architecture.md` 哪一节？"，回答不出就停手。
 
@@ -491,7 +453,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 > **状态更新与代码 commit 分离**（per §6.1 + `Architecture.md §10`）：状态更新是独立 commit，不进原 PR 的 commit message。这样 git blame 能清楚看到任务看板的演进历史。
 >
-> **状态更新 commit 可积累**（per §2.5.1 v4）：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。push 前必须先询问 Owner。
+> **状态更新 commit 可积累**（per §2.5.1）：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。push 前必须先询问 Owner。
 
 ### 9.5 当前任务状态（snapshot · 2026-06-13 12:46）
 
@@ -508,7 +470,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | `v0.1.0b-PR8` | Misc/Brainteaser QR | ⏳ | — | — | — |
 | `v0.1.0b-PR9` | Python 包基座 | ⏳ | — | — | — |
 
-> **远端操作状态列说明**（per §2.5.1 v4）：✅ 表示已 push；🟡 表示 AI Agent 已准备好但**未询问 Owner 前不会执行**远端操作。Owner 可在对话中批量授权（如"PR3-PR9 所有 push / merge / 删临时分支都授权你"），AI Agent 收到后仍打印询问卡但不再停下来等回复。
+> **远端操作状态列说明**（per §2.5.1）：✅ 表示已 push；🟡 表示 AI Agent 已准备好但**未询问 Owner 前不会执行**远端操作。Owner 可在对话中批量授权（如"PR3-PR9 所有 push / merge / 删临时分支都授权你"），AI Agent 收到后仍打印询问卡但不再停下来等回复。
 
 ---
 
@@ -522,10 +484,10 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**（per `prd.md §4.1 v0.1.0b-PR2`）：新增 `tools/steganography/image/{zsteg,steghide}.py` 两个 Stego/Image adapter；**75 个 pytest unit tests 100% PASS**（PR1 61 + PR2 14）；端到端 smoke：zsteg 命中 LSB 文本 (`flag{pr2_smoke_lsb_xyz}` severity=4) + steghide 正确识别两种 unavailable 信号（JPEG 编译限制 / 无 tty 环境）。**本地 commit 在 `feat/v0.1.0b-PR2-image-stego` 分支（待 Owner push + 开 PR）**；main 分支未变。**新增 `tools/base.py::_run_subprocess_with_input()`** 助手方法（per steghide 自动应答 prompt 需求）|
-| 2026-06-13 | **1.5** | **远端操作权限升级（per Owner 2026-06-13 12:31 决策）**：§2.5.1 从"硬禁止"升级为"**有权利但必须先询问 Owner**"。AI Agent 拥有 push / merge 权利，但每次执行前必须先询问并获得显式同意才能执行，绝不擅自作主。§9.4 状态同步表同步更新为"commit 由 AI Agent 做 / 远端操作 AI Agent 可做但必须先询问 Owner"。**事故响应流程**：错 push → GitHub 网页删分支；错 merge → Revert button 生成 revert commit。**迁移路径**：docs/v0.1.0b-add-github-workflow 分支内容已 merge 进 feat/v0.1.0b-PR2-image-stego（避免 push 时分两次推）；Owner 合并时合并 PR2 单 PR 即可，docs 分支可删 |
-| 2026-06-13 | **1.6** | **Git 操作权限最终方案（per Owner 2026-06-13 12:46 决策 v3）**：§2.5.1 从"push/merge 都询问"细化为"**AI Agent 全权处理所有 git 操作**（包括 push / merge / 删分支），**仅 3 类高风险远端操作必须询问**：(1) `git push` 远端；(2) `gh pr merge` / `gh pr create`；(3) **删临时分支**（本地 + 远端，含 `git branch -D` 和 `git push origin --delete`）。其余操作（add / commit / tag / checkout / branch create / stash / reset --soft / 本地 merge / 本地 rebase / cherry-pick / fetch / log 等）AI Agent 全权处理。**新增**：批量授权机制（Owner 一句话授权后，AI Agent 仍打印询问卡但不再停等）。**3 类高风险理由**：push 错分支 / merge 错 PR / 误删长期分支都是不可逆且容易出错 |
-| 2026-06-13 | **1.7** | **Git 操作权限升级 v3 → v4（per Owner 2026-06-13 12:54 决策）**：Owner 明确"所有执行动作都让 AI 执行（你打申请，我签字，你执行）"。v4 与 v3 差异：v3 默认 v3 留了一个空隙——merge 操作默认 Owner 自助；**v4 把 merge 完全纳入 AI Agent 询问流程**（每次仍询问，但 Owner 每次都签字授权）。**核心原则**：所有 git 操作（含 3 类高风险远端操作）AI Agent 都有权利执行；每次执行前 AI Agent 必须**打印询问卡** → Owner 在对话中回复 **Y / n / 修改建议** → AI Agent 按回复执行。**新增**：v4 适用场景与设计动机说明。**Owner 批量授权机制**：对话中说"批量授权：接下来 PR3-PR9 的所有 push / merge / 删分支都直接执行"，AI Agent 仍打印询问卡（保留记录）但不再停下来等回复 |
+| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**：`tools/steganography/image/{zsteg,steghide}.py` adapter 落地；75 unit tests PASS（PR1 61 + PR2 14）；详见 commit `4ca05e5`（PR #2）。 |
+| 2026-06-13 | **1.5** | **§2.5.1 升级 v2**：AI Agent 有 push/merge 权利但每次需询问 Owner。详见 git history。 |
+| 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
+| 2026-06-13 | **1.7** | **§2.5.1 升级 v4**：完全纳入 AI 询问流程（merge 不再 Owner 自助）；批量授权机制启用（per Owner 决策 2026-06-13 12:54）。详见 git history。 |
 
 ---
 

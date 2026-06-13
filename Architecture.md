@@ -846,11 +846,14 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 ## 10. 变更日志
 
+> **维护策略**：本表只保留**最近 4 条**。超出范围旧条目归档到 `docs/changelog/Architecture.md_archived.md`（v0.1+ 创建）。
+> 当前 3 条（1 条保留 + 2 条摘要）。
+
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-13 | 1.0 | 初版：4 层分层模型 + GUI 设计要点 + Core 调度层 API + 工具池 adapter 模式 + 与 skill 体系不桥接 + plug-in 机制 + 6 关验证方法 + 演进路径（v0.1→v0.5→v1.0）+ 兼容点预留。骨架参考 `pwn/autopwn/refactor.md §3 目标架构`，按 automisc 特性调整：4 层（GUI/Core/Tools/External）替代 7 层；明确 macOS only 单一假设；明确不桥接 skill；明确不引入 LLM |
-| 2026-06-13 | **1.1** | **v0.1.0b-PR1 实施落地**（per [`prd.md §4.1`](./prd.md)）：实现 `core/{result,suspicious,registry,orchestrator}.py` + `tools/base.py` + `tools/shared/{file,strings,binwalk,foremost,exiftool,xxd}.py`；**61 个 pytest unit 测试全过**；真实样本 smoke 命中关键可疑点（flag/PNG magic/base64/file_header）。**PR1 同步更新**：`§4.4` adapter 文件清单中的 PR1 6 个 ✅ adapter 从"待写"变"已实现"。**未做的事**（per `tools.md §6.2`）：PR2-PR9（Stego/Network/Audio+Video/Archive/Log/Memory/Brainteaser/Python 包）尚未实施 |
-| 2026-06-13 | **1.2** | **v0.1.0b-PR2 实施落地**：新增 `tools/steganography/image/{zsteg,steghide}.py` 两个 Stego/Image adapter；**75 个 pytest unit tests 全过**（PR1 61 + PR2 14）；端到端 smoke：zsteg 命中 LSB 文本 severity=4 + steghide 正确分类两种 unavailable 信号。**新增** `tools/base.py::_run_subprocess_with_input()` 助手方法。**§4.4 adapter 文件清单更新**：steganography/image/ 子目录落地，2 个 PR2 adapter 从"待写"变"已实现"。**未做的事**（per `tools.md §6.2`）：PR3-PR9 尚未实施 |
+| 2026-06-13 | 1.0 | 初版：4 层分层模型 + Core API + adapter 模式 + plug-in 机制 + 6 关验证 + 演进路径（v0.1→v0.5→v1.0）。详见 git history。 |
+| 2026-06-13 | **1.1** | v0.1.0b-PR1 实施落地（61 tests PASS）。详见 commit `9401f98`。 |
+| 2026-06-13 | **1.2** | v0.1.0b-PR2 实施落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
 
 ---
 
