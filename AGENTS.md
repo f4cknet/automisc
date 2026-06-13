@@ -462,7 +462,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | **P0** | `v0.1.0b-cleanup` | 文档重整（PR0）| ✅ done | commit `b1643bc`（main 本地，未 push）|
 | P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ✅ done | commit `da0f5a6`（feat 分支本地，未 push）|
-| P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox）| ⏳ | 依赖 PR9 |
+| P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox + steghide_audio）| ✅ done | commit `待定`（feat 分支本地，未 push）|
 | P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
 | P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 依赖 PR9 |
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
@@ -488,6 +488,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 16:55 | **1.11** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter）。ffmpeg 共享 binary，audio/video 各自独立 name。17 单测 + 2 fixture。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio/ffprobe/steghide_audio 全命中。详见本次 commit。 |
 | 2026-06-13 16:08 | **1.10** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（tshark + tcpdump）。tshark 用 `-T fields` CSV 模式 + webshell 关键字白名单。10 单测 + hand-write pcap fixture。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke 命中 flag [5] + webshell [4]。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.9** | **v0.1.0b-PR9 实施完成**：包基座 smoke（`pip install -e ".[dev]"` + `python -m automisc` + console_script `automisc` 全跑通）。新增 22 单测（包元数据 / 子包 import / CLI main / subprocess），总计 **97 unit tests PASS**（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `prd.md §4.1` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `Architecture.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
