@@ -9,13 +9,14 @@
 
 | 字段 | 值 |
 |---|---|
-| **当前 main HEAD** | `b9226c1`（v0.5-GUI-shortcuts）|
-| **当前版本** | v0.5+（频繁迭代模式，已 8 迭代）|
-| **下一个 milestone** | v0.5+ 真实题库回归（≥ 5 题）/ 递归链 / GUI 进度条（**owner 自由选**）|
+| **当前 main HEAD** | `e2fe29c`（v0.5-session-summary）|
+| **当前版本** | v0.5+（频繁迭代模式，已 9 迭代）|
+| **下一个 milestone** | 待 Owner 决策（**3 个新工具** base64 data URL / JPEG trailer / QR 坐标 4-5h，**优先**）|
 | **主分支** | main（per `AGENTS.md §2.4` 单 Owner 简化：直接 main commit）|
 | **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.4 v1.20 治理变更）|
 | **3 件套行数** | AGENTS 101 + prd 93 + STRUCTURE 186 = **380 行**（v3.0 治理）|
 | **测试** | **349 passed**（306 v0.1.1 基线 + 43 v0.5+ 增量）|
+| **真 flag 数** | **4**（QR + steg + KEY + meihuai）|
 | **今晚 commit 数** | 8 (4b4af51 → b9226c1) |
 | **真 flag 命中** | 2 (Challenge/QR_code.png `CTF{vjpw_wnoei}` + Challenge/steg.png `st3g0_saurus_wr3cks`) |
 

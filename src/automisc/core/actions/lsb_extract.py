@@ -201,14 +201,15 @@ class LSBExtractAction(Action):
             seen_texts: list[dict[str, Any]] = []
             best_sensitive: dict[str, Any] | None = None  # severity=5 命中
             for entry in text_entries:
+                # 抽 raw text
                 raw = _run_zsteg_extract(file_path, entry["channel"])
                 if raw is None:
+                    # 抽不出 raw, 退而用 zsteg 显示的 content
                     text = entry["content"]
                 else:
-                    try:
-                        text = raw.decode("utf-8").rstrip("\x00").strip()
-                    except UnicodeDecodeError:
-                        text = raw.decode("utf-8", errors="replace").rstrip("\x00").strip()
+                    # 抽出的 raw bytes 可能含 0xff 等非 UTF-8 字符
+                    # 用 errors='replace' 容错 (e.g. KEY.exe 解出的 133x133 PNG 含 0xff 字节)
+                    text = raw.decode("utf-8", errors="replace").rstrip("\x00").strip()
                 severity = score_text_severity(text)
                 is_sensitive = severity == 5
                 seen_texts.append({
