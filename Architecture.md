@@ -490,8 +490,8 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   │   ├── image/                       # ✅ PR2（zsteg + steghide）            ⏳ PR2 后续（binwalk/exiftool/foremost 共享版）
 │   │   ├── audio/                       # ✅ PR4（ffmpeg + sox + steghide_audio）
 │   │   └── video/                       # ✅ PR4（ffprobe + ffmpeg_video）
-│   ├── misc/                            # ⏳ PR5 / PR8
-│   │   ├── archive/
+│   ├── misc/                            # ✅ PR5（archive/）  ⏳ PR8
+│   │   ├── archive/                     # ✅ PR5（sevenz + unzip + john）
 │   │   ├── office/                      # P1 · 未排期
 │   │   └── brainteaser/
 │   └── shared/                          # 共享基础工具
@@ -570,9 +570,9 @@ src/automisc/
 | `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | **✅ PR4** |
 | `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | **✅ PR4** |
 | `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | **✅ PR4** |
-| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | ⏳ PR5 |
-| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | ⏳ PR5 |
-| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ❌ `brew install john-jumbo`（v0.1 必装）| ⏳ PR5 |
+| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | **✅ PR5** |
+| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | **✅ PR5** |
+| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ✅ `brew install john-jumbo` | **✅ PR5** |
 | `tools/forensics/log/grep.py` | [`tools.md §3.12 grep`](./tools.md) | ✅ macOS 自带 | ⏳ PR6 |
 | `tools/forensics/log/evtx_dump.py` | [`tools.md §3.4 evtx_dump`](./tools.md) | ⚠️ `pip install python-evtx` | ⏳ PR6 |
 | `tools/forensics/memory/vol.py` | [`tools.md §3.1 vol.py`](./tools.md) | ⚠️ **blocker**（per PR7-envfix）| ⚠️ PR7 |
@@ -852,6 +852,7 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 17:05 | **1.7** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（3 个新 adapter：sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 双重探测，命中伪加密"Wrong password"信号 [4]。新增 10 单测 + 2 fixture（普通 zip + 伪加密 zip）。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：sevenz 伪加密命中 [4]；正常 zip 命中 file count [1]；john 列出 zip2john/rar2john capability。详见本次 commit。 |
 | 2026-06-13 16:55 | **1.6** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter：ffmpeg_audio/sox/steghide_audio + ffprobe/ffmpeg_video）。ffmpeg 共享 binary，audio/video 各自独立 adapter name 便于 GUI 分类。新增 17 单测 + 2 fixture（WAV/MP4，含 flag metadata）。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio 命中 flag [5] + duration + audio_stream；ffprobe 命中 flag [5] + 2 streams + duration；steghide_audio 命中 capacity + tty unavailable 信号。详见本次 commit。 |
 | 2026-06-13 16:08 | **1.5** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（`tools/forensics/network/tshark.py` + `tcpdump.py`）。tshark 用 `-T fields` CSV 模式 + `http.request.uri/method` 字段；含 webshell 关键字白名单（eval/assert/base64_decode + shell.php/cmd.php + antsword/behinder）。新增 10 单测 + hand-write 经典 pcap fixture（389B，含 flag + webshell POST）。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke：`automisc run --tool tshark --file tests/fixtures/sample_http_flag.pcap` 命中 flag [5] + webshell_family [4]；tcpdump 同样命中。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.4** | **v0.1.0b-PR9 实施完成**：包基座验证（`pip install -e ".[dev]"` 跑通 + console_script `automisc` 装到 PATH + `python -m automisc` 真起）。新增 `tests/fixtures/sample_text.txt` (37B smoke fixture) + `tests/unit/test_pr9_package_base.py` (22 smoke 单测)。97 unit tests PASS（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke：`automisc run --tool strings --file tests/fixtures/sample_text.txt` 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
