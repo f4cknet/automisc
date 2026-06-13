@@ -22,6 +22,11 @@ from PySide6.QtWidgets import (
     QStatusBar,
 )
 
+from automisc.core.chains import (
+    build_zip_chain_dag,
+    find_embedded_archives,
+)
+from automisc.core.dag import DAG
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.registry import list_tools
 from automisc.core.router import FileRouter, RouteRecommendation
@@ -183,7 +188,7 @@ class MainWindow(QMainWindow):
             self.journal_panel.add_suspicious(tool_name, self.current_file, sp)
 
     def _on_auto_chain_finished(self, summaries) -> None:
-        """整链跑完 → 输出总结."""
+        """整链跑完 → 输出总结 + 检测 binwalk 输出含 archive → 触发 zip_chain."""
         total = len(summaries)
         ok = sum(1 for s in summaries if s.success)
         sps = sum(s.suspicious_count for s in summaries)
@@ -193,6 +198,87 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"auto-run done: {ok}/{total} OK · {sps} suspicious points"
         )
+
+        # v0.5-DAG: 检查 binwalk 输出里是否含 embedded archive → 触发 zip_chain
+        if self._current_recommendations:
+            binwalk_summary = next(
+                (s for s in summaries if s.tool_name == "binwalk"),
+                None,
+            )
+            if binwalk_summary and binwalk_summary.success:
+                # 从 core.journal 取 binwalk stdout
+                binwalk_entries = self.core.journal.filter_by_tool("binwalk")
+                if binwalk_entries:
+                    last_binwalk = binwalk_entries[-1]
+                    # journal 不存 stdout, 改用 ad-hoc 拿
+                    self._maybe_trigger_zip_chain_from_binwalk()
+
+    def _maybe_trigger_zip_chain_from_binwalk(self) -> None:
+        """跑一次 binwalk 拿 stdout, 检测 archive, 触发 zip_chain."""
+        if not self.current_file:
+            return
+        try:
+            result = self.core.run_tool("binwalk", str(self.current_file))
+        except Exception:  # noqa: BLE001
+            return
+
+        if not result.stdout:
+            return
+
+        archives = find_embedded_archives(result.stdout)
+        if not archives:
+            return
+
+        # binwalk 报有 archive → 提取 + 触发 zip_chain
+        self.output_view.append_text(
+            f"\n[DAG trigger] binwalk 检测到 {len(archives)} 个 embedded archive:\n"
+        )
+        for arch in archives[:5]:
+            self.output_view.append_text(f"  {arch}\n")
+
+        # 跑提取
+        extract_dir = Path("/tmp/automisc_extract")
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        binwalk_result = result  # 已跑过
+        if "extracted_files" in result.suspicious_points[0].__dict__ if result.suspicious_points else False:
+            pass  # binwalk 没暴露 extracted files via sps; 用 tool 直接抽取
+
+        # 跑 binwalk_extract
+        from automisc.core.actions.binwalk_extract import BinwalkExtractAction
+
+        binwalk_extract = BinwalkExtractAction()
+        extract_result = binwalk_extract.run(
+            {"file_path": str(self.current_file), "extract_dir": str(extract_dir)}
+        )
+        if not extract_result.success:
+            self.output_view.append_text(
+                f"[!] binwalk extract failed: {extract_result.message}\n"
+            )
+            return
+
+        extracted_files = extract_result.data.get("extracted_files", [])
+        zip_files = [
+            f for f in extracted_files
+            if f.lower().endswith((".zip",))
+        ]
+        if not zip_files:
+            self.output_view.append_text(
+                f"[!] no .zip file among {len(extracted_files)} extracted files\n"
+            )
+            return
+
+        # 对每个 zip 跑 chain
+        for zip_path in zip_files[:3]:  # 限制 3 个
+            self.output_view.append_text(
+                f"\n[DAG] running zip_chain on {Path(zip_path).name}...\n"
+            )
+            dag: DAG = build_zip_chain_dag()
+            ctx = dag.execute({"file_path": zip_path})
+            log = ctx.get("__log__", [])
+            for step in log:
+                self.output_view.append_text(
+                    f"  [{step['step']}] {step['node']}: {step['message']}\n"
+                )
 
     def _on_auto_chain_failed(self, tool_name: str, error_msg: str) -> None:
         self.output_view.append_text(

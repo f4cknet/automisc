@@ -35,6 +35,7 @@
 | ID | 标题 | 状态 | 实施 | 文件 |
 |---|---|---|---|---|
 | v0.1.1-auto-run | 拖文件自动跑 top 5 推荐 | ✅ done | main `6e4e14f` | [`upgrade/v0.1.1-auto-run.md`](upgrade/v0.1.1-auto-run.md) |
+| v0.5-DAG-chain | binwalk 检测 + 自动分离 + zip 智能分析链 | ✅ done | main (待 push) | [`upgrade/v0.5-DAG-chain.md`](upgrade/v0.5-DAG-chain.md) |
 
 ---
 

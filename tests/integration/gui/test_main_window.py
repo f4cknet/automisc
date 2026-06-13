@@ -207,7 +207,9 @@ class TestEndToEnd:
 
     def test_run_tool_against_sample(self, qtbot, sample_text):
         """拖入 sample + 选 strings → output 显示 flag{smoke_test_pr9_xyz}."""
+        # 关键: 关 auto-run 避免 auto-run 也写 journal
         w = MainWindow(core=CoreOrchestrator())
+        w._auto_run_enabled = False
         qtbot.addWidget(w)
 
         from PySide6.QtCore import QMimeData, QPoint, QUrl
