@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from automisc.core.actions.binwalk_extract import BinwalkExtractAction
+from automisc.core.actions.foremost_extract import ForemostExtractAction
 from automisc.core.actions.zip_chain import (
     BruteforceZipAction,
     FixPseudoEncryptionAction,
@@ -41,10 +42,17 @@ def build_zip_chain_with_bruteforce() -> DAG:
 
 
 def build_binwalk_extract_dag() -> DAG:
-    """binwalk 分离链:
+    """binwalk 分离链 (delegated to binwalk 检测 + foremost 提取):
     binwalk_extract → (success/failure → 终止)
     """
     return DAG(start_node=DAGNode(BinwalkExtractAction()))
+
+
+def build_foremost_extract_dag() -> DAG:
+    """foremost 单独提取链 (skip binwalk detection):
+    foremost_extract → (success/failure → 终止)
+    """
+    return DAG(start_node=DAGNode(ForemostExtractAction()))
 
 
 # ---------- 检测 binwalk 输出含 ZIP / 7z / rar / tar 等 ----------
@@ -62,5 +70,6 @@ __all__ = [
     "build_zip_chain_dag",
     "build_zip_chain_with_bruteforce",
     "build_binwalk_extract_dag",
+    "build_foremost_extract_dag",
     "find_embedded_archives",
 ]

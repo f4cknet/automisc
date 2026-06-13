@@ -85,10 +85,12 @@ def cmd_chain(args: argparse.Namespace) -> int:
     支持的 chain:
     - zip: try_unzip -> fix_pseudo (默认)
     - zip-full: try_unzip -> fix_pseudo -> bruteforce
-    - binwalk: binwalk_extract
+    - binwalk: binwalk 检测 + foremost 提取
+    - foremost: foremost 单独提取 (skip binwalk detection)
     """
     from automisc.core.chains import (
         build_binwalk_extract_dag,
+        build_foremost_extract_dag,
         build_zip_chain_dag,
         build_zip_chain_with_bruteforce,
     )
@@ -116,6 +118,8 @@ def cmd_chain(args: argparse.Namespace) -> int:
         dag = build_zip_chain_with_bruteforce()
     elif chain_name == "binwalk":
         dag = build_binwalk_extract_dag()
+    elif chain_name == "foremost":
+        dag = build_foremost_extract_dag()
     else:
         print(f"unknown chain: {chain_name}")
         return 1
@@ -184,8 +188,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_chain.add_argument(
         "--chain",
         required=True,
-        choices=["zip", "zip-full", "binwalk"],
-        help="chain 类型: zip (try_unzip+fix_pseudo) / zip-full (+bruteforce) / binwalk",
+        choices=["zip", "zip-full", "binwalk", "foremost"],
+        help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取)",
     )
     p_chain.add_argument("--file", required=True, help="目标文件路径")
     p_chain.add_argument(

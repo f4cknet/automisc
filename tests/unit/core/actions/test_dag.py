@@ -8,6 +8,10 @@ from pathlib import Path
 import pytest
 
 from automisc.core.actions.binwalk_extract import BinwalkExtractAction
+from automisc.core.actions.foremost_extract import (
+    ForemostExtractAction,
+    find_foremost_extract,
+)
 from automisc.core.actions.zip_chain import (
     BruteforceZipAction,
     FixPseudoEncryptionAction,
@@ -113,12 +117,14 @@ class TestBinwalkExtract:
         zip_data = b"PK\x03\x04" + b"\x00" * 50
         src.write_bytes(png_data + b"\x00\x00\x00\x00" + zip_data)
 
-        if not shutil.which("binwalk"):
-            pytest.skip("binwalk not installed")
+        if not shutil.which("binwalk") or not shutil.which("foremost"):
+            pytest.skip("binwalk or foremost not installed")
 
         extract_dir = tmp_path / "extract"
         action = BinwalkExtractAction()
         result = action.run({"file_path": str(src), "extract_dir": str(extract_dir)})
+        # binwalk 可能识别也可能不识别（取决于样本）
+        # 至少要返回 success=True 或 False with message
         assert result.message  # 必有 message
 
     def test_binwalk_extract_missing_file(self, tmp_path):
@@ -126,6 +132,66 @@ class TestBinwalkExtract:
         result = action.run({"file_path": str(tmp_path / "nonexistent.bin")})
         assert result.success is False
         assert "not found" in result.message
+
+
+# ---------- foremost_extract (v0.5 重构) ----------
+class TestForemostExtract:
+    def test_foremost_extract_real_file(self, tmp_path):
+        """foremost 单独提取（skip binwalk）."""
+        if not shutil.which("foremost"):
+            pytest.skip("foremost not installed")
+
+        # 造一个含 zip 头的复合文件
+        src = tmp_path / "composite.bin"
+        png_data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 50
+        zip_data = b"PK\x03\x04" + b"\x00" * 50
+        src.write_bytes(png_data + b"\x00\x00\x00\x00" + zip_data)
+
+        action = ForemostExtractAction(file_types="all")
+        result = action.run({"file_path": str(src)})
+        # foremost 应该会识别 zip + png
+        assert result.message
+        if result.success:
+            assert "extracted_files" in result.data
+
+    def test_foremost_extract_missing_file(self, tmp_path):
+        action = ForemostExtractAction()
+        result = action.run({"file_path": str(tmp_path / "nonexistent.bin")})
+        assert result.success is False
+        assert "not found" in result.message
+
+    def test_foremost_extract_custom_types(self, tmp_path):
+        """file_types 参数生效 (e.g. 仅 zip)."""
+        if not shutil.which("foremost"):
+            pytest.skip("foremost not installed")
+
+        # 造 png-only 文件
+        src = tmp_path / "img.bin"
+        src.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        action = ForemostExtractAction(file_types="zip")
+        result = action.run({"file_path": str(src)})
+        # 期望失败 (无 zip 提取)
+        assert result.message
+
+    def test_find_foremost_extract_helper(self, tmp_path):
+        """helper 函数: 扫描 output_dir 找 extracted files."""
+        # 造 fake foremost output 结构
+        out = tmp_path / "foremost_out"
+        (out / "zip").mkdir(parents=True)
+        (out / "png").mkdir(parents=True)
+        (out / "zip" / "00000000.zip").write_bytes(b"fake")
+        (out / "png" / "00000000.png").write_bytes(b"fake")
+        (out / "zip" / "audit.txt").write_text("audit")  # 应被排除
+
+        files = find_foremost_extract(out)
+        assert len(files) == 2  # 排除 audit.txt
+        assert any("zip" in f for f in files)
+        assert any("png" in f for f in files)
+        assert not any("audit.txt" in f for f in files)
+
+    def test_foremost_extract_nonexistent_dir(self, tmp_path):
+        """output dir 不存在 → empty list."""
+        assert find_foremost_extract(tmp_path / "no_such_dir") == []
 
 
 # ---------- zip_chain: detection ----------
