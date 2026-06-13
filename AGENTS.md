@@ -516,12 +516,12 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 ## 8. 变更日志
 
+> **维护策略**：本表只保留**最近 4 条**（治理/实施重大节点）。超出范围的旧条目按版本号升序归档到 [`docs/changelog/AGENTS.md_archived.md`](./docs/changelog/AGENTS.md_archived.md)。
+> **未来规则**：新增条目时追加到表尾；当本表超过 4 条时，最旧的一条移入归档文件并在本表删除。
+> 末次归档：2026-06-13（v1.0 / v1.1 / v1.2 / v1.3 已归档）。
+
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-13 | 1.0 | 初版：4 条铁律 + L1/L2/L3 违规分级 + 紧急通道 + AI Agent 精简条款（3 条核心）+ macOS only 约束（§2.4）+ 治理变更流程。骨架参考 `pwn/autopwn/AGENTS.md v1.7`，按 automisc 特性调整：铁律 4 完成判定改写（不追求 flag 匹配）；文档契约改为 `AGENTS.md` + `prd.md` + `Architecture.md` 三件套（无独立 `upgraded.md`，任务看板合并入 `prd.md §3`）；明确不引入 LLM / 不桥接 skill 体系 |
-| 2026-06-13 | 1.1 | **v0.1.0b-PR1 实施完成**（per `prd.md §4.1 v0.1.0b-PR1`）：实现 core/ + tools/shared/ 6 个 adapter + 61 unit tests 100% PASS + 真实样本 smoke 通过 6 关验收。**文档契约首次实战**：任务状态 🔄 → ✅ + `Architecture.md §10` + `tools.md §8` + 本表同步更新；代码与文档严格同 PR 落地 |
-| 2026-06-13 | 1.2 | **GitHub 工作流治理变更**（per Owner 2026-06-13 决策）：新增 §2.5（GitHub 工作流强制规范）+ §9（Git 仓库 & 工作流速查）。**关键约束**：（1）远端仓库 `https://github.com/f4cknet/automisc.git`；（2）每个任务必须在 feature 分支实施，PR target = `main`；（3）PR 标题 = `[v{X}.{Y}.{Z}] {动词} {对象}`；（4）PR 描述必须含 6 关验收 checklist；（5）合并方式 = Squash and merge；（6）AI Agent 不持有 GitHub 凭据，`git push` / `gh pr create` / merge 由 Owner 在本地完成。**注**：本条目同步自 `docs/v0.1.0b-add-github-workflow` 分支（commit 9644a53），因为 main 分支此前未包含 |
-| 2026-06-13 | 1.3 | **GitHub 工作流强化**：§2.5 重写为"AI Agent 硬约束"模式——**AI Agent 只做本地 commit，所有远端写操作 Owner 人工**。理由：AI Agent 不应持有 GitHub 凭据；远端写操作不可逆。§5 同步强化对应行。§9.4 状态同步表新增"commit 由 AI Agent 做 / push 由 Owner 做"明确分工。§9.5 snapshot 更新"本地分支 / 远端 PR"两列。**注**：本条目同步自 `docs/v0.1.0b-add-github-workflow` 分支（commit 9644a53） |
 | 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**（per `prd.md §4.1 v0.1.0b-PR2`）：新增 `tools/steganography/image/{zsteg,steghide}.py` 两个 Stego/Image adapter；**75 个 pytest unit tests 100% PASS**（PR1 61 + PR2 14）；端到端 smoke：zsteg 命中 LSB 文本 (`flag{pr2_smoke_lsb_xyz}` severity=4) + steghide 正确识别两种 unavailable 信号（JPEG 编译限制 / 无 tty 环境）。**本地 commit 在 `feat/v0.1.0b-PR2-image-stego` 分支（待 Owner push + 开 PR）**；main 分支未变。**新增 `tools/base.py::_run_subprocess_with_input()`** 助手方法（per steghide 自动应答 prompt 需求）|
 | 2026-06-13 | **1.5** | **远端操作权限升级（per Owner 2026-06-13 12:31 决策）**：§2.5.1 从"硬禁止"升级为"**有权利但必须先询问 Owner**"。AI Agent 拥有 push / merge 权利，但每次执行前必须先询问并获得显式同意才能执行，绝不擅自作主。§9.4 状态同步表同步更新为"commit 由 AI Agent 做 / 远端操作 AI Agent 可做但必须先询问 Owner"。**事故响应流程**：错 push → GitHub 网页删分支；错 merge → Revert button 生成 revert commit。**迁移路径**：docs/v0.1.0b-add-github-workflow 分支内容已 merge 进 feat/v0.1.0b-PR2-image-stego（避免 push 时分两次推）；Owner 合并时合并 PR2 单 PR 即可，docs 分支可删 |
 | 2026-06-13 | **1.6** | **Git 操作权限最终方案（per Owner 2026-06-13 12:46 决策 v3）**：§2.5.1 从"push/merge 都询问"细化为"**AI Agent 全权处理所有 git 操作**（包括 push / merge / 删分支），**仅 3 类高风险远端操作必须询问**：(1) `git push` 远端；(2) `gh pr merge` / `gh pr create`；(3) **删临时分支**（本地 + 远端，含 `git branch -D` 和 `git push origin --delete`）。其余操作（add / commit / tag / checkout / branch create / stash / reset --soft / 本地 merge / 本地 rebase / cherry-pick / fetch / log 等）AI Agent 全权处理。**新增**：批量授权机制（Owner 一句话授权后，AI Agent 仍打印询问卡但不再停等）。**3 类高风险理由**：push 错分支 / merge 错 PR / 误删长期分支都是不可逆且容易出错 |
