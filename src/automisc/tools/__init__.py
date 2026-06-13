@@ -23,3 +23,31 @@ from automisc.tools.shared import xxd  # noqa: F401
 # steganography/image/ 的 2 个 adapter（v0.1.0b-PR2）
 from automisc.tools.steganography.image import steghide  # noqa: F401
 from automisc.tools.steganography.image import zsteg  # noqa: F401
+
+# steganography/audio/ 的 3 个 adapter（v0.1.0b-PR4）
+from automisc.tools.steganography.audio import ffmpeg_audio  # noqa: F401
+from automisc.tools.steganography.audio import sox  # noqa: F401
+from automisc.tools.steganography.audio import steghide_audio  # noqa: F401
+
+# steganography/video/ 的 2 个 adapter（v0.1.0b-PR4）
+from automisc.tools.steganography.video import ffmpeg_video  # noqa: F401
+from automisc.tools.steganography.video import ffprobe  # noqa: F401
+
+# forensics/network/ 的 2 个 adapter（v0.1.0b-PR3）
+from automisc.tools.forensics.network import tcpdump  # noqa: F401
+from automisc.tools.forensics.network import tshark  # noqa: F401
+
+# misc/archive/ 的 3 个 adapter（v0.1.0b-PR5）
+from automisc.tools.misc.archive import john  # noqa: F401
+from automisc.tools.misc.archive import sevenz  # noqa: F401
+from automisc.tools.misc.archive import unzip  # noqa: F401
+
+# forensics/log/ 的 2 个 adapter（v0.1.0b-PR6）
+from automisc.tools.forensics.log import evtx_dump  # noqa: F401
+from automisc.tools.forensics.log import grep  # noqa: F401
+
+# forensics/memory/ 的 1 个 adapter（v0.1.0b-PR7）
+from automisc.tools.forensics.memory import vol  # noqa: F401
+
+# misc/brainteaser/ 的 1 个 adapter（v0.1.0b-PR8）
+from automisc.tools.misc.brainteaser import zbar  # noqa: F401

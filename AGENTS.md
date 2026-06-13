@@ -461,14 +461,23 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 |---|---|---|---|---|
 | **P0** | `v0.1.0b-cleanup` | 文档重整（PR0）| ✅ done | commit `b1643bc`（main 本地，未 push）|
 | P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
-| P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ⏳ | 依赖 PR9 |
-| P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox）| ⏳ | 依赖 PR9 |
-| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
-| P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 依赖 PR9 |
+| P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ✅ done | commit `da0f5a6`（feat 分支本地，未 push）|
+| P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox + steghide_audio）| ✅ done | commit `2a3d0fa`（feat 分支本地，未 push）|
+| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `813f367`（feat 分支本地，未 push）|
+| P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ✅ done | commit `18688d5`（feat 分支本地，未 push）|
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
-| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
+| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | commit `79d4c1b`（feat 分支本地，未 push）|
+<<<<<<< HEAD
+<<<<<<< HEAD
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ✅ done | commit `7eed6c4`（feat 分支本地，未 push）|
+=======
+| P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ✅ done | commit `待定`（feat 分支本地，未 push）|
+=======
+| P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ✅ done | commit `63fb531`（feat 分支本地，未 push）|
+>>>>>>> 5f40b08 ([v0.1.0b-PR7-status] fill commit SHA 63fb531)
+| P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ⏳ | 依赖 PR9；可与 PR3~PR8 并行 |
+>>>>>>> 63fb531 ([v0.1.0b-PR7] add Forensics/Memory adapter (vol3 via CLI wrapper))
 | P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
 | — | `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | commit `9401f98` |
 | — | `v0.1.0b-PR2` | Stego/Image（zsteg + steghide）| ✅ done | commit `4ca05e5`（PR #2）|
@@ -488,11 +497,17 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 18:00 | **1.16** | **v0.1.0b-PR7 实施完成**：Forensics/Memory adapter 落地（vol3 集成）。CLI 包装调 vol3 跑 4 plugin（pslist/pstree/netscan/filescan）。4 单测 + error path 覆盖。153 unit tests PASS。详见本次 commit。 |
+| 2026-06-13 17:55 | **1.15** | **v0.1.0b-PR7-envfix 实施完成**：vol.py 环境决策。vol3 (`pip install volatility3`) 装好（PR7 adapter 走它）；vol2 源码保留在 `extend_tools/volatility2/`（v0.5+ docker 化）。决策记录 `docs/decisions/v0.1.0b-PR7-vol-environment.md`。pyproject.toml 添加 `volatility3>=2.0` 依赖。详见本次 commit。 |
+| 2026-06-13 17:48 | **1.14** | **v0.1.0b-PR8 实施完成**：Misc/Brainteaser adapter 落地（zbar QR/条码识别）。5 单测 + 2 fixture（flag QR + URL QR）。149 unit tests PASS。flag QR 命中 [5]；URL QR 命中 [2]。详见本次 commit。 |
+| 2026-06-13 17:15 | **1.13** | **v0.1.0b-PR6 实施完成**：Forensics/Log adapter 落地（grep + evtx_dump）。grep 17 关键字含严重度分级；evtx_dump 集成 python-evtx 0.8.1 + 8 类可疑 EventID + 进程命令行关键字。pyproject.toml 添加 python-evtx 依赖。10 单测 + 1 fixture。144 unit tests PASS。grep 真实样本 smoke 命中 6 个 log_keyword。详见本次 commit。 |
+| 2026-06-13 17:05 | **1.12** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 探测伪加密。10 单测 + 2 fixture。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：伪加密命中 [4]；正常 zip 命中 file count。详见本次 commit。 |
+| 2026-06-13 16:55 | **1.11** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter）。ffmpeg 共享 binary，audio/video 各自独立 name。17 单测 + 2 fixture。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio/ffprobe/steghide_audio 全命中。详见本次 commit。 |
+| 2026-06-13 16:08 | **1.10** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（tshark + tcpdump）。tshark 用 `-T fields` CSV 模式 + webshell 关键字白名单。10 单测 + hand-write pcap fixture。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke 命中 flag [5] + webshell [4]。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.9** | **v0.1.0b-PR9 实施完成**：包基座 smoke（`pip install -e ".[dev]"` + `python -m automisc` + console_script `automisc` 全跑通）。新增 22 单测（包元数据 / 子包 import / CLI main / subprocess），总计 **97 unit tests PASS**（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `prd.md §4.1` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `Architecture.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
 | 2026-06-13 | **1.7** | **§2.5.1 升级 v4**：完全纳入 AI 询问流程（merge 不再 Owner 自助）；批量授权机制启用（per Owner 决策 2026-06-13 12:54）。详见 git history。 |
 | 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
-| 2026-06-13 | **1.5** | **§2.5.1 升级 v2**：AI Agent 有 push/merge 权利但每次需询问 Owner。详见 git history。 |
 
 ---
 

@@ -481,18 +481,19 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   ├── base.py                          # ToolAdapter 基类                      ✅ PR1
 │   │
 │   ├── forensics/                       # Forensics 分支
-│   │   ├── memory/                      # ⏳ PR7
+│   │   ├── memory/                      # ✅ PR7（vol）+ ✅ PR7-envfix（决策）
 │   │   ├── disk/                        # P1 · 未排期
 │   │   ├── network/                     # ⏳ PR3
 │   │   └── log/                         # ⏳ PR6
 │   ├── steganography/
+│   │   ├── network/                     # ✅ PR3（tshark + tcpdump）
 │   │   ├── image/                       # ✅ PR2（zsteg + steghide）            ⏳ PR2 后续（binwalk/exiftool/foremost 共享版）
-│   │   ├── audio/                       # ⏳ PR4
-│   │   └── video/                       # ⏳ PR4
-│   ├── misc/                            # ⏳ PR5 / PR8
-│   │   ├── archive/
+│   │   ├── audio/                       # ✅ PR4（ffmpeg + sox + steghide_audio）
+│   │   └── video/                       # ✅ PR4（ffprobe + ffmpeg_video）
+│   ├── misc/                            # ✅ PR5（archive/）  ⏳ PR8
+│   │   ├── archive/                     # ✅ PR5（sevenz + unzip + john）
 │   │   ├── office/                      # P1 · 未排期
-│   │   └── brainteaser/
+│   │   └── brainteaser/                 # ✅ PR8（zbar）
 │   └── shared/                          # 共享基础工具
 │       ├── file.py                      # ✅ PR1
 │       ├── strings.py                   # ✅ PR1
@@ -562,20 +563,20 @@ src/automisc/
 | `tools/shared/xxd.py` | [`tools.md §3.12 xxd`](./tools.md) | ✅ macOS 自带 | **✅ PR1** |
 | `tools/steganography/image/zsteg.py` | [`tools.md §3.5 zsteg`](./tools.md) | ✅ Ruby gem 已装 | **✅ PR2** |
 | `tools/steganography/image/steghide_image.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ `brew install steghide` | **✅ PR2** |
-| `tools/forensics/network/tshark.py` | [`tools.md §3.3 tshark`](./tools.md) | ✅ `brew install wireshark` | ⏳ PR3 |
-| `tools/forensics/network/tcpdump.py` | [`tools.md §3.3 tcpdump`](./tools.md) | ✅ macOS 自带 | ⏳ PR3 |
-| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
-| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ❌ `brew install sox`（v0.1 必装）| ⏳ PR4 |
-| `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | ⏳ PR4 |
-| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | ⏳ PR4 |
-| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
-| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | ⏳ PR5 |
-| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | ⏳ PR5 |
-| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ❌ `brew install john-jumbo`（v0.1 必装）| ⏳ PR5 |
-| `tools/forensics/log/grep.py` | [`tools.md §3.12 grep`](./tools.md) | ✅ macOS 自带 | ⏳ PR6 |
-| `tools/forensics/log/evtx_dump.py` | [`tools.md §3.4 evtx_dump`](./tools.md) | ⚠️ `pip install python-evtx` | ⏳ PR6 |
+| `tools/forensics/network/tshark.py` | [`tools.md §3.3 tshark`](./tools.md) | ✅ `brew install wireshark` | **✅ PR3** |
+| `tools/forensics/network/tcpdump.py` | [`tools.md §3.3 tcpdump`](./tools.md) | ✅ macOS 自带 | **✅ PR3** |
+| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ `brew install ffmpeg` | **✅ PR4** |
+| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ✅ 已装 | **✅ PR4** |
+| `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | **✅ PR4** |
+| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | **✅ PR4** |
+| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | **✅ PR4** |
+| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | **✅ PR5** |
+| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | **✅ PR5** |
+| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ✅ `brew install john-jumbo` | **✅ PR5** |
+| `tools/forensics/log/grep.py` | [`tools.md §3.12 grep`](./tools.md) | ✅ macOS 自带 | **✅ PR6** |
+| `tools/forensics/log/evtx_dump.py` | [`tools.md §3.4 evtx_dump`](./tools.md) | ✅ `pip install python-evtx` | **✅ PR6** |
 | `tools/forensics/memory/vol.py` | [`tools.md §3.1 vol.py`](./tools.md) | ⚠️ **blocker**（per PR7-envfix）| ⚠️ PR7 |
-| `tools/misc/brainteaser/zbar.py` | [`tools.md §3.8 zbarimg`](./tools.md) | ❌ `brew install zbar`（v0.1 必装）| ⏳ PR8 |
+| `tools/misc/brainteaser/zbar.py` | [`tools.md §3.8 zbarimg`](./tools.md) | ✅ `brew install zbar` | **✅ PR8** |
 
 **v0.1 P0 adapter 总数**：**22 个**，分 7 个 adapter PR（PR1/2 已完成 + PR3/4/5/6/7/8 待实施）+ 1 个包基座 PR（PR9）+ 1 个 encoders PR（`core/encoders/` 非工具池层）。
 
@@ -851,6 +852,12 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 18:00 | **1.10** | **v0.1.0b-PR7 实施完成**：Forensics/Memory adapter 落地（vol3 集成，per PR7-envfix 决策）。CLI 包装（`python3 -c "from volatility3.cli import main; main()"` 注入 argv）跑 pslist/pstree/netscan/filescan 4 个 plugin。4 单测 + error path 覆盖（empty/missing）。153 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10 + PR8 5 + PR7 4）。真实样本 smoke：empty.vmem 触发 vol3 "Unsatisfied requirement"（正常信号）。详见本次 commit。 |
+| 2026-06-13 17:48 | **1.9** | **v0.1.0b-PR8 实施完成**：Misc/Brainteaser adapter 落地（zbar QR/条码识别）。`zbarimg --quiet --raw` 扫描 + URL/长串/短串分类。5 单测 + 2 fixture（flag QR + URL QR，560B/828B，PIL + qrcode lib 生成）。149 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10 + PR8 5）。真实样本 smoke：flag QR 命中 flag [5] + barcode_text + meta；URL QR 命中 barcode_url [2] + meta。详见本次 commit。 |
+| 2026-06-13 17:15 | **1.8** | **v0.1.0b-PR6 实施完成**：Forensics/Log adapter 落地（2 个新 adapter：grep + evtx_dump）。grep 关键字 17 个（password/secret/hidden/webshell/flag/...）含严重度分级。evtx_dump 集成 python-evtx 0.8.1（pyproject.toml 添加依赖），检测 8 类可疑 EventID（4625/4672/4688/7045/1102 等）+ 进程命令行关键字（powershell/-enc/mimikatz 等）。新增 10 单测 + 1 fixture（auth.log）。144 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10）。真实样本 smoke：grep 命中 6 个 log_keyword（password [4]×3 + secret [4] + sudo [2] + hidden [2]）；evtx_dump 暂未生成真实 evtx fixture，error path 单测全过。详见本次 commit。 |
+| 2026-06-13 17:05 | **1.7** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（3 个新 adapter：sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 双重探测，命中伪加密"Wrong password"信号 [4]。新增 10 单测 + 2 fixture（普通 zip + 伪加密 zip）。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：sevenz 伪加密命中 [4]；正常 zip 命中 file count [1]；john 列出 zip2john/rar2john capability。详见本次 commit。 |
+| 2026-06-13 16:55 | **1.6** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter：ffmpeg_audio/sox/steghide_audio + ffprobe/ffmpeg_video）。ffmpeg 共享 binary，audio/video 各自独立 adapter name 便于 GUI 分类。新增 17 单测 + 2 fixture（WAV/MP4，含 flag metadata）。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio 命中 flag [5] + duration + audio_stream；ffprobe 命中 flag [5] + 2 streams + duration；steghide_audio 命中 capacity + tty unavailable 信号。详见本次 commit。 |
+| 2026-06-13 16:08 | **1.5** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（`tools/forensics/network/tshark.py` + `tcpdump.py`）。tshark 用 `-T fields` CSV 模式 + `http.request.uri/method` 字段；含 webshell 关键字白名单（eval/assert/base64_decode + shell.php/cmd.php + antsword/behinder）。新增 10 单测 + hand-write 经典 pcap fixture（389B，含 flag + webshell POST）。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke：`automisc run --tool tshark --file tests/fixtures/sample_http_flag.pcap` 命中 flag [5] + webshell_family [4]；tcpdump 同样命中。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.4** | **v0.1.0b-PR9 实施完成**：包基座验证（`pip install -e ".[dev]"` 跑通 + console_script `automisc` 装到 PATH + `python -m automisc` 真起）。新增 `tests/fixtures/sample_text.txt` (37B smoke fixture) + `tests/unit/test_pr9_package_base.py` (22 smoke 单测)。97 unit tests PASS（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke：`automisc run --tool strings --file tests/fixtures/sample_text.txt` 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.3** | **v0.1.0b-cleanup 治理重整**（per `prd.md §4.1`）：① §4.4 拆"目标布局（target）" + "当前落地（actual）"两栏；② §4.5 PR9 改为包基座验证，移除 `python_magic_bin` / `numpy` adapter 行；③ 标记 `extend_tools/` 处置。详见本次 commit。 |
 | 2026-06-13 | 1.2 | v0.1.0b-PR2 实施落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
