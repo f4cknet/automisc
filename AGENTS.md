@@ -468,7 +468,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
 | P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
-| P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ✅ done | commit `待定`（feat 分支本地，未 push）|
+| P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ✅ done | commit `7eed6c4`（feat 分支本地，未 push）|
 | P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
 | — | `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | commit `9401f98` |
 | — | `v0.1.0b-PR2` | Stego/Image（zsteg + steghide）| ✅ done | commit `4ca05e5`（PR #2）|
