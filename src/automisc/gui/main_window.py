@@ -32,10 +32,15 @@ from automisc.core.registry import list_tools
 from automisc.core.router import FileRouter, RouteRecommendation
 
 from .auto_runner import AutoRunner
+from .chain_runner import ChainRunner
 from .journal_panel import JournalPanel
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
 from .runner import ToolRunner
+
+
+# Chain 菜单项 (v0.5 chain 系列, 与 CLI 一致)
+_CHAIN_NAMES = ("zip", "zip-full", "binwalk", "foremost", "lsb")
 
 
 class MainWindow(QMainWindow):
@@ -51,6 +56,7 @@ class MainWindow(QMainWindow):
         self.core = core or CoreOrchestrator()
         self.current_file: Optional[Path] = None
         self._runner: Optional[ToolRunner] = None  # 单工具 async runner
+        self._chain_runner: Optional[ChainRunner] = None  # chain async runner (v0.5)
         self._auto_runner: Optional[AutoRunner] = None  # 链式 auto-runner
         self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐
         self._auto_run_enabled: bool = True  # 默认开启 auto-run
@@ -315,6 +321,23 @@ class MainWindow(QMainWindow):
         self.auto_run_action.toggled.connect(self._toggle_auto_run)
         run_menu.addAction(self.auto_run_action)
 
+        # Chain menu (v0.5 chain 系列, 同步 CLI)
+        # 5 个入口: zip / zip-full / binwalk / foremost / lsb
+        chain_menu = menubar.addMenu("&Chain")
+        for chain_name in _CHAIN_NAMES:
+            action = QAction(f"Run &{chain_name} chain", self)
+            action.triggered.connect(
+                lambda checked=False, name=chain_name: self._run_chain(name)
+            )
+            chain_menu.addAction(action)
+        chain_menu.addSeparator()
+        # bruteforce 限制 (testing)
+        bf_action = QAction("Run &zip-full (limit=5000)…", self)
+        bf_action.triggered.connect(
+            lambda checked=False: self._run_chain("zip-full", bruteforce_limit=5000)
+        )
+        chain_menu.addAction(bf_action)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
         about_action = QAction("&About", self)
@@ -399,3 +422,95 @@ class MainWindow(QMainWindow):
     def _on_runner_failed(self, error_msg: str) -> None:
         self.output_view.append_text(f"[!] runner error: {error_msg}\n")
         self.statusBar().showMessage(f"error: {error_msg}")
+
+    # ---------- chain runner (v0.5 GUI 同步 CLI) ----------
+    def _run_chain(self, chain_name: str, bruteforce_limit: int | None = None) -> None:
+        """异步跑 chain (QThread 包装 DAG, 跟 CLI 一致).
+
+        Args:
+            chain_name: zip / zip-full / binwalk / foremost / lsb
+            bruteforce_limit: bruteforce 测试用 (e.g. 5000), 加速 CI/开发
+        """
+        if not self.current_file:
+            self.statusBar().showMessage("请先拖入或打开文件")
+            self.output_view.append_text("[!] no file selected\n")
+            return
+
+        # 防止并发跑: 检查是否已有 runner 在跑
+        if self._chain_runner and self._chain_runner.isRunning():
+            self.statusBar().showMessage("前一个 chain 还在跑，请稍等…")
+            return
+        if self._runner and self._runner.isRunning():
+            self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
+            return
+
+        self.statusBar().showMessage(
+            f"running chain={chain_name} on {self.current_file.name} (async)…"
+        )
+        self.output_view.append_text(
+            f"\n=== Chain: {chain_name} ===\n"
+        )
+        self.output_view.append_text(f"=== File:  {self.current_file}\n")
+
+        # 起 QThread 跑
+        self._chain_runner = ChainRunner(
+            chain_name=chain_name,
+            file_path=str(self.current_file),
+            bruteforce_limit=bruteforce_limit,
+        )
+        self._chain_runner.started_run.connect(self._on_chain_started)
+        self._chain_runner.finished_with_context.connect(self._on_chain_finished)
+        self._chain_runner.failed_with_error.connect(self._on_chain_failed)
+        self._chain_runner.start()
+
+    def _on_chain_started(self, chain_name: str, file_path: str) -> None:
+        self.statusBar().showMessage(
+            f"running chain={chain_name} on {Path(file_path).name}…"
+        )
+
+    def _on_chain_finished(self, chain_name: str, file_path: str, context: dict) -> None:
+        """ChainRunner 跑成功 → 渲染 log + summary + flag_candidate."""
+        log = context.get("__log__", [])
+        self.output_view.append_text(f"\n--- chain log ({len(log)} steps) ---")
+        self.output_view.append_chain_log(log)
+        self.output_view.append_chain_summary(context)
+
+        # journal 累积 (suspicious points from all steps)
+        for step in log:
+            step_name = step["node"]
+            step_data = context.get(f"__step_{step['step']}_{step_name}__", {})
+            # 把 step 视为工具结果
+            if step_data:
+                # 当前 step 没存 suspicious_points, 但 last_result.data 里有 flag_candidate
+                # 给 journal 加一条 chain summary 记录
+                last_result = context.get("__last_result__")
+                if last_result and last_result.data:
+                    flag_candidate = last_result.data.get("flag_candidate")
+                    if flag_candidate and step_name == "lsb_extract":
+                        from automisc.core.suspicious import SuspiciousPoint
+                        sp = SuspiciousPoint(
+                            id="",
+                            tool_name=f"chain/{chain_name}/{step_name}",
+                            file_path=file_path,
+                            category="lsb_text",
+                            offset=None,
+                            matched_pattern=flag_candidate[:120],
+                            severity=5,
+                            suggested_action="LSB text 含敏感关键词 (key/flag/secret/ctf/password)",
+                        )
+                        self.journal_panel.add_suspicious(
+                            f"chain/{chain_name}", Path(file_path), sp
+                        )
+
+        # 状态
+        total = len(log)
+        ok = sum(1 for s in log if s.get("success"))
+        self.statusBar().showMessage(
+            f"chain={chain_name} done: {ok}/{total} OK"
+        )
+
+    def _on_chain_failed(self, chain_name: str, error_msg: str) -> None:
+        self.output_view.append_text(
+            f"[!] chain {chain_name} failed: {error_msg}\n"
+        )
+        self.statusBar().showMessage(f"chain {chain_name} error: {error_msg}")

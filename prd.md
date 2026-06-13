@@ -190,7 +190,7 @@
 | `v0.5.1` | **3 个预设模板**：pcap_webshell_check / image_stego_check / archive_crack | ⏳ | 6h | 每个模板 ≈ 2h |
 | `v0.5.2` | **GUI "自动分析"按钮**：菜单点击 → 选模板 → 自动执行 | ⏳ | 3h | |
 | `v0.5.3` | **macOS 打包评估**：py2app / PyInstaller 二选一实测 | ⏳ | 4h | 视 v0.1-Q2 决策 |
-| `v0.5-LSB-router` | **LSB 抽取后智能路由**：text 终止（敏感词/base64/binary 标严重）/ file 二次 router（zip→伪加密+bruteforce, rar→john, png→递归） | ✅ | 4h | **已完成**（commit (待 push), 2026-06-13 22:30）；**Owner 触发** Challenge/steg.png 实测（`zsteg` 抽到 LSB text 含 flag 关键词未识别）；详见 [`upgrade/v0.5-LSB-router.md`](../upgrade/v0.5-LSB-router.md) + `Architecture.md §3.5`；**6 关验收**：② ✅ 339 passed (306 基线 + 33 新)；③ ✅ 真实题 steg.png 命中 `flag_candidate=st3g0_saurus_wr3cks`；④ ✅ QR_code.png LSB FAIL (无 text) / stress 04 zip 不变 / stress 06 foremost 不变；⑤ ✅ Owner 自审（Q1-Q4 + Q3 简化 + password 后补）；⑥ ✅ 文档同步 |
+| `v0.5-LSB-router-GUI` | **GUI 同步**: Chain 菜单 5 入口 (zip/zip-full/binwalk/foremost/lsb) + ChainRunner QThread + output_view flag_candidate 红底高亮 + 5 集成测试 | ✅ | 2h | 与 v0.5-LSB-router 同 commit 推送 |
 
 ### 4.3 v1.0 候选（DAG 编排）
 
