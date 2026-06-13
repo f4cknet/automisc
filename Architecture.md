@@ -452,138 +452,133 @@ class BinwalkAdapter(ToolAdapter):
 ### 4.4 adapter 文件清单（per `prd.md §4.1 v0.1.0b` 2026-06-13 重整）
 
 > **目录结构调整**：按 `tools.md §2` 的 11 个 subflow 重新组织。**Encoding 编码函数从 `tools/encoders/` 移到 `core/encoders/`**（per Owner 决策"编码分析自编写非工具池"）。
+>
+> **2026-06-13 14:00 重整说明**：原 §4.4 把所有目标目录一次性铺出来，看起来像"已落地"，但代码实际只到 `tools/shared/` + `tools/steganography/image/`。
+> **本次修订**：① 拆为"目标布局（target）"和"当前落地（actual）"两栏；② 标记每个目录的 PR 来源；③ `extend_tools/` 处置单列。
+
+#### 4.4.1 目标布局（v0.1 GA · 全部 PR ✅ 后）
 
 ```
-tools/                                   # 工具池层（外部工具 adapter）
+src/automisc/                           # Python 包根（per pyproject.toml [tool.setuptools.packages.find]）
 ├── __init__.py
-├── base.py                              # ToolAdapter 基类
-│
-├── forensics/                           # Forensics 分支（per tools.md §3.1-3.4）
-│   ├── memory/
-│   │   ├── __init__.py
-│   │   ├── vol.py                       # P0 · ⚠️ v0.1 必须先恢复 vol2 安装
-│   │   ├── strings_memory.py            # P0 · 共享 strings adapter
-│   │   └── binwalk_memory.py            # P0 · 共享 binwalk adapter
-│   ├── disk/
-│   │   ├── __init__.py
-│   │   ├── photorec.py                  # P1
-│   │   ├── testdisk.py                  # P1
-│   │   ├── sleuthkit.py                 # P1 · ❌ 需 brew install sleuthkit
-│   │   └── sevenz_disk.py               # P1 · 共享 7z（VMDK/OVA 解压）
-│   ├── network/
-│   │   ├── __init__.py
-│   │   ├── tshark.py                    # P0 · ✅ 已装
-│   │   ├── tcpdump.py                   # P0 · ✅ 已装
-│   │   ├── wireshark.py                 # P1 · GUI 辅助
-│   │   ├── pcapfix.py                   # P1 · ❌ 需 brew install pcapfix
-│   │   ├── aircrack.py                  # P1
-│   │   └── multimon.py                  # P1 · DTMF/POCSAG
-│   └── log/
-│       ├── __init__.py
-│       ├── grep.py                      # P0 · macOS 自带
-│       ├── evtx_dump.py                 # P0 · ⚠️ 需 pip install python-evtx
-│       └── sevenz_log.py                # P0 · 共享 7z（解 .evtx.bz2）
-│
-├── steganography/                       # Steganography 分支（per tools.md §3.5-3.7）
+├── __main__.py                          # console_script 入口（per [project.scripts]）
+├── core/                                # Core 调度层（per §1 分层）
 │   ├── __init__.py
-│   ├── image/
-│   │   ├── binwalk_image.py             # P0 · 共享
-│   │   ├── zsteg.py                     # P0 · ✅ Ruby gem 已装
-│   │   ├── steghide_image.py            # P0 · 共享
-│   │   ├── exiftool_image.py            # P0 · 共享
-│   │   ├── foremost_image.py            # P0 · 共享
-│   │   ├── outguess.py                  # P1
-│   │   ├── stegdetect.py                # P1
-│   │   ├── stegseek.py                  # P1
-│   │   ├── pngcheck.py                  # P1
-│   │   ├── f5.py                        # P1 · ⚠️ 需 Java wrapper
-│   │   └── stegolsb.py                  # P2
-│   ├── audio/
-│   │   ├── __init__.py
-│   │   ├── ffmpeg_audio.py              # P0 · ✅ 已装
-│   │   ├── sox.py                       # P0 · ❌ 需 brew install sox
-│   │   ├── steghide_audio.py            # P0 · 共享
-│   │   └── mp3stego.py                  # P1 · ⚠️ 需 Wine
-│   └── video/
+│   ├── orchestrator.py                  # CoreOrchestrator 入口                  ✅ PR1
+│   ├── registry.py                      # @register_tool 装饰器                  ✅ PR1
+│   ├── result.py                        # ToolResult dataclass                   ✅ PR1
+│   ├── suspicious.py                    # SuspiciousPoint + SUSPICIOUS_PATTERNS  ✅ PR1
+│   ├── router.py                        # FileRouter 入口分流                    ⏳  v0.1.x
+│   ├── journal.py                       # Journal 自动记录                       ⏳  v0.1.x
+│   ├── exceptions.py                    # AutomiscError / ToolNotFound          ⏳  v0.1.x
+│   └── encoders/                        # Encoding 内置实现（**非工具池层**）
 │       ├── __init__.py
-│       ├── ffmpeg_video.py              # P0 · 共享 ffmpeg
-│       └── ffprobe.py                   # P0 · ✅ 已装
-│
-├── misc/                                # Misc Others 分支（per tools.md §3.9-3.11）
-│   ├── __init__.py
-│   ├── archive/
-│   │   ├── sevenz.py                    # P0 · ✅ 已装（共享）
-│   │   ├── unzip.py                     # P0 · ✅ 已装
-│   │   ├── john.py                      # P0 · ❌ 需 brew install john-jumbo
-│   │   ├── zipcrack.py                  # P0 · fallback（⚠️ 源码未软链）
-│   │   └── hashcat.py                   # P1
-│   ├── office/
-│   │   ├── exiftool_office.py           # P0 · 共享
-│   │   ├── binwalk_office.py            # P0 · 共享
-│   │   ├── pdftotext.py                 # P1 · ⚠️ 需 brew install poppler
-│   │   ├── mutool.py                    # P1 · ❌ 需 brew install mupdf-tools
-│   │   └── python_docx.py               # P1
-│   └── brainteaser/
-│       ├── zbar.py                      # P0 · ❌ 需 brew install zbar
-│       └── sqlite3.py                   # P1
-│
-└── shared/                              # 共享基础工具（per tools.md §3.12）
-    ├── __init__.py
-    ├── file.py                          # P0 · ✅ 已装
-    ├── strings.py                       # P0 · ✅ 已装
-    ├── binwalk.py                       # P0 · ✅ 已装（也可独立调用）
-    ├── foremost.py                      # P0 · ✅ 已装
-    ├── exiftool.py                      # P0 · ✅ 已装
-    ├── xxd.py                           # P0 · ✅ 已装
-    ├── hexdump.py                       # P1
-    └── scalpel.py                       # P1
-
-core/                                    # Core 调度层
-└── encoders/                            # Encoding 内置实现（**非工具池层**）
-    ├── __init__.py
-    ├── base.py                          # P0 · base16/32/58/62/64/85/91/2048/32768/65536
-    ├── classical.py                     # P0 · ROT13/47/18 + Caesar + Vigenère + Atbash + Pigpen + Keyboard Shift + Affine + Rail Fence
-    ├── custom.py                        # P0 · BCD + IEEE 754 + UTF-16 endianness + Unicode Tags/Variation Selector + Multi-layer auto-decoder
-    └── tests/
-        └── ...                          # 单元测试
+│       ├── base.py                      # base16/32/58/62/64/85/91/2048/32768/65536 ⏳ encoders PR
+│       ├── classical.py                 # ROT13/47/18 + Caesar + Vigenère + ...   ⏳ encoders PR
+│       └── custom.py                    # BCD + IEEE 754 + UTF-16 + Unicode Tags ⏳ encoders PR
+├── tools/                               # 工具池层（外部工具 adapter）
+│   ├── __init__.py                      # 显式 import 所有 adapter（per §6.3）
+│   ├── base.py                          # ToolAdapter 基类                      ✅ PR1
+│   │
+│   ├── forensics/                       # Forensics 分支
+│   │   ├── memory/                      # ⏳ PR7
+│   │   ├── disk/                        # P1 · 未排期
+│   │   ├── network/                     # ⏳ PR3
+│   │   └── log/                         # ⏳ PR6
+│   ├── steganography/
+│   │   ├── image/                       # ✅ PR2（zsteg + steghide）            ⏳ PR2 后续（binwalk/exiftool/foremost 共享版）
+│   │   ├── audio/                       # ⏳ PR4
+│   │   └── video/                       # ⏳ PR4
+│   ├── misc/                            # ⏳ PR5 / PR8
+│   │   ├── archive/
+│   │   ├── office/                      # P1 · 未排期
+│   │   └── brainteaser/
+│   └── shared/                          # 共享基础工具
+│       ├── file.py                      # ✅ PR1
+│       ├── strings.py                   # ✅ PR1
+│       ├── binwalk.py                   # ✅ PR1
+│       ├── foremost.py                  # ✅ PR1
+│       ├── exiftool.py                  # ✅ PR1
+│       ├── xxd.py                       # ✅ PR1
+│       ├── hexdump.py                   # P1 · 未排期
+│       └── scalpel.py                   # P1 · 未排期
+└── gui/                                 # GUI 层（PySide6）
+    ├── __init__.py                      # ⏳ GUI PR
+    ├── main_window.py                   # ⏳ GUI PR
+    ├── menu_dock.py                     # ⏳ GUI PR
+    └── output_view.py                   # ⏳ GUI PR
 ```
 
-### 4.5 adapter 文件 vs tools.md 关系（v0.1 P0 重点关注）
+#### 4.4.2 当前落地（2026-06-13 14:00 snapshot）
 
-| adapter 文件 | 对应 tools.md 工具 | 状态 | v0.1 PR |
+```bash
+$ tree src/automisc/
+src/automisc/
+├── __init__.py
+├── __main__.py
+├── core/
+│   ├── __init__.py
+│   ├── orchestrator.py
+│   ├── registry.py
+│   ├── result.py
+│   └── suspicious.py
+└── tools/
+    ├── __init__.py
+    ├── base.py
+    ├── shared/      ← PR1 落地 6 adapter
+    └── steganography/image/  ← PR2 落地 2 adapter
+```
+
+**未落地**（按 §4.4.1 目标 vs 当前 diff）：
+- `core/router.py` / `core/journal.py` / `core/exceptions.py` / `core/encoders/`
+- `tools/forensics/{memory,disk,network,log}/`
+- `tools/steganography/{audio,video}/`
+- `tools/misc/{archive,office,brainteaser}/`
+- `gui/`
+
+**extend_tools/ 处置**（per `prd.md §4.1 v0.1.0b-cleanup`）：
+- `extend_tools/png_crc_check.py` — 散落脚本，待 v0.1.x 评估是否收入 `tools/shared/` 或删除
+- `extend_tools/F5-steganography/` — Java 第三方源码，**不要入包**；考虑 `docs/references/` 或删除
+- `extend_tools/volatility2/` — vol2 源码备份，**不要入包**；待 PR7-envfix 决策后处置
+- **本 PR（cleanup）不删代码**——仅在文档标记，后续 PR 按"逐项评估"原则处置
+
+### 4.5 adapter 文件 vs tools.md 关系（v0.1 P0 重点关注 · 2026-06-13 14:00 重整）
+
+> **修订说明**：原表 PR9 标的是 `python_magic_bin` / `numpy` adapter，但按 `prd.md §4.1` 重整后 PR9 = "Python 包基座"。本表重排：① PR9 改为包基座验证（依赖 `pyproject.toml` 中 optional `gui` / `dev` deps）；② adapter 实施 PR 编号保持 PR1~PR8；③ encoders 不入此表（走 `core/encoders/`，per §4.4）。
+
+| adapter 文件 | 对应 tools.md 工具 | 外部依赖 | PR |
 |---|---|---|---|
-| `tools/shared/binwalk.py` | [`tools.md §3.5 binwalk`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/shared/strings.py` | [`tools.md §3.5 strings`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/shared/foremost.py` | [`tools.md §3.5 foremost`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/shared/exiftool.py` | [`tools.md §3.5 exiftool`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/shared/file.py` | [`tools.md §3.5 file`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/shared/xxd.py` | [`tools.md §3.12 xxd`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR1 |
-| `tools/steganography/image/zsteg.py` | [`tools.md §3.5 zsteg`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR2 |
-| `tools/steganography/image/steghide_image.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR2 |
-| `tools/forensics/network/tshark.py` | [`tools.md §3.3 tshark`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR3 |
-| `tools/forensics/network/tcpdump.py` | [`tools.md §3.3 tcpdump`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR3 |
-| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR4 |
-| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR4 |
-| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR4 |
-| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR5 |
-| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR5 |
-| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ❌ v0.1 必须装 `brew install john-jumbo` | v0.1.0b-PR5 |
-| `tools/forensics/log/grep.py` | [`tools.md §3.12 grep`](./tools.md) | ✅ 已装可写 | v0.1.0b-PR6 |
-| `tools/forensics/log/evtx_dump.py` | [`tools.md §3.4 evtx_dump`](./tools.md) | ⚠️ 需 `pip install python-evtx` | v0.1.0b-PR6 |
-| `tools/forensics/memory/vol.py` | [`tools.md §3.1 vol.py`](./tools.md) | ⚠️ **必须先恢复 vol2 安装**（blocker） | v0.1.0b-PR7 |
-| `tools/misc/brainteaser/zbar.py` | [`tools.md §3.8 zbarimg`](./tools.md) | ❌ v0.1 必须装 `brew install zbar` | v0.1.0b-PR8 |
-| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ❌ v0.1 必须装 `brew install sox` | v0.1.0b-PR4 追加 |
-| `tools/shared/python_magic_bin.py` | [`tools.md §4 python-magic-bin`](./tools.md) | ❌ v0.1 必须 `pip install python-magic-bin` | v0.1.0b-PR9 |
-| `tools/shared/numpy.py` | [`tools.md §4 numpy`](./tools.md) | ❌ v0.1 必须 `pip install numpy` | v0.1.0b-PR9 |
+| `tools/shared/file.py` | [`tools.md §3.12 file`](./tools.md) | ✅ macOS 自带 | **✅ PR1** |
+| `tools/shared/strings.py` | [`tools.md §3.12 strings`](./tools.md) | ✅ macOS 自带 | **✅ PR1** |
+| `tools/shared/binwalk.py` | [`tools.md §3.12 binwalk`](./tools.md) | ✅ `brew install binwalk` | **✅ PR1** |
+| `tools/shared/foremost.py` | [`tools.md §3.12 foremost`](./tools.md) | ✅ `brew install foremost` | **✅ PR1** |
+| `tools/shared/exiftool.py` | [`tools.md §3.12 exiftool`](./tools.md) | ✅ `brew install exiftool` | **✅ PR1** |
+| `tools/shared/xxd.py` | [`tools.md §3.12 xxd`](./tools.md) | ✅ macOS 自带 | **✅ PR1** |
+| `tools/steganography/image/zsteg.py` | [`tools.md §3.5 zsteg`](./tools.md) | ✅ Ruby gem 已装 | **✅ PR2** |
+| `tools/steganography/image/steghide_image.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ `brew install steghide` | **✅ PR2** |
+| `tools/forensics/network/tshark.py` | [`tools.md §3.3 tshark`](./tools.md) | ✅ `brew install wireshark` | ⏳ PR3 |
+| `tools/forensics/network/tcpdump.py` | [`tools.md §3.3 tcpdump`](./tools.md) | ✅ macOS 自带 | ⏳ PR3 |
+| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
+| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ❌ `brew install sox`（v0.1 必装）| ⏳ PR4 |
+| `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | ⏳ PR4 |
+| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | ⏳ PR4 |
+| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
+| `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | ⏳ PR5 |
+| `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | ⏳ PR5 |
+| `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ❌ `brew install john-jumbo`（v0.1 必装）| ⏳ PR5 |
+| `tools/forensics/log/grep.py` | [`tools.md §3.12 grep`](./tools.md) | ✅ macOS 自带 | ⏳ PR6 |
+| `tools/forensics/log/evtx_dump.py` | [`tools.md §3.4 evtx_dump`](./tools.md) | ⚠️ `pip install python-evtx` | ⏳ PR6 |
+| `tools/forensics/memory/vol.py` | [`tools.md §3.1 vol.py`](./tools.md) | ⚠️ **blocker**（per PR7-envfix）| ⚠️ PR7 |
+| `tools/misc/brainteaser/zbar.py` | [`tools.md §3.8 zbarimg`](./tools.md) | ❌ `brew install zbar`（v0.1 必装）| ⏳ PR8 |
 
-**v0.1 P0 adapter 总数**：**22 个**，分 9 个 PR 实施（per [`tools.md §6.2`](./tools.md) + [`AGENTS.md §2.1`](./AGENTS.md) ≤400 行/PR 约束）。
+**v0.1 P0 adapter 总数**：**22 个**，分 7 个 adapter PR（PR1/2 已完成 + PR3/4/5/6/7/8 待实施）+ 1 个包基座 PR（PR9）+ 1 个 encoders PR（`core/encoders/` 非工具池层）。
 
-**Encoding 编码函数（`core/encoders/`）**：**不计入 adapter 数**，3 个 Python 模块（base / classical / custom）共 9h 实现。
-| `tools/john.py` | [`tools.md §3.3 john`](./tools.md) | ❌ v0.1 需 `brew install john-jumbo` |
-| `tools/zbar.py` | [`tools.md §3.8 zbarimg`](./tools.md) | ❌ v0.1 需 `brew install zbar` |
-| `tools/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ❌ v0.1 需 `brew install sox` |
+**Python 依赖（per `pyproject.toml`）**：
+- `pyproject.toml` 已写；PR9 验证 `pip install -e ".[dev,gui]"` 跑通
+- PR4/5/6/8 各自的 brew / pip 依赖在实施 PR 的"环境准备"小节里写明命令
+- 不预装到 `pyproject.toml dependencies`（per 当前策略：v0.1 阶段仅声明核心依赖，GUI / 隐写 / 取证 Python 包在后续 PR 追加）
 
-> **adapter 实施顺序**：先 ✅ 工具吃满（≥8 个），再回头补 ❌ 工具的安装 + adapter。
+> **adapter 实施顺序**：✅（PR1+PR2 已完成 8 个）→ ⏳ 缺 tshark/tcpdump/ffmpeg/ffprobe/sox/sevenz/unzip/john/grep/evtx_dump/zbar/vol.py 共 13 个 + 包基座 1 个 = 14 个待实施，按 PR3~PR9 顺序。
 
 ---
 
@@ -847,13 +842,13 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 ## 10. 变更日志
 
 > **维护策略**：本表只保留**最近 4 条**。超出范围旧条目归档到 `docs/changelog/Architecture.md_archived.md`（v0.1+ 创建）。
-> 当前 3 条（1 条保留 + 2 条摘要）。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-13 | 1.0 | 初版：4 层分层模型 + Core API + adapter 模式 + plug-in 机制 + 6 关验证 + 演进路径（v0.1→v0.5→v1.0）。详见 git history。 |
+| 2026-06-13 14:00 | **1.3** | **v0.1.0b-cleanup 治理重整**（per `prd.md §4.1`）：① §4.4 拆"目标布局（target）" + "当前落地（actual）"两栏；② §4.5 PR9 改为包基座验证，移除 `python_magic_bin` / `numpy` adapter 行；③ 标记 `extend_tools/` 处置。详见本次 commit。 |
+| 2026-06-13 | 1.2 | v0.1.0b-PR2 实施落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
 | 2026-06-13 | **1.1** | v0.1.0b-PR1 实施落地（61 tests PASS）。详见 commit `9401f98`。 |
-| 2026-06-13 | **1.2** | v0.1.0b-PR2 实施落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
+| 2026-06-13 | 1.0 | 初版：4 层分层模型 + Core API + adapter 模式 + plug-in 机制 + 6 关验证 + 演进路径（v0.1→v0.5→v1.0）。详见 git history。 |
 
 ---
 

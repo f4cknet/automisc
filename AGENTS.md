@@ -455,20 +455,24 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 >
 > **状态更新 commit 可积累**（per §2.5.1）：AI Agent 在 main 分支做状态更新 commit 时，**不立即 push**——等下一次任务一起推（避免 1 commit / 1 push 的浪费）。push 前必须先询问 Owner。
 
-### 9.5 当前任务状态（snapshot · 2026-06-13 12:46）
+### 9.5 当前任务状态（snapshot · 2026-06-13 14:00 · 重排后）
 
-| 任务 ID | 标题 | 状态 | 本地分支 | 远端 PR | 远端操作状态 |
-|---|---|---|---|---|---|
-| `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | main（f2f4a93）| — | ✅ main 已 push |
-| `v0.1.0b-PR2` | Stego/Image | ✅ done | feat/v0.1.0b-PR2-image-stego（e9b462c）| — | ✅ 分支已 push；待 Owner 开 PR + merge |
-| `v0.1.0b-docs` | GitHub workflow 治理 | ✅ 已 merge 进 PR2 | （含在 PR2 分支内）| — | ✅ 同 PR2 一起 push |
-| `v0.1.0b-PR3` | Forensics/Network | ⏳ next | — | — | — |
-| `v0.1.0b-PR4` | Stego/Audio+Video | ⏳ | — | — | — |
-| `v0.1.0b-PR5` | Misc/Archive | ⏳ | — | — | — |
-| `v0.1.0b-PR6` | Forensics/Log | ⏳ | — | — | — |
-| `v0.1.0b-PR7` | Forensics/Memory（vol.py 恢复 blocker）| ⚠️ blocker | — | — | — |
-| `v0.1.0b-PR8` | Misc/Brainteaser QR | ⏳ | — | — | — |
-| `v0.1.0b-PR9` | Python 包基座 | ⏳ | — | — | — |
+| 优先级 | 任务 ID | 标题 | 状态 | 备注 |
+|---|---|---|---|---|
+| **P0** | `v0.1.0b-cleanup` | 文档重整（PR0）| 🔄 in progress | 本次（PR0）；不引入代码改动 |
+| P1 | `v0.1.0b-PR9` | Python 包基座 | ⏳ next | 依赖 cleanup |
+| P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ⏳ | 依赖 PR9 |
+| P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox）| ⏳ | 依赖 PR9 |
+| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
+| P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 依赖 PR9 |
+| P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
+| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
+| P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
+| P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ⏳ | 依赖 PR9；可与 PR3~PR8 并行 |
+| P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
+| — | `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | commit `9401f98` |
+| — | `v0.1.0b-PR2` | Stego/Image（zsteg + steghide）| ✅ done | commit `4ca05e5`（PR #2）|
+| — | `v0.1.0b-docs` | GitHub workflow 治理 | ✅ done | 含在 PR #2 内 |
 
 > **远端操作状态列说明**（per §2.5.1）：✅ 表示已 push；🟡 表示 AI Agent 已准备好但**未询问 Owner 前不会执行**远端操作。Owner 可在对话中批量授权（如"PR3-PR9 所有 push / merge / 删临时分支都授权你"），AI Agent 收到后仍打印询问卡但不再停下来等回复。
 
@@ -484,10 +488,11 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**：`tools/steganography/image/{zsteg,steghide}.py` adapter 落地；75 unit tests PASS（PR1 61 + PR2 14）；详见 commit `4ca05e5`（PR #2）。 |
-| 2026-06-13 | **1.5** | **§2.5.1 升级 v2**：AI Agent 有 push/merge 权利但每次需询问 Owner。详见 git history。 |
-| 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
+| 2026-06-13 14:00 | **1.8** | **v0.1.0b-cleanup（PR0）实施完成**：① `prd.md §4.1` 合并两套任务体系为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3~PR8 → PR7-envfix+PR7 → encoders → GUI）；③ `Architecture.md §4.4` 拆"目标布局 + 当前落地"两栏 + `§4.5` PR9 改为包基座；④ 标记 `extend_tools/` 处置。**不引入代码改动**。详见本次 commit。 |
 | 2026-06-13 | **1.7** | **§2.5.1 升级 v4**：完全纳入 AI 询问流程（merge 不再 Owner 自助）；批量授权机制启用（per Owner 决策 2026-06-13 12:54）。详见 git history。 |
+| 2026-06-13 | **1.6** | **§2.5.1 升级 v3**：细化为"3 类高风险远端操作必询问"，其余全权处理。详见 git history。 |
+| 2026-06-13 | **1.5** | **§2.5.1 升级 v2**：AI Agent 有 push/merge 权利但每次需询问 Owner。详见 git history。 |
+| 2026-06-13 | **1.4** | **v0.1.0b-PR2 实施完成**：`tools/steganography/image/{zsteg,steghide}.py` adapter 落地；75 unit tests PASS（PR1 61 + PR2 14）；详见 commit `4ca05e5`（PR #2）。 |
 
 ---
 

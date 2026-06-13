@@ -141,24 +141,44 @@
 
 ### 4.1 v0.1 启动（最小可用 GUI · 当前 sprint）
 
-| ID | 任务 | 状态 | 预估 | 备注 |
-|---|---|---|---|---|
-| `v0.1.0` | **项目骨架**：创建 `automisc/` 包 + `__main__.py` + `pyproject.toml` + 基础目录结构（`gui/` / `core/` / `tools/`）| ⏳ | 1h | 必须最先做；架构分层的物理落点（per `Architecture.md §1`）|
-| `v0.1.1` | **GUI 主窗口骨架**：PySide6 `QMainWindow` + 文件拖拽接收 + 菜单树（六大分类占位）| ⏳ | 2h | 依赖 v0.1.0；视觉调试在本地手动跑 |
-| `v0.1.2` | **入口分流器**：`core/router.py` 根据 `file` 命令 + 后缀 + magic bytes 路由到 subflow 推荐 | ⏳ | 2h | 依赖 v0.1.0；见 `Architecture.md §3` |
-| `v0.1.3` | **可疑点扫描器**：`core/suspicious.py` 统一 schema（per §6）+ 关键字 / 正则集合 | ⏳ | 2h | 依赖 v0.1.0；GUI 输出区高亮依赖此 |
-| `v0.1.4` | **journal 自动记录**：`core/journal.py` 每次工具调用 = 一段（per misc-skill `solve_journal.md` 约定）| ⏳ | 1.5h | 依赖 v0.1.0 |
-| `v0.1.5` | **工具 adapter 基类**：`tools/base.py` 定义 `ToolAdapter` 抽象类 + `run(file_path) -> ToolResult` 接口 | ⏳ | 1h | 依赖 v0.1.0；见 `Architecture.md §6` |
-| `v0.1.6` | **5 个核心 adapter 落地**：binwalk / strings / foremost / tshark / vol.py（或 exiftool 二选一）| ⏳ | 4h | 依赖 v0.1.5；输出统一走 `ToolResult` schema |
-| `v0.1.7` | **GUI 集成**：菜单点击 → Core 调用 adapter → 输出区实时渲染 + 高亮 + journal 写入 | ⏳ | 3h | 依赖 v0.1.1 + v0.1.3 + v0.1.6 |
-| `v0.1.8` | **拖拽到 GUI**：拖拽事件 → 自动识别文件类型 → 弹出 subflow 推荐菜单 | ⏳ | 2h | 依赖 v0.1.1 + v0.1.2 |
-| `v0.1.9` | **基础测试**：pytest unit（Core 单测）+ pytest-qt 集成（GUI 拖拽 + 菜单触发）| ⏳ | 3h | 依赖 v0.1.7 + v0.1.8 |
-| `v0.1.10` | **6 关验收**：单元 + 集成 + 真实样本 smoke + Owner 自审 + 文档同步 | ⏳ | 2h | 依赖 v0.1.9；本表状态全部 ✅ |
-| `v0.1.0b` | **重整工具池分类（按分支重排）**：从 9 个 subflow（图片隐写/流量/压缩/内存/编码/二进制/音频/文档/二维码）改为按"用户面对的题目类型"分支：Forensics（Memory/Disk/Network/Log）+ Steganography（Image/Audio/Video）+ Encoding（内置自写）+ Misc Others（Archive/Office/Brainteaser）。**影响**：`tools.md` 全量重写 + `prd.md §5` §6 同步 + `Architecture.md §4.4` 同步 | ⏳ | 1h | **不引入新工具依赖**；仅重组分类 + 新增 4 个 subflow 入口分流规则；**依赖**：先于 v0.1.5 / v0.1.6 / v0.1.7 实施 |
-| `v0.1.0b-PR1` | **v0.1 第一个实施 PR（共享基础工具 6 个 adapter）**：实现 `tools/shared/` 下的 6 个 adapter（`file` / `strings` / `binwalk` / `foremost` / `exiftool` / `xxd`）+ `tools/base.py` ToolAdapter 基类 + `core/suspicious.py` 最小可用可疑点扫描器 + `core/registry.py` 装饰器 + `core/orchestrator.py` 最小调度 + `core/result.py` ToolResult + 单元测试。**不含 GUI**（GUI 是 v0.1.1 范围）| ✅ | 4h | **当前任务**；按 `tools.md §6.2` 实施；**6 关验收**：① 代码合入 `main` 分支（commit 详情见 git log）；② `pytest tests/unit -q` 全过（**61 tests / 100% PASS**）；③ N/A（PR1 无 GUI / 无集成测试）；④ 真实样本 smoke：generated fixture（PNG + base64 + flag 注释）跑 6 个 adapter，关键可疑点命中（flag severity=5 / PNG file_header severity=4 / base64 severity=3）；⑤ Owner 自审（单 Owner 项目）；⑥ 文档同步（本表 + `tools.md §3.12` + `Architecture.md §4.4` + `AGENTS.md §8`）|
-| `v0.1.0b-PR2` | **Stego/Image 主工具（zsteg + steghide adapter）**：实现 `tools/steganography/image/zsteg.py`（PNG/BMP LSB 全通道检测）+ `tools/steganography/image/steghide.py`（JPEG/BMP/WAV/AU 隐写提取/嵌入，需要口令）+ 单元测试。**依赖**：`tools/shared/` 6 个 adapter 已就绪（PR1）| ✅ | 4h | **已完成**；按 `tools.md §3.5` + `Architecture.md §4.4`；**6 关验收**：① ✅ 代码合入 `main`（merge commit `4ca05e5` via PR #2 Squash merge，2026-06-13）；② ✅ `pytest tests/unit -q` 全过（**75 passed**：PR1 61 + PR2 14）；③ N/A（PR2 无 GUI / 集成）；④ ✅ 真实样本 smoke：zsteg LSB PNG 命中 `flag{pr2_smoke_lsb_xyz}` [4]；steghide JPEG/BMP 正确识别 unavailable 信号；⑤ ✅ Owner 自审（单 Owner 项目，PR #2 由 Owner 开 PR + 签字 merge 授权）；⑥ ✅ 文档同步（本表 + `tools.md §3.5` + `Architecture.md §4.4` + `AGENTS.md §2.5.1 v4`）|
+> **2026-06-13 14:00 重整说明**：本节原列两套并行任务体系（`v0.1.0~v0.1.10` 旧编号 + `v0.1.0b~PR9` 新编号），互相重叠矛盾。
+> **重整结果**：以 `v0.1.0b-*` 体系为**唯一事实来源**（对应代码实际状态 + AGENTS.md §9.5 状态看板）。
+> 旧编号已废止，PR3~PR9 + cleanup + GUI + encoders 10 项任务已按依赖重排。
 
-**v0.1 总预估**：~23.5h（按 6h/人/天 ≈ 4 天）
+| 优先级 | ID | 任务 | 状态 | 预估 | 备注 |
+|---|---|---|---|---|---|
+| **P0** | `v0.1.0b-cleanup` | **文档重整（PR0 · 阻塞后续）**：合并 prd.md §4.1 两套体系为单一一套；清理 `Architecture.md §4.4 / §4.5` 中尚未落地的"假目录"（forensics/ misc/ encoders/ gui/）；标记 `extend_tools/` 处置（png_crc_check / F5 / volatility2 是历史遗留杂物，按铁律 2 列入后续清理 PR，不在本 PR 删代码）；新增 §4.5 重排优先级表说明本次决策 | 🔄 | 1h | **当前任务**；**不引入代码改动**；**依赖**：无（最先做）|
+| P1 | `v0.1.0b-PR9` | **Python 包基座补完**：pyproject.toml 已写但 `python -m automisc` 未验证；补 `src/automisc/__main__.py` 入口 + dev install smoke + console_script 跑通 | ⏳ | 1.5h | **依赖**：cleanup；**所有后续 PR 跑 smoke 的前置** |
+| P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump adapter）| ⏳ | 3h | **依赖**：PR9；按 PR1 模板复制；2 adapter + 单元测试 |
+| P3 | `v0.1.0b-PR4` | Stego/Audio + Video（ffmpeg_audio + ffprobe + ffmpeg_video + sox）| ⏳ | 4h | **依赖**：PR9；⚠️ sox 需 `brew install sox`（v0.1 必装）|
+| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 4h | **依赖**：PR9；⚠️ john-jumbo 需 `brew install john-jumbo`（v0.1 必装）|
+| P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 2.5h | **依赖**：PR9；⚠️ evtx_dump 需 `pip install python-evtx` |
+| P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 2h | **依赖**：PR9；⚠️ zbar 需 `brew install zbar`（v0.1 必装）|
+| P7 | `v0.1.0b-PR7-envfix` | **前置环境修复（解决 vol.py blocker）**：在 Apple Silicon 上 brew 装 volatility2 / 或 python 装 `pip install volatility3` 二选一；选好方案后 ADR 写进 `tools.md §3.1` | ⏳ | 1h | **依赖**：PR9；**不写 adapter**，只解决"装得上" |
+| P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ | 3h | **依赖**：PR7-envfix；⚠️ blocker 在 PR7-envfix |
+| P8 | `v0.1.0b-encoders` | **Encoding 自编写（9h Python 模块）**：`core/encoders/base.py`（base16/32/58/62/64/85/91/2048/32768/65536）+ `core/encoders/classical.py`（ROT13/47/18 + Caesar + Vigenère + Atbash + Pigpen + Keyboard Shift + Affine + Rail Fence）+ `core/encoders/custom.py`（BCD + IEEE 754 + UTF-16 endianness + Unicode Tags/Variation Selector + Multi-layer auto-decoder）+ 单元测试 | ⏳ | 9h | **依赖**：PR9；可与 PR3~PR8 并行；非工具池层（per Architecture.md §4.4）|
+| P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6 QMainWindow + 文件拖拽 + 菜单树 + 输出区 + journal 面板）| ⏳ | 8h | **依赖**：PR3~PR8 + encoders 全 ✅；**放最后**——所有 adapter 跑通再做 GUI 集成，避免改 22 个 adapter 时 GUI 测试跟着改 |
+| — | `v0.1.0b-PR1` | **共享基础工具 6 个 adapter**（file / strings / binwalk / foremost / exiftool / xxd）+ tools/base.py + core/suspicious.py + core/registry.py + core/orchestrator.py + core/result.py + 单元测试 | ✅ | 4h | **已完成**（per AGENTS.md §9.5）；**6 关验收**：① ✅ commit `4ca05e5`；② ✅ 61 tests PASS；③ N/A；④ ✅ fixture smoke 命中 flag/file_header/base64；⑤ ✅ Owner 自审；⑥ ✅ 文档同步 |
+| — | `v0.1.0b-PR2` | **Stego/Image 主工具**（zsteg + steghide adapter）+ 单元测试 | ✅ | 4h | **已完成**（per AGENTS.md §9.5）；**6 关验收**：① ✅ commit `4ca05e5`；② ✅ 75 passed（PR1 61 + PR2 14）；③ N/A；④ ✅ zsteg LSB PNG 命中 `flag{pr2_smoke_lsb_xyz}` [4]；⑤ ✅ Owner 自审；⑥ ✅ 文档同步 |
+| — | `v0.1.0b-docs` | GitHub workflow 治理（AGENTS.md §2.5 + §8 变更日志）| ✅ | 1h | **已完成**（per AGENTS.md §9.5）；非代码 PR，纯治理 |
+
+**v0.1 总预估**：~39h（按 6h/人/天 ≈ 6.5 天）+ 清理 + 环境修复 = ~41h
+- 已完成：9h（PR1 4h + PR2 4h + docs 1h）
+- 待实施：32h（cleanup 1h + PR9 1.5h + PR3~PR8 18.5h + encoders 9h + GUI 8h - 部分依赖重叠）
+
+**实施顺序**（per `AGENTS.md §2.1` 任务粒度约束 ≤400 行 / PR）：
+1. 🔄 **cleanup**（P0，当前）→ 1h
+2. ⏳ **PR9**（包基座）→ 1.5h
+3. ⏳ **PR3** → 3h ｜ ⏳ **PR4** → 4h ｜ ⏳ **PR5** → 4h ｜ ⏳ **PR6** → 2.5h ｜ ⏳ **PR8** → 2h ｜ ⏳ **PR7-envfix** → 1h + **PR7** → 3h ｜ ⏳ **encoders** → 9h
+   - PR3~PR8 + encoders 互相无依赖，可并行（人不够时分批）
+4. ⏳ **GUI** → 8h（最后做）
+
+**决策记录**（2026-06-13 14:00）：
+- **为什么 cleanup 第一**：铁律 1 要求"代码改动必须有 prd.md 对应行"；现在 prd 自己矛盾，再不重整后续 PR 的文档同步无法可依
+- **为什么 PR9 第二**：pyproject.toml 写了但没 smoke 验证；PR3 跑 smoke 需要 `python -m automisc` 真能起来
+- **为什么 PR7（Memory）放后面**：vol.py 安装是 blocker；拆出 PR7-envfix 单独解决"装得上"，避免污染 PR7 的代码 PR
+- **为什么 GUI 最后**：避免改 22 个 adapter 时 GUI 集成测试跟着改 22 次；adapter 全跑通再做 GUI 集成测试效率最高
+- **为什么 encoders 与 PR3~PR8 并行**：非工具池层（per `Architecture.md §4.4`），与 adapter 无耦合
 
 ### 4.2 v0.5 候选（工具链模板编排）
 
@@ -485,10 +505,10 @@ v0.1（当前）              v0.5（中期）              v1.0（远期）
 ## 12. 变更日志
 
 > **维护策略**：本表只保留**最近 4 条**。超出范围旧条目归档到 `docs/changelog/prd.md_archived.md`（v0.1+ 创建）。
-> 当前 1 条。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 14:00 | **1.1** | **v0.1.0b-cleanup 治理重整**：① §4.1 合并两套任务体系（旧 `v0.1.0~v0.1.10` + 新 `v0.1.0b~PR9`）为单一 `v0.1.0b-*` 体系；② 按"依赖 + 价值 + 阻塞面"重排 P0~P9 优先级（cleanup → PR9 → PR3/4/5/6/8 → PR7-envfix+PR7 → encoders → GUI）；③ 新增"决策记录"小节说明排序理由；④ 移除旧编号任务行。详见本次 commit。 |
 | 2026-06-13 | 1.0 | 初版：产品定位 + 用户故事 + 任务看板（v0.1/v0.5/v1.0）+ 工具池 + 入口分流表 + 可疑点 schema + 完成判定 + GUI + 演进路线图。详见 git history（commit 9401f98）。 |
 
 ---
