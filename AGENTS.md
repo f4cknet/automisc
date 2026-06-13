@@ -401,7 +401,7 @@ Reviewer 验证 PR 是否违反本文档的 4 条铁律 + `prd.md §3` 任务粒
 | P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | squash merge `c682f5c`（PR #12 包含）|
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ✅ done | squash merge `c682f5c`（PR #12）|
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ✅ done | squash merge `c94d5405`（PR #13）|
-| P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
+| P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ✅ done | commit `2a4fbe0`（main by mavis）|
 | — | `v0.1.0b-PR1` | 共享基础工具 6 个 adapter | ✅ done | commit `9401f98` |
 | — | `v0.1.0b-PR2` | Stego/Image（zsteg + steghide）| ✅ done | commit `4ca05e5`（PR #2）|
 | — | `v0.1.0b-docs` | GitHub workflow 治理 | ✅ done | 含在 PR #2 内 |

@@ -1,0 +1,244 @@
+"""GUI 集成测试 — main window + file drop + tool selection + output + journal.
+
+pytest-qt 必须在 conftest 或这里设置 QT_QPA_PLATFORM=offscreen。
+"""
+
+from __future__ import annotations
+
+import os
+
+# 必须在 import PySide6 之前设置
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from pathlib import Path
+
+import pytest
+from PySide6.QtCore import Qt
+
+from automisc.core.orchestrator import CoreOrchestrator
+from automisc.core.suspicious import SuspiciousPoint
+from automisc.gui.journal_panel import JournalPanel
+from automisc.gui.main_window import MainWindow
+from automisc.gui.menu_dock import TOOL_CATEGORIES, ToolMenuDock
+from automisc.gui.output_view import OutputView
+
+
+# ---------- fixture ----------
+@pytest.fixture
+def qt_app(qtbot):
+    """提供 QApplication 实例 + qtbot."""
+    return qtbot
+
+
+@pytest.fixture
+def sample_text() -> Path:
+    """真实样本 fixture（PR9 创建的 sample_text.txt）."""
+    return Path("tests/fixtures/sample_text.txt")
+
+
+# ---------- 1. MainWindow import + instantiate ----------
+class TestMainWindow:
+    def test_main_window_construct(self, qtbot):
+        """QMainWindow 构造无异常（PySide6 widget tree init OK）."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        assert w.windowTitle().startswith("automisc")
+        assert w.menu_dock is not None
+        assert w.output_view is not None
+        assert w.journal_panel is not None
+
+    def test_main_window_accept_drops(self, qtbot):
+        """拖拽 enabled."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        assert w.acceptDrops() is True
+
+    def test_main_window_default_status(self, qtbot):
+        """默认状态栏有 Ready 文案."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        assert "Ready" in w.statusBar().currentMessage()
+
+
+# ---------- 2. Menu dock ----------
+class TestToolMenuDock:
+    def test_menu_categories(self, qtbot):
+        """8 个分类（PR1~PR8 + encoders 不在 menu）。"""
+        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        qtbot.addWidget(dock)
+        assert dock.tree.topLevelItemCount() == 8
+
+    def test_menu_total_tools(self, qtbot):
+        """所有分类下的工具数 == 22（v0.1 frozen）."""
+        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        qtbot.addWidget(dock)
+        count = 0
+        for i in range(dock.tree.topLevelItemCount()):
+            cat = dock.tree.topLevelItem(i)
+            count += cat.childCount()
+        assert count == 22  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1
+
+    def test_menu_callback(self, qtbot):
+        """点击工具项触发 callback."""
+        selected = []
+        dock = ToolMenuDock(on_tool_selected=selected.append)
+        qtbot.addWidget(dock)
+        # 找第一个可点击的子项
+        cat = dock.tree.topLevelItem(0)
+        first_child = cat.child(0)
+        dock._on_item_clicked(first_child, 0)
+        assert selected == ["file"]  # PR1 第一个是 file
+
+    def test_menu_tool_categories_constant(self):
+        """TOOL_CATEGORIES 字典含 8 分类 22 工具（避免漏写）."""
+        assert len(TOOL_CATEGORIES) == 8
+        total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
+        assert total == 22
+
+
+# ---------- 3. Output view ----------
+class TestOutputView:
+    def test_append_text(self, qtbot):
+        view = OutputView()
+        qtbot.addWidget(view)
+        view.append_text("hello\nworld")
+        assert "hello" in view.toPlainText()
+        assert "world" in view.toPlainText()
+
+    def test_append_suspicious_severity_color(self, qtbot):
+        """severity=5 应显示红色."""
+        view = OutputView()
+        qtbot.addWidget(view)
+        sp = SuspiciousPoint(
+            id="",
+            tool_name="strings",
+            file_path="/tmp/test.txt",
+            category="flag",
+            matched_pattern="flag{test}",
+            severity=5,
+            suggested_action="submit",
+        )
+        view.append_suspicious(sp)
+        text = view.toPlainText()
+        assert "[5]" in text
+        assert "flag" in text
+        assert "flag{test}" in text
+
+
+# ---------- 4. Journal panel ----------
+class TestJournalPanel:
+    def test_add_suspicious(self, qtbot):
+        panel = JournalPanel()
+        qtbot.addWidget(panel)
+        sp = SuspiciousPoint(
+            id="",
+            tool_name="strings",
+            file_path="/tmp/test.txt",
+            category="flag",
+            matched_pattern="flag{abc}",
+            severity=5,
+            suggested_action="submit",
+        )
+        panel.add_suspicious("strings", Path("/tmp/test.txt"), sp)
+        assert panel.tree.topLevelItemCount() == 1
+        item = panel.tree.topLevelItem(0)
+        assert item.text(panel.COL_TOOL) == "strings"
+        assert item.text(panel.COL_VALUE) == "flag{abc}"
+        assert item.text(panel.COL_SEV) == "5"
+
+    def test_journal_accumulates(self, qtbot):
+        """journal 累积多条."""
+        panel = JournalPanel()
+        qtbot.addWidget(panel)
+        for i in range(5):
+            sp = SuspiciousPoint(
+                id="",
+                tool_name="t",
+                file_path="/x",
+                category="test",
+                matched_pattern=f"v{i}",
+                severity=3,
+                suggested_action="",
+            )
+            panel.add_suspicious("t", Path("/x"), sp)
+        assert panel.tree.topLevelItemCount() == 5
+
+    def test_journal_clear(self, qtbot):
+        panel = JournalPanel()
+        qtbot.addWidget(panel)
+        sp = SuspiciousPoint(
+            id="",
+            tool_name="t",
+            file_path="",
+            category="x",
+            matched_pattern="y",
+            severity=1,
+            suggested_action="",
+        )
+        panel.add_suspicious("t", None, sp)
+        assert panel.tree.topLevelItemCount() == 1
+        panel.clear()
+        assert panel.tree.topLevelItemCount() == 0
+
+
+# ---------- 5. End-to-end: drag file + run tool ----------
+class TestEndToEnd:
+    def test_drop_file_sets_current_file(self, qtbot, sample_text, tmp_path):
+        """拖入文件 → current_file 设置 + output 显示."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        # 模拟 dropEvent
+        from PySide6.QtCore import QMimeData, QPoint, QUrl
+        from PySide6.QtGui import QDropEvent
+
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(sample_text))])
+        event = QDropEvent(
+            QPoint(0, 0),
+            Qt.CopyAction,
+            mime,
+            Qt.LeftButton,
+            Qt.NoModifier,
+        )
+        w.dropEvent(event)
+        assert w.current_file == sample_text
+        assert "drop" in w.output_view.toPlainText()
+        assert str(sample_text) in w.output_view.toPlainText()
+
+    def test_run_tool_against_sample(self, qtbot, sample_text):
+        """拖入 sample + 选 strings → output 显示 flag{smoke_test_pr9_xyz}."""
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        from PySide6.QtCore import QMimeData, QPoint, QUrl
+        from PySide6.QtGui import QDropEvent
+
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(sample_text))])
+        event = QDropEvent(
+            QPoint(0, 0),
+            Qt.CopyAction,
+            mime,
+            Qt.LeftButton,
+            Qt.NoModifier,
+        )
+        w.dropEvent(event)
+
+        # 选 strings（PR1）
+        w._run_tool("strings")
+        text = w.output_view.toPlainText()
+        assert "strings" in text
+        assert "flag{smoke_test_pr9_xyz}" in text
+        # journal 也应有记录
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        sp_item = w.journal_panel.tree.topLevelItem(0)
+        # value 列：matched_pattern + (context)；context 含原行文本
+        assert "flag{smoke_test_pr9_xyz}" in sp_item.text(w.journal_panel.COL_VALUE)
+
+    def test_run_tool_no_file(self, qtbot):
+        """没选文件时点工具 → 状态栏提示."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        w._run_tool("strings")
+        assert "请先拖入" in w.statusBar().currentMessage()
+        assert "[!]" in w.output_view.toPlainText()
