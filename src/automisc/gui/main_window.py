@@ -24,8 +24,9 @@ from PySide6.QtWidgets import (
 
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.registry import list_tools
-from automisc.core.router import FileRouter
+from automisc.core.router import FileRouter, RouteRecommendation
 
+from .auto_runner import AutoRunner
 from .journal_panel import JournalPanel
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
@@ -33,7 +34,7 @@ from .runner import ToolRunner
 
 
 class MainWindow(QMainWindow):
-    """automisc 主窗口。
+    """automisc 主窗口.
 
     Args:
         core: 注入的 Core 调度器（不在 GUI 内 new）
@@ -44,7 +45,10 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.core = core or CoreOrchestrator()
         self.current_file: Optional[Path] = None
-        self._runner: Optional[ToolRunner] = None  # 当前 async runner
+        self._runner: Optional[ToolRunner] = None  # 单工具 async runner
+        self._auto_runner: Optional[AutoRunner] = None  # 链式 auto-runner
+        self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐
+        self._auto_run_enabled: bool = True  # 默认开启 auto-run
 
         self.setWindowTitle("automisc — CTF Misc 半自动化辅助工具箱")
         self.resize(1200, 800)
@@ -64,7 +68,9 @@ class MainWindow(QMainWindow):
 
         # 状态栏
         self.setStatusBar(QStatusBar())
-        self.statusBar().showMessage("Ready · 拖入文件或点左侧菜单")
+        self.statusBar().showMessage(
+            "Ready · 拖入文件自动跑 top 5 推荐 · 点左侧菜单手动跑"
+        )
 
         # 简单菜单栏（File / View）
         self._build_menu_bar()
@@ -84,17 +90,23 @@ class MainWindow(QMainWindow):
         if not local_path:
             return
 
+        # 停止之前的 auto_runner（如果还在跑）
+        if self._auto_runner and self._auto_runner.isRunning():
+            self._auto_runner.stop()
+            self._auto_runner.wait(2000)
+
         self.current_file = Path(local_path)
         self.statusBar().showMessage(f"已选文件: {self.current_file.name}")
 
         # v0.1.1：FileRouter 智能推荐（per Architecture §3.5）
         try:
             route = FileRouter().route(self.current_file)
+            self._current_recommendations = route.recommendations
             self.output_view.append_text(
                 f"[drop] file={self.current_file}\n"
                 f"        size={route.file_size} bytes\n"
                 f"        magic={route.detected_magic or 'unknown'}\n"
-                f"        recommendations:\n"
+                f"        recommendations ({len(route.recommendations)}):\n"
             )
             for rec in route.recommendations[:5]:
                 self.output_view.append_text(
@@ -102,11 +114,90 @@ class MainWindow(QMainWindow):
                 )
         except Exception as e:  # noqa: BLE001
             # 路由失败（如文件不可读）→ 兜底
+            self._current_recommendations = []
             self.output_view.append_text(
                 f"[drop] file={self.current_file}\n"
                 f"        router error: {e}\n"
             )
+
+        # v0.1.1-auto-run: auto-run 开启则自动启动 AutoRunner 跑 top 5
+        if self._auto_run_enabled and self._current_recommendations:
+            self.output_view.append_text(
+                f"\n[auto-run] 启动串行跑 top 5 推荐工具...\n"
+            )
+            self._start_auto_run(self._current_recommendations)
+        elif not self._auto_run_enabled:
+            self.output_view.append_text(
+                f"\n[auto-run disabled] 点左侧菜单手动选工具跑\n"
+            )
+
         event.acceptProposedAction()
+
+    # ---------- auto-run (v0.1.1 增强) ----------
+    def _start_auto_run(self, recommendations: list[RouteRecommendation]) -> None:
+        """启动 AutoRunner 串行跑推荐工具."""
+        if self._auto_runner and self._auto_runner.isRunning():
+            return  # 已有在跑
+        self._auto_runner = AutoRunner(
+            self.core, recommendations, str(self.current_file), max_tools=5
+        )
+        self._auto_runner.tool_started.connect(self._on_auto_tool_started)
+        self._auto_runner.tool_finished.connect(self._on_auto_tool_finished)
+        self._auto_runner.chain_finished.connect(self._on_auto_chain_finished)
+        self._auto_runner.chain_failed.connect(self._on_auto_chain_failed)
+        self._auto_runner.start()
+
+    def _on_auto_tool_started(self, tool_name: str, index: int, total: int) -> None:
+        self.statusBar().showMessage(
+            f"[auto {index+1}/{total}] running {tool_name} on {self.current_file.name}…"
+        )
+
+    def _on_auto_tool_finished(self, tool_name: str, summary, result) -> None:
+        """单个工具跑完 → 写 output + journal.
+
+        AutoRunner 已把完整 ToolResult 传过来（避免重复跑工具）。
+        """
+        self.output_view.append_text(
+            f"\n=== {tool_name} (auto {summary.success and 'OK' or 'FAIL'}) ===\n"
+        )
+        if result.stderr:
+            self.output_view.append_text(f"[stderr] {result.stderr[:500]}\n")
+
+        # 写 stdout 详情
+        stdout = result.stdout or ""
+        if len(stdout) > 2000:
+            stdout = stdout[:2000] + f"\n... (truncated)\n"
+        if stdout:
+            self.output_view.append_text(stdout)
+
+        # suspicious points
+        self.output_view.append_text(
+            f"exit_code: {result.exit_code} | "
+            f"suspicious_points ({len(result.suspicious_points)}):\n"
+        )
+        for sp in result.suspicious_points:
+            self.output_view.append_suspicious(sp)
+
+        # journal 累积
+        for sp in result.suspicious_points:
+            self.journal_panel.add_suspicious(tool_name, self.current_file, sp)
+
+    def _on_auto_chain_finished(self, summaries) -> None:
+        """整链跑完 → 输出总结."""
+        total = len(summaries)
+        ok = sum(1 for s in summaries if s.success)
+        sps = sum(s.suspicious_count for s in summaries)
+        self.output_view.append_text(
+            f"\n[auto-run done] {ok}/{total} OK · {sps} suspicious points found\n"
+        )
+        self.statusBar().showMessage(
+            f"auto-run done: {ok}/{total} OK · {sps} suspicious points"
+        )
+
+    def _on_auto_chain_failed(self, tool_name: str, error_msg: str) -> None:
+        self.output_view.append_text(
+            f"[!] auto-run chain failed at {tool_name}: {error_msg}\n"
+        )
 
     # ---------- menu actions ----------
     def _build_menu_bar(self) -> None:
@@ -130,11 +221,24 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.menu_dock.toggleViewAction())
         view_menu.addAction(self.journal_panel.toggleViewAction())
 
+        # Run menu (v0.1.1 auto-run 切换)
+        run_menu = menubar.addMenu("&Run")
+        self.auto_run_action = QAction("&Auto-run on drop", self)
+        self.auto_run_action.setCheckable(True)
+        self.auto_run_action.setChecked(self._auto_run_enabled)
+        self.auto_run_action.toggled.connect(self._toggle_auto_run)
+        run_menu.addAction(self.auto_run_action)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
         about_action = QAction("&About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
+
+    def _toggle_auto_run(self, checked: bool) -> None:
+        self._auto_run_enabled = checked
+        status = "ON" if checked else "OFF"
+        self.statusBar().showMessage(f"auto-run: {status} (拖文件{'自动跑' if checked else '手动选'})")
 
     def _open_file_dialog(self) -> None:
         from PySide6.QtWidgets import QFileDialog
