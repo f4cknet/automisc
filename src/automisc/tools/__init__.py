@@ -41,3 +41,7 @@ from automisc.tools.forensics.network import tshark  # noqa: F401
 from automisc.tools.misc.archive import john  # noqa: F401
 from automisc.tools.misc.archive import sevenz  # noqa: F401
 from automisc.tools.misc.archive import unzip  # noqa: F401
+
+# forensics/log/ 的 2 个 adapter（v0.1.0b-PR6）
+from automisc.tools.forensics.log import evtx_dump  # noqa: F401
+from automisc.tools.forensics.log import grep  # noqa: F401

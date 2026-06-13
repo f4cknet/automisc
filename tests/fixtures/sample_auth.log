@@ -1,0 +1,6 @@
+Jun 13 10:30:01 host sshd[1234]: Accepted password for alice from 192.168.1.10
+Jun 13 10:30:05 host sshd[1235]: Failed password for root from 1.2.3.4
+Jun 13 10:30:10 host sudo: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/bin/bash
+Jun 13 10:30:15 host sshd[1236]: Failed password for admin from 5.6.7.8
+Jun 13 10:30:20 host app: secret token=abc123def456
+Jun 13 10:30:25 host app: hidden file detected
