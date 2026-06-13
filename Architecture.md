@@ -488,8 +488,8 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   ├── steganography/
 │   │   ├── network/                     # ✅ PR3（tshark + tcpdump）
 │   │   ├── image/                       # ✅ PR2（zsteg + steghide）            ⏳ PR2 后续（binwalk/exiftool/foremost 共享版）
-│   │   ├── audio/                       # ⏳ PR4
-│   │   └── video/                       # ⏳ PR4
+│   │   ├── audio/                       # ✅ PR4（ffmpeg + sox + steghide_audio）
+│   │   └── video/                       # ✅ PR4（ffprobe + ffmpeg_video）
 │   ├── misc/                            # ⏳ PR5 / PR8
 │   │   ├── archive/
 │   │   ├── office/                      # P1 · 未排期
@@ -565,11 +565,11 @@ src/automisc/
 | `tools/steganography/image/steghide_image.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ `brew install steghide` | **✅ PR2** |
 | `tools/forensics/network/tshark.py` | [`tools.md §3.3 tshark`](./tools.md) | ✅ `brew install wireshark` | **✅ PR3** |
 | `tools/forensics/network/tcpdump.py` | [`tools.md §3.3 tcpdump`](./tools.md) | ✅ macOS 自带 | **✅ PR3** |
-| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
-| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ❌ `brew install sox`（v0.1 必装）| ⏳ PR4 |
-| `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | ⏳ PR4 |
-| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | ⏳ PR4 |
-| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | ⏳ PR4 |
+| `tools/steganography/audio/ffmpeg_audio.py` | [`tools.md §3.6 ffmpeg`](./tools.md) | ✅ `brew install ffmpeg` | **✅ PR4** |
+| `tools/steganography/audio/sox.py` | [`tools.md §3.6 sox`](./tools.md) | ✅ 已装 | **✅ PR4** |
+| `tools/steganography/audio/steghide_audio.py` | [`tools.md §3.5 steghide`](./tools.md) | ✅ 共享 | **✅ PR4** |
+| `tools/steganography/video/ffmpeg_video.py` | [`tools.md §3.7 ffmpeg`](./tools.md) | ✅ 共享 | **✅ PR4** |
+| `tools/steganography/video/ffprobe.py` | [`tools.md §3.7 ffprobe`](./tools.md) | ✅ `brew install ffmpeg` | **✅ PR4** |
 | `tools/misc/archive/sevenz.py` | [`tools.md §3.9 7z`](./tools.md) | ✅ `brew install p7zip` | ⏳ PR5 |
 | `tools/misc/archive/unzip.py` | [`tools.md §3.9 unzip`](./tools.md) | ✅ macOS 自带 | ⏳ PR5 |
 | `tools/misc/archive/john.py` | [`tools.md §3.9 john`](./tools.md) | ❌ `brew install john-jumbo`（v0.1 必装）| ⏳ PR5 |
@@ -852,6 +852,7 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 16:55 | **1.6** | **v0.1.0b-PR4 实施完成**：Stego/Audio+Video adapter 落地（5 个新 adapter：ffmpeg_audio/sox/steghide_audio + ffprobe/ffmpeg_video）。ffmpeg 共享 binary，audio/video 各自独立 adapter name 便于 GUI 分类。新增 17 单测 + 2 fixture（WAV/MP4，含 flag metadata）。124 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17）。真实样本 smoke：ffmpeg_audio 命中 flag [5] + duration + audio_stream；ffprobe 命中 flag [5] + 2 streams + duration；steghide_audio 命中 capacity + tty unavailable 信号。详见本次 commit。 |
 | 2026-06-13 16:08 | **1.5** | **v0.1.0b-PR3 实施完成**：Forensics/Network adapter 落地（`tools/forensics/network/tshark.py` + `tcpdump.py`）。tshark 用 `-T fields` CSV 模式 + `http.request.uri/method` 字段；含 webshell 关键字白名单（eval/assert/base64_decode + shell.php/cmd.php + antsword/behinder）。新增 10 单测 + hand-write 经典 pcap fixture（389B，含 flag + webshell POST）。107 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10）。真实样本 smoke：`automisc run --tool tshark --file tests/fixtures/sample_http_flag.pcap` 命中 flag [5] + webshell_family [4]；tcpdump 同样命中。详见本次 commit。 |
 | 2026-06-13 15:13 | **1.4** | **v0.1.0b-PR9 实施完成**：包基座验证（`pip install -e ".[dev]"` 跑通 + console_script `automisc` 装到 PATH + `python -m automisc` 真起）。新增 `tests/fixtures/sample_text.txt` (37B smoke fixture) + `tests/unit/test_pr9_package_base.py` (22 smoke 单测)。97 unit tests PASS（PR1 61 + PR2 14 + PR9 22）。真实样本 smoke：`automisc run --tool strings --file tests/fixtures/sample_text.txt` 命中 `flag{smoke_test_pr9_xyz}` [5]。详见本次 commit。 |
 | 2026-06-13 14:00 | **1.3** | **v0.1.0b-cleanup 治理重整**（per `prd.md §4.1`）：① §4.4 拆"目标布局（target）" + "当前落地（actual）"两栏；② §4.5 PR9 改为包基座验证，移除 `python_magic_bin` / `numpy` adapter 行；③ 标记 `extend_tools/` 处置。详见本次 commit。 |

@@ -24,6 +24,15 @@ from automisc.tools.shared import xxd  # noqa: F401
 from automisc.tools.steganography.image import steghide  # noqa: F401
 from automisc.tools.steganography.image import zsteg  # noqa: F401
 
+# steganography/audio/ 的 3 个 adapter（v0.1.0b-PR4）
+from automisc.tools.steganography.audio import ffmpeg_audio  # noqa: F401
+from automisc.tools.steganography.audio import sox  # noqa: F401
+from automisc.tools.steganography.audio import steghide_audio  # noqa: F401
+
+# steganography/video/ 的 2 个 adapter（v0.1.0b-PR4）
+from automisc.tools.steganography.video import ffmpeg_video  # noqa: F401
+from automisc.tools.steganography.video import ffprobe  # noqa: F401
+
 # forensics/network/ 的 2 个 adapter（v0.1.0b-PR3）
 from automisc.tools.forensics.network import tcpdump  # noqa: F401
 from automisc.tools.forensics.network import tshark  # noqa: F401
