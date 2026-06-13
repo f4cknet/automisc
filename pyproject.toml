@@ -31,6 +31,7 @@ test-gui = ["pytest-qt>=4.2"]
 
 [project.scripts]
 automisc = "automisc.__main__:main"
+automisc-gui = "automisc.__main__:main_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

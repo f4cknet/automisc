@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from automisc.core.exceptions import RegistryError, ToolNotFoundError
 from automisc.core.registry import (
     _TOOL_REGISTRY,
     clear_registry,
@@ -59,12 +60,12 @@ def test_register_tool_returns_class():
 
 def test_register_tool_rejects_duplicate():
     register_tool(_DummyAdapter)
-    with pytest.raises(ValueError, match="already registered"):
+    with pytest.raises(RegistryError, match="already registered"):
         register_tool(_DummyAdapter)
 
 
 def test_get_tool_class_raises_for_unknown():
-    with pytest.raises(ValueError, match="Tool not registered"):
+    with pytest.raises(ToolNotFoundError, match="tool not registered"):
         get_tool_class("nonexistent_tool_xyz")
 
 

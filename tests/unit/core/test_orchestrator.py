@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from automisc.core import registry as reg_mod
+from automisc.core.exceptions import ToolNotFoundError
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.registry import register_tool
 from automisc.core.result import ToolResult
@@ -54,5 +55,5 @@ def test_run_tool_returns_adapter_result():
 
 def test_run_tool_unknown_tool_raises():
     core = CoreOrchestrator()
-    with pytest.raises(ValueError, match="Tool not registered"):
+    with pytest.raises(ToolNotFoundError, match="tool not registered"):
         core.run_tool("does_not_exist_xyz", "/dev/null")

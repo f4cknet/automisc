@@ -1,7 +1,7 @@
-"""AutoMisc CLI 入口（v0.1.0b-PR1 占位）
+"""AutoMisc CLI 入口（v0.1.0b-PR1 占位 + v0.1.1 GUI 子命令）
 
 v0.1.0b-PR1 阶段仅暴露 ``automisc tools list`` 子命令用于核对 adapter 注册。
-GUI 入口（v0.1.1+）将在后续 PR 引入 PySide6 后启用。
+v0.1.1 起新增 ``automisc gui`` 启动 PySide6 GUI 窗口（macOS only）。
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from automisc import __version__
 
 
 def cmd_tools_list(_args: argparse.Namespace) -> int:
-    """列出所有已注册的 tool adapter。"""
+    """列出所有已注册的 tool adapter."""
     from automisc.core.registry import list_tools
     from automisc.tools import shared  # 触发 @register_tool 装饰器
 
@@ -27,7 +27,7 @@ def cmd_tools_list(_args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """对给定文件运行指定 tool，返回 0/非 0。"""
+    """对给定文件运行指定 tool，返回 0/非 0."""
     from automisc.core.orchestrator import CoreOrchestrator
     from automisc.core.registry import get_tool
 
@@ -54,6 +54,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0 if result.exit_code == 0 else 1
 
 
+def cmd_gui(_args: argparse.Namespace) -> int:
+    """启动 PySide6 GUI 主窗口（macOS only）."""
+    return main_gui()
+
+
+def main_gui() -> int:
+    """无参入口：给 console_script `automisc-gui` 用."""
+    import sys
+
+    from PySide6.QtWidgets import QApplication
+
+    from automisc.core.orchestrator import CoreOrchestrator
+    from automisc.gui.main_window import MainWindow
+    # 触发全部 adapter 注册
+    from automisc.tools import shared  # noqa: F401
+    from automisc.tools import steganography, forensics, misc  # noqa: F401
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    core = CoreOrchestrator()
+    win = MainWindow(core=core)
+    win.show()
+    return app.exec()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="automisc",
@@ -72,6 +96,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--file", required=True, help="目标文件路径")
     p_run.set_defaults(func=cmd_run)
 
+    p_gui = sub.add_parser("gui", help="启动 PySide6 GUI 主窗口（macOS only）")
+    p_gui.set_defaults(func=cmd_gui)
+
     return parser
 
 
@@ -83,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_tools_list(args)
     if args.cmd == "run":
         return cmd_run(args)
+    if args.cmd == "gui":
+        return cmd_gui(args)
 
     parser.print_help()
     return 0
