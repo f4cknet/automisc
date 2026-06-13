@@ -460,7 +460,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | 优先级 | 任务 ID | 标题 | 状态 | 备注 |
 |---|---|---|---|---|
 | **P0** | `v0.1.0b-cleanup` | 文档重整（PR0）| ✅ done | commit `b1643bc`（main 本地，未 push）|
-| P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | 依赖 cleanup；commit 待 push |
+| P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ⏳ | 依赖 PR9 |
 | P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox）| ⏳ | 依赖 PR9 |
 | P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ⏳ | 依赖 PR9 |
