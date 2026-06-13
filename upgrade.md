@@ -37,7 +37,8 @@
 | v0.1.1-auto-run | 拖文件自动跑 top 5 推荐 | ✅ done | main `6e4e14f` | [`upgrade/v0.1.1-auto-run.md`](upgrade/v0.1.1-auto-run.md) |
 | v0.5-DAG-chain | binwalk 检测 + 自动分离 + zip 智能分析链 | ✅ done | main `31fe17a` | [`upgrade/v0.5-DAG-chain.md`](upgrade/v0.5-DAG-chain.md) |
 | v0.5-DAG-chain-realtest | CLI 实测 Challenge/QR_code.png 拿 flag `CTF{vjpw_wnoei}` | ✅ done | main `e2b9587` | [`upgrade/v0.5-DAG-chain-realtest.md`](upgrade/v0.5-DAG-chain-realtest.md) |
-| v0.5-DAG-chain-refactor | foremost 工具模块化（binwalk delegate to foremost） | ✅ done | main (待 push) | [`upgrade/v0.5-DAG-chain-refactor.md`](upgrade/v0.5-DAG-chain-refactor.md) |
+| v0.5-DAG-chain-refactor | foremost 工具模块化（binwalk delegate to foremost） | ✅ done | main `4b4af51` | [`upgrade/v0.5-DAG-chain-refactor.md`](upgrade/v0.5-DAG-chain-refactor.md) |
+| v0.5-DAG-stress-test | 6 道压力测试（伪加密/真加密/foremost/套娃/多嵌/纯 png） | ✅ done | main (待 push) | [`upgrade/v0.5-DAG-stress-test.md`](upgrade/v0.5-DAG-stress-test.md) |
 
 ---
 
