@@ -395,6 +395,7 @@ MISC（根）
 | 2026-06-13 | 1.0 | 初版：扫描 `ctf-forensics/` + `ctf-misc/` md + 当前 macOS 环境 `which` + Python 包抽查，按 9 个 subflow 分类 |
 | 2026-06-13 | **2.0** | **重大分支重整**（per `prd.md §4.1 v0.1.0b`）：从"按工具能力分类"改为"按用户面对的题目类型分支"——MISC / Forensics (4) / Steganography (3) / Encoding (内置) / Misc Others (3) = **11 个 subflow**，54 个工具（28✅ / 2⚠️ / 24❌）。**删去**：OSINT / Blockchain / Games & VMs（与 automisc 完全离线定位冲突）。**合并下沉**：原"二进制分析"独立 subflow 降为"共享基础工具"；原"文档分析"归入 Misc Others / Office。**新增 P0**：22 个 adapter（远超 ≥5 要求），分 9 个 PR 实施。**Encoding 自编写**：明确无外部工具依赖，3 个 Python 模块（base / classical / custom）共 9h |
 | 2026-06-13 | **2.1** | **v0.1.0b-PR1 实施完成**：实现共享基础工具 6 个 adapter（`tools/shared/{file,strings,binwalk,foremost,exiftool,xxd}.py`）；**61 pytest unit tests 100% PASS**；端到端 smoke 命中关键可疑点（flag/PNG magic/base64/file_header）；CLI 入口 `python -m automisc tools list` + `python -m automisc run --tool X --file Y` 可用。**未做**：PR2-PR9（Stego/Network/Audio+Video/Archive/Log/Memory/Brainteaser/Python 包）按 §6.2 计划待实施 |
+| 2026-06-13 | **2.2** | **v0.1.0b-PR2 实施完成**：实现 Stego/Image 两个 adapter（`tools/steganography/image/{zsteg,steghide}.py`）；**75 pytest unit tests 全过**（PR1 61 + PR2 14）；zsteg 端到端 smoke 命中 LSB 文本 (`flag{pr2_smoke_lsb_xyz}` severity=4)；steghide 正确识别两种 unavailable 信号（macOS JPEG 编译限制 / 无 tty 环境）。**steghide adapter 设计要点**：v0.1 范围仅调 `steghide info`（无密码探测），extract 让用户在 GUI 触发（避免密码管理 + 临时文件责任）。**未做**：PR3-PR9 按 §6.2 计划待实施 |
 
 ---
 

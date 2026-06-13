@@ -99,6 +99,52 @@ class ToolAdapter(ABC):
             duration_ms = int((time.monotonic() - start) * 1000)
             return 127, "", f"executable not found: {e}", duration_ms
 
+    def _run_subprocess_with_input(
+        self,
+        cmd: list[str],
+        input_text: str,
+        *,
+        timeout: float | None = None,
+    ) -> tuple[int, str, str, int]:
+        """subprocess 包装 + 自动喂 stdin（绕过交互式 y/n prompt）。
+
+        Returns:
+            同 ``_run_subprocess``
+        """
+        effective_timeout = timeout if timeout is not None else self.default_timeout
+        start = time.monotonic()
+
+        import os
+        env = os.environ.copy()
+        homebrew_paths = "/opt/homebrew/bin:/usr/local/bin"
+        current_path = env.get("PATH", "")
+        if homebrew_paths not in current_path:
+            env["PATH"] = f"{homebrew_paths}:{current_path}"
+
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=input_text,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                env=env,
+                check=False,
+            )
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return proc.returncode, proc.stdout, proc.stderr, duration_ms
+        except subprocess.TimeoutExpired:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return (
+                124,
+                "",
+                f"subprocess timeout after {effective_timeout}s",
+                duration_ms,
+            )
+        except FileNotFoundError as e:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return 127, "", f"executable not found: {e}", duration_ms
+
     # ---- 抽象方法 ----
 
     @abstractmethod

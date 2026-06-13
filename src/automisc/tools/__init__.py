@@ -3,6 +3,9 @@
 v0.1.0b-PR1 范围：
 - ``base`` — ToolAdapter 抽象基类
 - ``shared`` — 共享基础工具（file / strings / binwalk / foremost / exiftool / xxd）
+
+v0.1.0b-PR2 范围：
+- ``steganography/image`` — Stego/Image（zsteg + steghide）
 """
 
 # 显式 import 触发 @register_tool 装饰器
@@ -16,3 +19,7 @@ from automisc.tools.shared import file  # noqa: F401
 from automisc.tools.shared import foremost  # noqa: F401
 from automisc.tools.shared import strings  # noqa: F401
 from automisc.tools.shared import xxd  # noqa: F401
+
+# steganography/image/ 的 2 个 adapter（v0.1.0b-PR2）
+from automisc.tools.steganography.image import steghide  # noqa: F401
+from automisc.tools.steganography.image import zsteg  # noqa: F401
