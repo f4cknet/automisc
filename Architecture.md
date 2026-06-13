@@ -481,7 +481,7 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   ├── base.py                          # ToolAdapter 基类                      ✅ PR1
 │   │
 │   ├── forensics/                       # Forensics 分支
-│   │   ├── memory/                      # ⏳ PR7（adapter）+ PR7-envfix（决策）
+│   │   ├── memory/                      # ✅ PR7（vol）+ ✅ PR7-envfix（决策）
 │   │   ├── disk/                        # P1 · 未排期
 │   │   ├── network/                     # ⏳ PR3
 │   │   └── log/                         # ⏳ PR6
@@ -852,6 +852,7 @@ v1.0 起把 docstring 升级为 `outputs: list[str]` 类字段。
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 18:00 | **1.10** | **v0.1.0b-PR7 实施完成**：Forensics/Memory adapter 落地（vol3 集成，per PR7-envfix 决策）。CLI 包装（`python3 -c "from volatility3.cli import main; main()"` 注入 argv）跑 pslist/pstree/netscan/filescan 4 个 plugin。4 单测 + error path 覆盖（empty/missing）。153 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10 + PR8 5 + PR7 4）。真实样本 smoke：empty.vmem 触发 vol3 "Unsatisfied requirement"（正常信号）。详见本次 commit。 |
 | 2026-06-13 17:48 | **1.9** | **v0.1.0b-PR8 实施完成**：Misc/Brainteaser adapter 落地（zbar QR/条码识别）。`zbarimg --quiet --raw` 扫描 + URL/长串/短串分类。5 单测 + 2 fixture（flag QR + URL QR，560B/828B，PIL + qrcode lib 生成）。149 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10 + PR8 5）。真实样本 smoke：flag QR 命中 flag [5] + barcode_text + meta；URL QR 命中 barcode_url [2] + meta。详见本次 commit。 |
 | 2026-06-13 17:15 | **1.8** | **v0.1.0b-PR6 实施完成**：Forensics/Log adapter 落地（2 个新 adapter：grep + evtx_dump）。grep 关键字 17 个（password/secret/hidden/webshell/flag/...）含严重度分级。evtx_dump 集成 python-evtx 0.8.1（pyproject.toml 添加依赖），检测 8 类可疑 EventID（4625/4672/4688/7045/1102 等）+ 进程命令行关键字（powershell/-enc/mimikatz 等）。新增 10 单测 + 1 fixture（auth.log）。144 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10 + PR6 10）。真实样本 smoke：grep 命中 6 个 log_keyword（password [4]×3 + secret [4] + sudo [2] + hidden [2]）；evtx_dump 暂未生成真实 evtx fixture，error path 单测全过。详见本次 commit。 |
 | 2026-06-13 17:05 | **1.7** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（3 个新 adapter：sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 双重探测，命中伪加密"Wrong password"信号 [4]。新增 10 单测 + 2 fixture（普通 zip + 伪加密 zip）。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：sevenz 伪加密命中 [4]；正常 zip 命中 file count [1]；john 列出 zip2john/rar2john capability。详见本次 commit。 |
