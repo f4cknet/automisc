@@ -481,7 +481,7 @@ src/automisc/                           # Python 包根（per pyproject.toml [to
 │   ├── base.py                          # ToolAdapter 基类                      ✅ PR1
 │   │
 │   ├── forensics/                       # Forensics 分支
-│   │   ├── memory/                      # ⏳ PR7
+│   │   ├── memory/                      # ⏳ PR7（adapter）+ PR7-envfix（决策）
 │   │   ├── disk/                        # P1 · 未排期
 │   │   ├── network/                     # ⏳ PR3
 │   │   └── log/                         # ⏳ PR6

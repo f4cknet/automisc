@@ -466,7 +466,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `813f367`（feat 分支本地，未 push）|
 | P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ✅ done | commit `18688d5`（feat 分支本地，未 push）|
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
-| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
+| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | commit `待定`（feat 分支本地，未 push）|
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ⏳ | 依赖 PR9；可与 PR3~PR8 并行 |
 | P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
@@ -488,6 +488,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-13 17:55 | **1.15** | **v0.1.0b-PR7-envfix 实施完成**：vol.py 环境决策。vol3 (`pip install volatility3`) 装好（PR7 adapter 走它）；vol2 源码保留在 `extend_tools/volatility2/`（v0.5+ docker 化）。决策记录 `docs/decisions/v0.1.0b-PR7-vol-environment.md`。pyproject.toml 添加 `volatility3>=2.0` 依赖。详见本次 commit。 |
 | 2026-06-13 17:48 | **1.14** | **v0.1.0b-PR8 实施完成**：Misc/Brainteaser adapter 落地（zbar QR/条码识别）。5 单测 + 2 fixture（flag QR + URL QR）。149 unit tests PASS。flag QR 命中 [5]；URL QR 命中 [2]。详见本次 commit。 |
 | 2026-06-13 17:15 | **1.13** | **v0.1.0b-PR6 实施完成**：Forensics/Log adapter 落地（grep + evtx_dump）。grep 17 关键字含严重度分级；evtx_dump 集成 python-evtx 0.8.1 + 8 类可疑 EventID + 进程命令行关键字。pyproject.toml 添加 python-evtx 依赖。10 单测 + 1 fixture。144 unit tests PASS。grep 真实样本 smoke 命中 6 个 log_keyword。详见本次 commit。 |
 | 2026-06-13 17:05 | **1.12** | **v0.1.0b-PR5 实施完成**：Misc/Archive adapter 落地（sevenz + unzip + john）。sevenz 用 `7z l` + `7z t -p` 探测伪加密。10 单测 + 2 fixture。134 unit tests PASS（PR1 61 + PR2 14 + PR9 22 + PR3 10 + PR4 17 + PR5 10）。真实样本 smoke：伪加密命中 [4]；正常 zip 命中 file count。详见本次 commit。 |

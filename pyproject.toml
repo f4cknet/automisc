@@ -15,6 +15,7 @@ keywords = ["ctf", "misc", "steganography", "forensics", "security"]
 # v0.1 阶段：仅声明核心依赖；GUI / 隐写 / 取证 Python 包在后续 PR 追加
 dependencies = [
     "python-evtx>=0.8.1",  # PR6: Forensics/Log Windows EVTX 日志解析
+    "volatility3>=2.0",     # PR7-envfix: Forensics/Memory（vol3 官方 Python 3 port；vol2 留 v0.5+ docker）
 ]
 
 [project.optional-dependencies]
