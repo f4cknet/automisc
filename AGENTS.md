@@ -463,7 +463,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P1 | `v0.1.0b-PR9` | Python 包基座 | ✅ done | commit `cedea12`（本地，未 push）|
 | P2 | `v0.1.0b-PR3` | Forensics/Network（tshark + tcpdump）| ✅ done | commit `da0f5a6`（feat 分支本地，未 push）|
 | P3 | `v0.1.0b-PR4` | Stego/Audio+Video（ffmpeg + ffprobe + sox + steghide_audio）| ✅ done | commit `2a3d0fa`（feat 分支本地，未 push）|
-| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `待定`（feat 分支本地，未 push）|
+| P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `813f367`（feat 分支本地，未 push）|
 | P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ⏳ | 依赖 PR9 |
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
 | P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ⏳ | 依赖 PR9 |
