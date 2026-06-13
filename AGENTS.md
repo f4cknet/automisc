@@ -466,7 +466,7 @@ PR:    feat/v0.1.0b-PR2-image-stego -> main
 | P4 | `v0.1.0b-PR5` | Misc/Archive（sevenz + unzip + john）| ✅ done | commit `813f367`（feat 分支本地，未 push）|
 | P5 | `v0.1.0b-PR6` | Forensics/Log（grep + evtx_dump）| ✅ done | commit `18688d5`（feat 分支本地，未 push）|
 | P6 | `v0.1.0b-PR8` | Misc/Brainteaser QR（zbar）| ⏳ | 依赖 PR9 |
-| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | commit `待定`（feat 分支本地，未 push）|
+| P7 | `v0.1.0b-PR7-envfix` | 前置环境修复（vol.py blocker）| ✅ done | commit `79d4c1b`（feat 分支本地，未 push）|
 | P7 | `v0.1.0b-PR7` | Forensics/Memory（vol.py adapter）| ⚠️ blocker | 依赖 PR7-envfix |
 | P8 | `v0.1.0b-encoders` | Encoding 自编写（base/classical/custom）| ⏳ | 依赖 PR9；可与 PR3~PR8 并行 |
 | P9 | `v0.1.0b-gui` | GUI 主窗口（PySide6）| ⏳ | 依赖 PR3~PR8 + encoders 全 ✅ |
