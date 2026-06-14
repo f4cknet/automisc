@@ -72,6 +72,8 @@ class MainWindow(QMainWindow):
         self._auto_runner: Optional[AutoRunner] = None  # 链式 auto-runner
         self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐
         self._auto_run_enabled: bool = True  # 默认开启 auto-run
+        # v0.5-tmp-text-mode: text-based decoder GUI 弹 QFileDialog 时记住用户选
+        self.output_dir_for_text_decoder: str = str(Path.cwd())  # 默认 cwd
 
         self.setWindowTitle("automisc — CTF Misc 半自动化辅助工具箱")
         self.resize(1200, 800)
@@ -699,17 +701,36 @@ class MainWindow(QMainWindow):
                 )
                 return
 
+            # v0.5-tmp-text-mode: 弹 QFileDialog 让用户选 output 目录
+            # 之前没弹, GUI 默认写到无关的 current_file 同目录 (误导)
+            from PySide6.QtWidgets import QFileDialog
+            out_dir = QFileDialog.getExistingDirectory(
+                self,
+                f"选择 {decoder_name} 输出目录 (text 模式无 current_file)",
+                str(self.output_dir_for_text_decoder),  # 上次选的 / 默认 cwd
+            )
+            if not out_dir:
+                self.statusBar().showMessage("已取消 (没选 output dir)")
+                self.output_view.append_text(
+                    f"\n=== Decoder: {decoder_name} (text mode) ===\n"
+                    f"[!] 用户取消 QFileDialog, 没选 output dir\n"
+                )
+                return
+            self.output_dir_for_text_decoder = out_dir  # 记住
+
             self.statusBar().showMessage(
-                f"running decoder={decoder_name} (text mode, len={len(candidate)})…"
+                f"running decoder={decoder_name} (text mode, len={len(candidate)}, out_dir={out_dir})…"
             )
             self.output_view.append_text(
                 f"\n=== Decoder: {decoder_name} (text mode) ===\n"
                 f"  input_len: {len(candidate)} chars\n"
+                f"  out_dir:   {out_dir}\n"
             )
 
             self._decode_runner = DecodeRunner(
                 decoder_name=decoder_name,
                 text=candidate,
+                out_dir=out_dir,
             )
         else:
             # 传统 file-based decoder (e.g. base64-image)

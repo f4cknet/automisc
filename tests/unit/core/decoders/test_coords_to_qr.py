@@ -230,7 +230,14 @@ class TestErrors:
         with pytest.raises(CoordsQRDecoderError):
             decode_coords_to_qr("hello world", file_path="/tmp/nonexistent.txt")
 
-    def test_no_file_path_fails(self):
-        """没 file_path -> 不知道 output 放哪 -> raise (v0.5-output-samedir)."""
-        with pytest.raises(CoordsQRDecoderError):
-            decode_coords_to_qr("(7,7),(7,8)", file_path=None)
+    def test_no_file_path_falls_back_to_tmp(self):
+        """v0.5-tmp-text-mode: 没 file_path -> 走 /tmp/automisc_text_outputs/, 不 raise."""
+        import os
+        r = decode_coords_to_qr("(7,7),(7,8)", file_path=None)
+        # 应写到 /tmp (或 /private/tmp 在 macOS)
+        assert "/tmp" in r.output_path or "/private/tmp" in r.output_path
+        # output_path 应含 automisc_text_outputs (v0.5-tmp-text-mode)
+        assert "automisc_text_outputs" in r.output_path
+        # cleanup
+        if Path(r.output_path).exists():
+            os.unlink(r.output_path)

@@ -274,7 +274,7 @@ class TestMainWindowIntegration:
 
 # ---------- v0.5-hex-ascii-fix 端到端 ----------
 class TestHexAsciiMenuE2E:
-    def test_menu_hex_ascii_uses_input_not_current_file(self, qtbot, tmp_path):
+    def test_menu_hex_ascii_uses_input_not_current_file(self, qtbot, tmp_path, monkeypatch):
         """核心修复: 菜单栏 [hex-ascii] 走 input 区, 不会读 current_file.
 
         场景 (per Owner 2026-06-14 09:50):
@@ -282,7 +282,14 @@ class TestHexAsciiMenuE2E:
         2. Clear + 粘贴 '28372c37290a' 到 input 区
         3. 点菜单 [hex-ascii] -> 应解 input 区出 (7,7), 不应读 meihuai.jpg
         """
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication, QFileDialog
+
+        # v0.5-tmp-text-mode: monkey-patch QFileDialog 返回 tmp_path (避免弹 native dialog 卡住)
+        monkeypatch.setattr(
+            QFileDialog,
+            "getExistingDirectory",
+            staticmethod(lambda *args, **kwargs: str(tmp_path)),
+        )
 
         w = MainWindow()
         qtbot.addWidget(w)
@@ -324,8 +331,17 @@ class TestHexAsciiMenuE2E:
         assert "detected_format" in out
         assert "hex" in out
 
-    def test_menu_hex_ascii_empty_input_no_current_file_read(self, qtbot):
+    def test_menu_hex_ascii_empty_input_no_current_file_read(self, qtbot, tmp_path, monkeypatch):
         """input 区空 + current_file=meihuai.jpg: 不读 current_file, 提示 'input is empty'."""
+        from PySide6.QtWidgets import QFileDialog
+
+        # v0.5-tmp-text-mode: monkey-patch 避免弹 native dialog
+        monkeypatch.setattr(
+            QFileDialog,
+            "getExistingDirectory",
+            staticmethod(lambda *args, **kwargs: str(tmp_path)),
+        )
+
         w = MainWindow()
         qtbot.addWidget(w)
         meihuai = Path("Challenge/meihuai.jpg")

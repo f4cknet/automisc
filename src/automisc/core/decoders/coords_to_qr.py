@@ -41,7 +41,7 @@ from typing import Final
 
 from PIL import Image
 
-from automisc.core.utils.output_path import output_path_for
+from automisc.core.utils.output_path import output_path_for, text_based_output_path
 
 
 # hex 字节对 pattern (e.g. "2837" -> 0x28=40='(' 不太对, 实际是 2 bytes per coord)
@@ -256,6 +256,7 @@ def decode_coords_to_qr(
     file_path: str | None = None,
     qr_size: int | None = None,
     cell_px: int = 11,
+    out_dir: str | None = None,
 ) -> DecodedQRResult:
     """主入口: 坐标串 → QR PNG → zbar 识别.
 
@@ -264,6 +265,7 @@ def decode_coords_to_qr(
         file_path: 输入文件路径 (用于决定 output_path 目录, v0.5-output-samedir)
         qr_size: 显式指定 QR 尺寸 (None = 推断)
         cell_px: 每 cell 像素数 (默认 11, 跟 meihuai 272/25 一致)
+        out_dir: 显式指定输出目录 (None = /tmp 默认; 仅 text 模式生效)
 
     Returns:
         DecodedQRResult
@@ -277,13 +279,14 @@ def decode_coords_to_qr(
     # 像素级坐标时自动推断 cell_px (默认 11 仍兜底)
     actual_cell_px = _infer_cell_px(coords, qr_size) if cell_px == 11 else cell_px
 
-    # output 路径: input 同目录 (v0.5-output-samedir)
-    if not file_path:
-        raise CoordsQRDecoderError(
-            "需要 input file path 才能确定 output 目录 (v0.5-output-samedir); "
-            "CLI 用 --file <txt>; GUI 菜单触发时, current_file 是 meihuai.jpg 之类"
+    # output 路径: input 同目录 (v0.5-output-samedir) 或 /tmp (v0.5-tmp-text-mode)
+    if file_path:
+        out_path = output_path_for(file_path, suffix=".png", purpose="coords_qr")
+    else:
+        # v0.5-tmp-text-mode: text 模式没 input file, 走 /tmp
+        out_path = text_based_output_path(
+            suffix=".png", purpose="coords_qr", out_dir=out_dir
         )
-    out_path = output_path_for(file_path, suffix=".png", purpose="coords_qr")
 
     width, height = _render_qr_png(coords, qr_size, out_path, cell_px=actual_cell_px)
     zbar_stdout, decoded = _run_zbar(out_path)
@@ -305,12 +308,13 @@ def decode_coords_to_qr(
 def _register() -> None:
     from automisc.core.decoders.registry import DecoderSpec, register_decoder
 
-    def _runner(file_path: str | None = None, text: str | None = None, **_):
+    def _runner(file_path: str | None = None, text: str | None = None, output_dir: str | None = None, **_):
         """coords-qr 跟 hex-ascii 一样是 text-based decoder.
 
         Args:
             file_path: 输入文件路径 (仅用于决定 output_path 目录)
             text: 坐标串 (e.g. "(7,7),(7,8),...")
+            output_dir: GUI 弹 QFileDialog 选的 dir / CLI --out-dir (v0.5-tmp-text-mode)
         """
         # 解析 text 源
         if text is None and file_path is not None:
@@ -323,17 +327,7 @@ def _register() -> None:
             raise CoordsQRDecoderError(
                 "需要 --text '(7,7),(7,8),...' 或 --file <含坐标的txt>"
             )
-        # 决定 output 目录:
-        # 1. 如果有 file_path, 用 file_path 的 parent (可能用户用 --file 传了 dummy)
-        # 2. 否则没法确定 (v0.5-output-samedir 硬规则)
-        if file_path is None:
-            # GUI 菜单触发时 main_window 必传 current_file;
-            # CLI 用 --text 不传 --file 应 raise (避免写 cwd)
-            raise CoordsQRDecoderError(
-                "需要 --file <path> 决定 output 目录 (v0.5-output-samedir); "
-                "GUI 用户拖文件后菜单触发会自动传 current_file"
-            )
-        return decode_coords_to_qr(text, file_path=file_path)
+        return decode_coords_to_qr(text, file_path=file_path, out_dir=output_dir)
 
     register_decoder(
         DecoderSpec(

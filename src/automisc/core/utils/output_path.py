@@ -27,6 +27,7 @@ p = temp_path_for("/Challenge/x.rar", suffix=".hash", purpose="rar_hash")
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 
@@ -172,10 +173,53 @@ def extract_dir_for(
     return (src.parent / f"{src.stem}__{p}").resolve()
 
 
+# v0.5-tmp-text-mode (2026-06-14 12:08 per Owner):
+# Text 模式 (用户粘在 input 区 / --text) 没有"输入文件"概念,
+# 强制 samedir 会写到无关目录 (e.g. meihuai.jpg 同目录, 但坐标串跟 meihuai 无关)
+# 改成默认 /tmp, file 模式仍 samedir
+TEXT_BASED_TMP_DIR: Final[Path] = Path(tempfile.gettempdir()).resolve() / "automisc_text_outputs"
+
+
+def text_based_output_path(
+    suffix: str = ".bin",
+    purpose: str = "output",
+    out_dir: str | Path | None = None,
+) -> Path:
+    """text 模式输出文件路径 (v0.5-tmp-text-mode).
+
+    当用户输入是文本 (粘在 input 区 / CLI --text) 时, 没有"输入文件"概念,
+    用此 helper 生成路径. 优先级:
+    1. out_dir 显式指定 (GUI QFileDialog 选的, 或 CLI --out-dir) -> 用之
+    2. 默认 -> /tmp/automisc_text_outputs/<purpose>_<rand>.<suffix>
+
+    Args:
+        suffix: 输出后缀 (含点, e.g. ".png")
+        purpose: 用途标识 (e.g. "coords_qr", "base64")
+        out_dir: 显式指定输出目录 (None = /tmp 默认)
+
+    Returns:
+        输出文件绝对路径
+    """
+    import time
+    import secrets
+    p = _sanitize(purpose)
+    if out_dir:
+        target_dir = Path(out_dir).resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+        name = f"{p}_{int(time.time())}_{secrets.token_hex(4)}{suffix}"
+        return target_dir / name
+    # 默认 /tmp
+    TEXT_BASED_TMP_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"{p}_{int(time.time())}_{secrets.token_hex(4)}{suffix}"
+    return TEXT_BASED_TMP_DIR / name
+
+
 __all__ = [
+    "TEXT_BASED_TMP_DIR",
+    "extract_dir_for",
+    "is_in_tmp",
     "output_dir_for",
     "output_path_for",
     "temp_path_for",
-    "extract_dir_for",
-    "is_in_tmp",
+    "text_based_output_path",
 ]

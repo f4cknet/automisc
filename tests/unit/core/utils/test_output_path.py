@@ -99,6 +99,46 @@ class TestOutputPathHelper:
         assert is_in_tmp(extract_dir_for(inp, purpose="x")) is False
 
 
+# ---------- v0.5-tmp-text-mode: text 模式 (没 input file) -> /tmp ----------
+class TestTextBasedOutputPath:
+    def test_default_tmp_dir(self):
+        """无 out_dir -> /tmp/automisc_text_outputs/<purpose>_<ts>_<rand>.<suffix>."""
+        from automisc.core.utils.output_path import text_based_output_path
+        p = text_based_output_path(suffix=".png", purpose="coords_qr")
+        # /tmp 或 /private/tmp (macOS symlink)
+        assert "/tmp" in str(p) or "/private/tmp" in str(p)
+        # 应含 automisc_text_outputs
+        assert "automisc_text_outputs" in str(p)
+        # 路径应唯一 (有 timestamp)
+        p2 = text_based_output_path(suffix=".png", purpose="coords_qr")
+        assert p != p2, "两次调用应返回不同路径 (timestamp + random)"
+
+    def test_with_out_dir_override(self, tmp_path):
+        """显式 out_dir -> 用 caller 指定的 dir."""
+        from automisc.core.utils.output_path import text_based_output_path
+        p = text_based_output_path(suffix=".png", purpose="coords_qr", out_dir=str(tmp_path))
+        # 应在 tmp_path 下
+        assert str(p).startswith(str(tmp_path.resolve()))
+        # 应含 coords_qr 用途
+        assert "coords_qr" in p.name
+        # 应含 .png 后缀
+        assert p.suffix == ".png"
+
+    def test_creates_tmp_dir_if_missing(self, tmp_path, monkeypatch):
+        """首次调用会创建 /tmp/automisc_text_outputs."""
+        from automisc.core.utils.output_path import text_based_output_path, TEXT_BASED_TMP_DIR
+        import shutil
+        # 删目录模拟"不存在"
+        if TEXT_BASED_TMP_DIR.exists():
+            monkeypatch.setattr(
+                "automisc.core.utils.output_path.TEXT_BASED_TMP_DIR",
+                tmp_path / "automisc_text_outputs",
+            )
+        # 不抛错 + 路径合理
+        p = text_based_output_path(suffix=".bin", purpose="x")
+        assert p.parent.exists()
+
+
 # ---------- base64_image: 同目录 ----------
 class TestBase64ImageSameDir:
     def test_decode_writes_to_input_dir(self, tmp_path):

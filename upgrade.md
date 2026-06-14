@@ -59,7 +59,8 @@
 | v0.5-output-samedir | 所有文件输出都跟 input 同目录 (不再写 /tmp) | ✅ done | main `af35fb0` | [`upgrade/v0.5-output-samedir.md`](upgrade/v0.5-output-samedir.md) |
 | v0.5-hex-ascii-fix + v0.5-clear-on-new-file | 删顶 bar 按钮 + hex-ascii 走 input + 拖新文件清空旧 output | ✅ done | main `aed9bb1` | [`upgrade/v0.5-hex-ascii-fix.md`](upgrade/v0.5-hex-ascii-fix.md) |
 | v0.5-coords-qr | 坐标串 → QR PNG → zbar (菜单栏新增 🔳 QR 工具 分类) | ✅ done | main `ea70001` | [`upgrade/v0.5-coords-qr.md`](upgrade/v0.5-coords-qr.md) |
-| v0.5-truncate-output + v0.5-short-circuit | strings/grep 渲染版 stdout (不打印 raw) + AutoRunner 命中 severity>=5 终止链 | ✅ done | main (待 push) | [`upgrade/v0.5-truncate-output.md`](upgrade/v0.5-truncate-output.md) |
+| v0.5-truncate-output + v0.5-short-circuit | strings/grep 渲染版 stdout (不打印 raw) + AutoRunner 命中 severity>=5 终止链 | ✅ done | main `386e3c0` | [`upgrade/v0.5-truncate-output.md`](upgrade/v0.5-truncate-output.md) |
+| v0.5-tmp-text-mode | text 模式 (无 file_path) 写 /tmp + GUI 弹 QFileDialog 选 dir | ✅ done | main (待 push) | [`upgrade/v0.5-tmp-text-mode.md`](upgrade/v0.5-tmp-text-mode.md) |
 
 ---
 
