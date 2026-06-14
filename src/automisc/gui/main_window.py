@@ -889,24 +889,23 @@ class MainWindow(QMainWindow):
         # - coords-qr: 解 "(r,c)" 坐标串 (per meihuai 手工解法自动化)
         # - base/rot 系列 (per v0.5-base-rot-decoders PR3): 12 base + 4 rot + 1 stego + 1 custom
         #   都是解文本串, 走 text 模式
+        # - cipher 系列 (per v0.5-cipher-decoders): 凯撒/培根/摩尔斯/猪圈/... 全部 text input
         # - base64-image: 解 base64 编码的图片, 走 file 模式 (e.g. 拖了 base64.txt 或 data URL 文件)
+        #
+        # v0.5-cipher-decoders-textfix (per Owner 19:14):
+        # 之前 text_based_decoders 是手写硬编码 list, 加新 cipher 时容易漏.
+        # 改成读 spec.text_only 字段 (registry 自动声明). 新 decoder 加 text_only=True 即生效.
         #
         # v0.5-coords-qr-file-mode (per Owner 15:23):
         # coords-qr 有 current_file 时优先 file 模式 (e.g. 拖了 .bin 坐标文件),
         # 走 text 模式会触发 'input_len: 8 chars (CSV text)' bug, 因为
         # extract_base_candidate 抽不到 8 字符坐标, 兜底到 'CSV text' (file 工具把坐标串判成 CSV).
         # 修: coords-qr 且 current_file 存在 -> 走 file 模式让 runner read_text(file_path).
-        text_based_decoders = {
-            "hex-ascii",
-            # base_rot 系列 (per v0.5-base-rot-decoders PR3)
-            "base16", "base32", "base36", "base58", "base62", "base64",
-            "base85", "base91", "base92", "base100", "base32768", "base65536",
-            "rot5", "rot13", "rot18", "rot47",
-            "base64-custom", "base64-stego",
-        }
-        is_text_based = decoder_name in text_based_decoders
+        from automisc.core.decoders.registry import get_decoder
+        spec = get_decoder(decoder_name)
+        is_text_based = bool(spec and spec.text_only)
 
-        # coords-qr 特殊: 有 current_file 时走 file 模式
+        # coords-qr 特殊: 有 current_file 时走 file 模式 (override)
         if decoder_name == "coords-qr" and self.current_file is not None:
             is_text_based = False  # 走 file 模式分支
 
@@ -946,11 +945,10 @@ class MainWindow(QMainWindow):
                 return
 
             # v0.5-tmp-text-mode-2 (per Owner 12:44): QFileDialog 只在 decoder 真有文件输出时弹
-            # - hex-ascii / base_convert: result 是 string, 不写文件 -> 不弹
+            # - hex-ascii / base_convert / cipher: result 是 string, 不写文件 -> 不弹
             # - coords-qr: result 含 output_path (写 PNG) -> 弹
-            from automisc.core.decoders.registry import get_decoder
+            # spec 已在 is_text_based 判定时拿到 (前面 line ~907), 这里复用
             from PySide6.QtWidgets import QFileDialog
-            spec = get_decoder(decoder_name)
             produces_file = False
             if spec and "output_path" in spec.description.lower():
                 # 简单 heuristic: description 提 output_path 就是有文件输出

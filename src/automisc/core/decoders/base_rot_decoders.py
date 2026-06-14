@@ -252,6 +252,7 @@ def _register_all() -> None:
                 cli_cmd=f"decode {name}",
                 run=_make_base_runner(name, decode_fn),
                 description=f"{desc} → ASCII (per core/encoders/base.py)",
+                text_only=True,  # v0.5-cipher-decoders-textfix: 全 text input
             )
         )
 
@@ -264,6 +265,7 @@ def _register_all() -> None:
             cli_cmd="decode rot5",
             run=_make_rot_runner("rot5", classical.rot5),
             description="Digits 0-9 旋转 5 位 (CTF 数字密码)",
+            text_only=True,
         )
     )
     register_decoder(
@@ -274,6 +276,7 @@ def _register_all() -> None:
             cli_cmd="decode rot13",
             run=_make_rot_runner("rot13", classical.rot13),
             description="字母 A-Z a-z 旋转 13 位 (凯撒密码)",
+            text_only=True,
         )
     )
     register_decoder(
@@ -284,6 +287,7 @@ def _register_all() -> None:
             cli_cmd="decode rot18",
             run=_make_rot_runner("rot18", classical.rot18),
             description="ROT13(字母) + ROT5(数字) 组合",
+            text_only=True,
         )
     )
     register_decoder(
@@ -294,6 +298,7 @@ def _register_all() -> None:
             cli_cmd="decode rot47",
             run=_make_rot_runner("rot47", classical.rot47),
             description="ASCII 33-126 整段旋转 47 位 (藏 base64 结果常用)",
+            text_only=True,
         )
     )
 
@@ -306,6 +311,7 @@ def _register_all() -> None:
             cli_cmd="decode base64-custom",
             run=run_base64_custom,
             description="CTF 变体 base64 (用户提供 64 字符表); interactive=True 弹 QInputDialog",
+            text_only=True,
         )
     )
 
@@ -318,6 +324,7 @@ def _register_all() -> None:
             cli_cmd="decode base64-stego",
             run=run_base64_stego,
             description="base64 末 2 bit 隐写解码 (per core/encoders/base64_stego.py)",
+            text_only=True,
         )
     )
 

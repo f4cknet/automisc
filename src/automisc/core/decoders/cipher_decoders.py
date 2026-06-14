@@ -490,6 +490,7 @@ def _register_all() -> None:
                 cli_cmd=f"decode {name}",
                 run=runner,
                 description=desc,
+                text_only=True,  # 12 cipher 全是 text input (e.g. "KHOOR" "..." "⌜⌜⌝")
             )
         )
 
@@ -504,6 +505,7 @@ def _register_all() -> None:
                 cli_cmd=f"decode placeholder-{group}",
                 run=lambda **kw: run_placeholder(group=group, **kw),
                 description=f"'{group}' 目录尚未实现，等待 Owner 定义具体 cipher。",
+                text_only=True,  # 占位也是 text-only (跑就立刻 TBD 提示)
             )
         )
 

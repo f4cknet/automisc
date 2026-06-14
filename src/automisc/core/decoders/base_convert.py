@@ -206,6 +206,7 @@ def _register() -> None:
             cli_cmd="decode hex-ascii",
             run=_runner,
             description="Hex / Binary / Base64 / Base32 → ASCII 转换 (自动探测格式; v0.5-hex-ascii-fix)",
+            text_only=True,  # v0.5-cipher-decoders-textfix: text input 优先
         )
     )
 

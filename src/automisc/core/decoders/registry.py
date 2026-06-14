@@ -55,6 +55,9 @@ class DecoderSpec:
         category: 兼容旧字段 — GUI 菜单分组 ("decode" / "convert" / "extract" / "base_rot" ...)
         group: v0.5-cipher-decoders — GUI 一级目录分组 ("解密工具1" / "解密工具2" / ...)
             默认 "general"（兼容老 decoder，仍走 category 渲染）
+        text_only: v0.5-cipher-decoders-textfix — 该 decoder 是否只接受 text input
+            (不从 file 读). True = GUI _run_decoder 跳过 file 检查走 input 区.
+            默认 False (保持向后兼容, 老 base64-image 等 file-based decoder 不变)
         cli_cmd: CLI 子命令 (e.g. "decode base64-image")
         run: runner 函数 (file_path, **kwargs) -> result dataclass
         description: GUI 状态栏 tooltip
@@ -67,6 +70,7 @@ class DecoderSpec:
     run: DecoderRunner
     description: str = ""
     group: str = "general"  # v0.5-cipher-decoders 加的字段，老 decoder 留空走默认
+    text_only: bool = False  # v0.5-cipher-decoders-textfix 加的字段
 
 
 # 全局 registry (按注册顺序)
