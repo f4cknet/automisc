@@ -641,6 +641,19 @@ class MainWindow(QMainWindow):
                             f"chain/{chain_name}", Path(file_path), sp
                         )
 
+            # v0.5-chain-success-journal (per Owner 14:59):
+            # 所有 step.success 且 data 里有 'extracted_to' / 'password' / 'foremost_output'
+            # / 'lsb_text' 等成功标记 → 推 journal add_event (灰色信息)
+            # 让 Owner 在 Journal 区也能看到 'bruteforce 成功' / '解压成功' / '伪加密修复成功'
+            if step.get("success") and step_data:
+                self._push_chain_step_to_journal(
+                    chain_name=chain_name,
+                    file_path=file_path,
+                    step_name=step_name,
+                    step_data=step_data,
+                    step_message=step.get("message", ""),
+                )
+
         # 状态
         total = len(log)
         ok = sum(1 for s in log if s.get("success"))
@@ -653,6 +666,111 @@ class MainWindow(QMainWindow):
             f"[!] chain {chain_name} failed: {error_msg}\n"
         )
         self.statusBar().showMessage(f"chain {chain_name} error: {error_msg}")
+        # v0.5-chain-success-journal (per Owner 14:59):
+        # chain 整链失败也记 journal, 让 Owner 看到 chain 状态
+        self.journal_panel.add_event(
+            tool_name=f"chain/{chain_name}",
+            kind="chain 失败",
+            value=f"chain {chain_name} 失败: {error_msg}",
+            file_path=self.current_file,
+            severity=4,  # warn
+        )
+
+    def _push_chain_step_to_journal(
+        self,
+        chain_name: str,
+        file_path: str,
+        step_name: str,
+        step_data: dict,
+        step_message: str,
+    ) -> None:
+        """v0.5-chain-success-journal (per Owner 14:59):
+        推 step.success 的成功标记到 journal_panel.add_event (灰色信息).
+
+        覆盖 step 类型:
+        - bruteforce_zip / bruteforce_rar: data 里有 password + extracted_to
+          → kind='bruteforce 成功' value='password=...; 解压到 /xxx'
+        - try_unzip / fix_pseudo_encryption: data 里有 extracted_to (无 password)
+          → kind='解压成功' / kind='伪加密修复成功' (按 step_name 区分)
+        - foremost_extract: data 里有 foremost_output (或 extracted_to)
+          → kind='foremost 提取' value='提取到 /xxx'
+        - binwalk_extract: data 里有 extracted_to
+          → kind='binwalk 提取' value='提取到 /xxx'
+        - lsb_extract: data 里有 lsb_text (per Owner '解压到 xxx' 类成功点)
+          → kind='LSB 提取成功' value='提取到 /xxx' (若有 extracted_to)
+        """
+        path_obj = Path(file_path)
+
+        # 1) bruteforce 成功: 有 password
+        if "password" in step_data:
+            pwd = step_data["password"]
+            ext = step_data.get("extracted_to", "?")
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind="bruteforce 成功",
+                value=f"password={pwd!r}; 解压到 {ext}",
+                file_path=path_obj,
+                severity=0,  # 信息, 灰色
+            )
+            return
+
+        # 2) fix_pseudo_encryption 成功: 有 fixed_count 或 backup
+        if step_name == "fix_pseudo_encryption" and "fixed_count" in step_data:
+            ext = step_data.get("extracted_to", "?")
+            fixed = step_data["fixed_count"]
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind="伪加密修复成功",
+                value=f"修复 {fixed} 个 flag_bits; 解压到 {ext}",
+                file_path=path_obj,
+                severity=0,
+            )
+            return
+
+        # 3) try_unzip 直接成功 (无 password 无 fix): extracted_to
+        if step_name == "try_unzip" and "extracted_to" in step_data:
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind="解压成功",
+                value=f"解压到 {step_data['extracted_to']}",
+                file_path=path_obj,
+                severity=0,
+            )
+            return
+
+        # 4) foremost_extract: data 里有 foremost_output
+        if step_name == "foremost_extract":
+            out = step_data.get("foremost_output") or step_data.get("extracted_to", "?")
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind="foremost 提取",
+                value=f"提取到 {out}",
+                file_path=path_obj,
+                severity=0,
+            )
+            return
+
+        # 5) binwalk_extract: data 里有 extracted_to
+        if step_name == "binwalk_extract" and "extracted_to" in step_data:
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind="binwalk 提取",
+                value=f"提取到 {step_data['extracted_to']}",
+                file_path=path_obj,
+                severity=0,
+            )
+            return
+
+        # 6) 解压类 rar/unzip: extracted_to
+        if "extracted_to" in step_data:
+            self.journal_panel.add_event(
+                tool_name=f"chain/{chain_name}/{step_name}",
+                kind=f"{step_name} 成功",
+                value=f"解压到 {step_data['extracted_to']}",
+                file_path=path_obj,
+                severity=0,
+            )
+            return
 
     # ---------- decoder menu (v0.5-decoder-menu, GUI 同步 CLI) ----------
     def _build_tools_menu(self, menubar) -> None:

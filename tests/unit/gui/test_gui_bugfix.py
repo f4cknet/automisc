@@ -172,3 +172,162 @@ class TestLsbTextHighlight:
         assert "st3g0_saurus_wr3cks" in out
         # 同时 flag_candidate 也应在 (per v0.5-LSB-router)
         assert "FLAG CANDIDATE" in out
+
+
+# ---------- v0.5-chain-success-journal: chain 成功点入 journal (Owner 14:59) ----------
+class TestChainSuccessJournal:
+    """v0.5-chain-success-journal (per Owner 14:59):
+    拖 QR_code.png 跑 zip-full chain -> bruteforce 找到密码, 解压到目录,
+    都应在 journal 区记一条 (不是只在 output 区).
+
+    Owner 14:59 反馈: '为什么没把 [bruteforce 成功] / [解压到 xxx] 加到 Journal 条目中?
+    可疑点以及成功点都应该在 Journal 列表中'
+    """
+
+    def test_bruteforce_zip_success_goes_to_journal(self, qtbot, tmp_path):
+        """v0.5-chain-success-journal: bruteforce_zip 成功 -> journal add_event.
+
+        模拟 _on_chain_finished 走完 zip-full chain on QR_code.png:
+        - step 3 bruteforce_zip success=True, data={password, extracted_to, ...}
+        - journal 应收到 kind='bruteforce 成功' 一条
+        """
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+        from pathlib import Path
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+        w.current_file = Path("Challenge/QR_code.png")
+        if not w.current_file.exists():
+            pytest.skip("Challenge/QR_code.png not found")
+
+        (tmp_path / "QR_code_bruteforced").mkdir()
+        step_data = {
+            "password": "7639",
+            "tried": 7640,
+            "total": 8421616,
+            "extracted_to": str(tmp_path / "QR_code_bruteforced"),
+        }
+
+        w._push_chain_step_to_journal(
+            chain_name="zip-full",
+            file_path="Challenge/QR_code.png",
+            step_name="bruteforce_zip",
+            step_data=step_data,
+            step_message="FOUND password='7639'",
+        )
+        QApplication.processEvents()
+
+        # journal 应有 1 条, kind='bruteforce 成功'
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "bruteforce 成功"
+        v = item.text(w.journal_panel.COL_VALUE)
+        assert "7639" in v
+        assert "解压到" in v
+        assert "QR_code_bruteforced" in v
+        assert item.text(w.journal_panel.COL_FILE) == "QR_code.png"
+        assert item.text(w.journal_panel.COL_SEV) == "0"  # 信息级
+
+    def test_fix_pseudo_encryption_success_goes_to_journal(self, qtbot, tmp_path):
+        """fix_pseudo_encryption 成功 -> journal add_event kind='伪加密修复成功'."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        step_data = {
+            "extracted_to": str(tmp_path / "QR_code__unzipped"),
+            "fixed_count": 2,
+            "backup": str(tmp_path / "QR_code.png.bak"),
+        }
+        (tmp_path / "QR_code__unzipped").mkdir()
+
+        w._push_chain_step_to_journal(
+            chain_name="zip-full",
+            file_path="Challenge/QR_code.png",
+            step_name="fix_pseudo_encryption",
+            step_data=step_data,
+            step_message="fixed 2 flag_bits",
+        )
+        QApplication.processEvents()
+
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "伪加密修复成功"
+        v = item.text(w.journal_panel.COL_VALUE)
+        assert "修复 2" in v
+        assert "解压到" in v
+
+    def test_try_unzip_success_goes_to_journal(self, qtbot, tmp_path):
+        """try_unzip 直接成功 (无密码) -> journal kind='解压成功'."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        (tmp_path / "out").mkdir()
+        step_data = {"extracted_to": str(tmp_path / "out")}
+
+        w._push_chain_step_to_journal(
+            chain_name="zip",
+            file_path="/tmp/a.zip",
+            step_name="try_unzip",
+            step_data=step_data,
+            step_message="unzipped",
+        )
+        QApplication.processEvents()
+
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "解压成功"
+        assert "解压到" in item.text(w.journal_panel.COL_VALUE)
+
+    def test_foremost_extract_success_goes_to_journal(self, qtbot, tmp_path):
+        """foremost_extract 成功 -> journal kind='foremost 提取'."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        (tmp_path / "out").mkdir()
+        step_data = {"foremost_output": str(tmp_path / "out")}
+
+        w._push_chain_step_to_journal(
+            chain_name="foremost",
+            file_path="/tmp/a.bin",
+            step_name="foremost_extract",
+            step_data=step_data,
+            step_message="extracted",
+        )
+        QApplication.processEvents()
+
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "foremost 提取"
+        assert "提取到" in item.text(w.journal_panel.COL_VALUE)
+
+    def test_chain_failed_goes_to_journal(self, qtbot):
+        """chain 整链失败也记 journal, kind='chain 失败', sev=4 (warn)."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+        w._on_chain_failed("zip-full", "ValueError: bad zip")
+        QApplication.processEvents()
+
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "chain 失败"
+        assert "zip-full 失败" in item.text(w.journal_panel.COL_VALUE)
+        assert "ValueError" in item.text(w.journal_panel.COL_VALUE)
+        assert item.text(w.journal_panel.COL_SEV) == "4"  # warn
+
