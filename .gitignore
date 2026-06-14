@@ -53,3 +53,6 @@ Challenge/*.bak
 # v0.5-coords-qr-file-mode: coords-qr CLI / GUI 跑出的 PNG
 Challenge/coords_qr_*
 Challenge/*__coords_qr.png
+
+# v0.5-chain-journal-fix: binwalk 提取的目录 (含 _00000000.zip 等中间产物)
+Challenge/*__extract/
