@@ -134,9 +134,9 @@ class TestRouteHexToFile:
         assert result.file_type == "image"
         # 34082 / 2 = 17041 bytes raw
         assert result.raw_size == 17041
-        # 文件写到 /tmp/automisc_text_outputs
+        # v0.5-hex-router-samedir: 无 input_path 走系统 /tmp/automisc/
         assert "/tmp" in result.output_path or "/private/tmp" in result.output_path
-        assert "automisc_text_outputs" in result.output_path
+        assert "automisc" in result.output_path
         # 验证 file 真存在且 magic 头对
         out = Path(result.output_path)
         assert out.exists()
@@ -239,3 +239,90 @@ class TestStringsAdapterIntegration:
         # L1 命中行有内容
         assert "L1:" in r.stdout
         assert "504b" in r.stdout
+
+
+# ---------- v0.5-hex-router-samedir: 输出路径优先级 (Owner 14:24) ----------
+class TestRouteHexToFileSamedir:
+    """v0.5-hex-router-samedir (per Owner 14:24 反馈):
+    - input_path 已知 -> samedir (per v0.5-output-samedir)
+    - out_dir 显式 -> 用之
+    - 都不传 -> 系统 /tmp/automisc (不是 macOS /private/var/folders/.../T/)
+    """
+
+    def test_input_path_writes_to_samedir(self, tmp_path):
+        """input_path 已知时, 写到 file_path.parent (samedir per v0.5-output-samedir)."""
+        from automisc.core.actions.hex_router import route_hex_to_file
+
+        fake_input = tmp_path / "meihuai.jpg"
+        fake_input.write_text("dummy")  # 内容无关, 只用路径
+        # PNG header 拼到 35000 chars
+        png_header = "89504e470d0a1a0a"
+        hex_text = png_header + "00" * 17000
+        result = route_hex_to_file(hex_text, follow_up=False, input_path=fake_input)
+        out = Path(result.output_path)
+        # samedir!
+        assert out.parent.resolve() == fake_input.parent.resolve()
+        assert out.exists()
+        out.unlink(missing_ok=True)
+
+    def test_out_dir_explicit(self, tmp_path):
+        """out_dir 显式 (无 input_path) -> 用 out_dir."""
+        from automisc.core.actions.hex_router import route_hex_to_file
+
+        png_header = "89504e470d0a1a0a"
+        hex_text = png_header + "00" * 17000
+        custom = tmp_path / "my_custom_dir"
+        result = route_hex_to_file(
+            hex_text, follow_up=False, out_dir=custom
+        )
+        out = Path(result.output_path)
+        assert out.parent.resolve() == custom.resolve()
+        out.unlink(missing_ok=True)
+
+    def test_no_anchor_writes_to_system_tmp(self):
+        """无 input_path / out_dir -> 系统 /tmp/automisc/ (Owner 期望的 /tmp, 不是 /private/var/folders)."""
+        from automisc.core.actions.hex_router import route_hex_to_file
+
+        png_header = "89504e470d0a1a0a"
+        hex_text = png_header + "00" * 17000
+        result = route_hex_to_file(hex_text, follow_up=False)
+        out = Path(result.output_path)
+        # 不应在 macOS /private/var/folders/.../T/ (旧 gettempdir 行为)
+        assert "/private/var/folders" not in result.output_path
+        # 应该在 /tmp/automisc/ 下
+        assert "/tmp" in result.output_path or "/private/tmp" in result.output_path
+        assert "automisc" in result.output_path
+        out.unlink(missing_ok=True)
+
+    def test_strings_adapter_writes_to_input_samedir(self, tmp_path):
+        """end-to-end: strings adapter 调 route_hex_to_file, saved 路径在 input_path.parent.
+
+        Owner 14:24 反馈: 'saved=/private/var/folders/.../automisc_text_outputs/hex_router_unknown_xxx..bin'
+        修: strings adapter 现在传 input_path, 应该写到 meihuai.jpg 同目录.
+        """
+        # 造个长 hex 串文件
+        f = tmp_path / "fake.jpg"
+        png_header = "89504e470d0a1a0a"
+        f.write_text(png_header + "00" * 17000)
+
+        from automisc.tools.shared.strings import StringsAdapter
+        a = StringsAdapter()
+        r = a.run(str(f))
+        # 找 saved=
+        saved_line = next(
+            (l for l in r.stdout.splitlines() if "saved=" in l), None
+        )
+        assert saved_line is not None, f"应该有 saved= 行, 实际 stdout: {r.stdout!r}"
+        # saved 应在 f.parent (samedir)
+        assert str(f.parent) in saved_line, f"saved 不在 samedir: {saved_line}"
+        # 不应在 /private/var/folders (旧 gettempdir)
+        assert "/private/var/folders" not in saved_line
+
+        # cleanup
+        from automisc.core.utils.output_path import is_in_tmp
+        import re
+        m = re.search(r"saved=(\S+?)(?:,|\s|$)", saved_line)
+        if m:
+            saved_path = m.group(1)
+            if not is_in_tmp(saved_path):
+                Path(saved_path).unlink(missing_ok=True)

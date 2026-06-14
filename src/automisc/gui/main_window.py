@@ -171,6 +171,17 @@ class MainWindow(QMainWindow):
         for sp in result.suspicious_points:
             self.journal_panel.add_suspicious(tool_name, self.current_file, sp)
 
+        # v0.5-hex-router-samedir (per Owner 14:24):
+        # 工具写了文件时, status bar 弹提示 (除了 stdout / journal 已含 saved=...)
+        # 让 Owner 看到 'auto-run 写文件到 ...' 知道 samedir
+        if stdout and "saved=" in stdout:
+            import re
+            m = re.search(r"saved=(\S+?)(?:,|\s|$)", stdout)
+            if m:
+                self.statusBar().showMessage(
+                    f"auto-run 写文件: {m.group(1)}", 8000  # 8s 显示
+                )
+
     def _on_auto_chain_finished(self, summaries) -> None:
         """整链跑完 → 输出总结 + 检测 binwalk 输出含 archive → 触发 zip_chain."""
         total = len(summaries)

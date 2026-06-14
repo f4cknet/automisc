@@ -177,7 +177,11 @@ def extract_dir_for(
 # Text 模式 (用户粘在 input 区 / --text) 没有"输入文件"概念,
 # 强制 samedir 会写到无关目录 (e.g. meihuai.jpg 同目录, 但坐标串跟 meihuai 无关)
 # 改成默认 /tmp, file 模式仍 samedir
-TEXT_BASED_TMP_DIR: Final[Path] = Path(tempfile.gettempdir()).resolve() / "automisc_text_outputs"
+#
+# v0.5-hex-router-samedir (2026-06-14 14:24 per Owner):
+# Owner 反馈: tempfile.gettempdir() 在 macOS 返回 /private/var/folders/.../T/,
+# 不是用户期望的 /tmp. 改用 Path("/tmp") (macOS 系统 tmp, symlink-resolved).
+TEXT_BASED_TMP_DIR: Final[Path] = Path("/tmp") / "automisc_text_outputs"
 
 
 def text_based_output_path(

@@ -172,7 +172,14 @@ class StringsAdapter(ToolAdapter):
                         from automisc.core.actions.hex_router import (
                             route_hex_to_file,
                         )
-                        router_result = route_hex_to_file(hex_text)
+                        # v0.5-hex-router-samedir (per Owner 14:24):
+                        # 传 input_path = 当前 strings 处理的 file_path
+                        # hex_router 会写到 file_path.parent (samedir per v0.5-output-samedir)
+                        # 而非 /tmp, 避免 14:24 反馈的
+                        # 'saved=/private/var/folders/.../automisc_text_outputs/hex_router_xxx.bin'
+                        router_result = route_hex_to_file(
+                            hex_text, input_path=file_path
+                        )
                         long_hex_routed.append(
                             f"L{sp.category.rsplit('_line', 1)[-1]}: {hex_text[:60]}... "
                             f"-> magic={router_result.magic}, "

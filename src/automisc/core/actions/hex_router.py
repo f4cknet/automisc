@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
-from automisc.core.utils.output_path import text_based_output_path
+from automisc.core.utils.output_path import text_based_output_path  # noqa: F401  # 保留: docs
 
 
 # v0.5-hex-router (per Owner 13:39): 短于此长度仍打印到 GUI (让人手抄走 hex-ascii 流程)
@@ -194,13 +194,20 @@ def route_hex_to_file(
     hex_text: str,
     out_dir: str | None = None,
     follow_up: bool = True,
+    input_path: str | Path | None = None,
 ) -> HexRouterResult:
     """主入口: hex 字符串 -> 写文件 + (可选) follow-up 工具.
 
+    v0.5-hex-router-samedir (per Owner 14:24):
+    - out_dir 优先级: input_path.parent (samedir per v0.5-output-samedir) > out_dir > /tmp/sys
+    - 不用 text_based_output_path: 因为 strings adapter 调用此函数时, file_path 已知
+      (e.g. meihuai.jpg), 应该写到 meihuai.jpg 同目录, 而非 /tmp
+
     Args:
         hex_text: hex 字符串 (e.g. "89504e47...")
-        out_dir: 输出目录 (None = /tmp/automisc_text_outputs/ via helper)
+        out_dir: 输出目录 (None = input_path.parent > /tmp/automisc)
         follow_up: True = 自动调 zbar / unzip 等后续工具
+        input_path: 原始输入文件路径 (samedir anchor)
 
     Returns:
         HexRouterResult (含 follow_up_stdout / stderr)
@@ -224,10 +231,20 @@ def route_hex_to_file(
     # 探测 magic
     magic_label, ext, file_type, follow_up_desc = detect_magic(raw)
 
-    # 写 /tmp/<purpose>_<rand>.<ext>
-    out_path = text_based_output_path(
-        suffix=f".{ext}", purpose=f"hex_router_{file_type}"
-    )
+    # v0.5-hex-router-samedir: 优先级 input_path.parent > out_dir > /tmp/automisc
+    p = f"hex_router_{file_type}"
+    # ext 已经含点 (e.g. ".png" / ".bin"), 不再加
+    suffix_clean = ext if ext.startswith(".") else f".{ext}"
+    name = f"{p}_{int(time.time())}_{secrets.token_hex(4)}{suffix_clean}"
+    if input_path is not None:
+        target_dir = Path(input_path).resolve().parent
+    elif out_dir is not None:
+        target_dir = Path(out_dir).resolve()
+    else:
+        # 无 anchor: 走系统 /tmp (per Owner 14:24)
+        target_dir = Path("/tmp") / "automisc"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_path = target_dir / name
     out_path.write_bytes(raw)
 
     # 可选: 跑 follow-up 工具

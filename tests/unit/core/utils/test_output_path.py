@@ -113,6 +113,21 @@ class TestTextBasedOutputPath:
         p2 = text_based_output_path(suffix=".png", purpose="coords_qr")
         assert p != p2, "两次调用应返回不同路径 (timestamp + random)"
 
+    def test_default_tmp_is_system_tmp_not_gettempdir(self):
+        """v0.5-hex-router-samedir (per Owner 14:24):
+        默认 /tmp 必须是系统 /tmp (macOS symlink -> /private/tmp), 不是
+        Python tempfile.gettempdir() 返回的 /private/var/folders/.../T/
+        (macOS per-user tmp, 不是用户期望的 /tmp)
+        """
+        from automisc.core.utils.output_path import text_based_output_path, TEXT_BASED_TMP_DIR
+        p = text_based_output_path(suffix=".bin", purpose="test")
+        # 不应在 macOS per-user tmp
+        assert "/private/var/folders" not in str(p)
+        # 应在系统 /tmp 下
+        assert str(p).startswith("/tmp/") or str(p).startswith("/private/tmp/")
+        # TEXT_BASED_TMP_DIR 应是 Path("/tmp") 解析后的
+        assert TEXT_BASED_TMP_DIR.parent.resolve() == Path("/tmp").resolve()
+
     def test_with_out_dir_override(self, tmp_path):
         """显式 out_dir -> 用 caller 指定的 dir."""
         from automisc.core.utils.output_path import text_based_output_path
