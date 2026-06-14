@@ -1,0 +1,8 @@
+# pcap 训练样本（本地归档，不入 git）
+# Per AGENTS.md §5.4：训练样本放 tests/fixtures/challenges/，体积 < 2MB，
+# 原文件不 commit（只 commit 元信息 + 解题描述到 upgrade/v0.5-train-NNN-*.md
+# 或 upgrade/v0.5-{arch}.md 的"复现命令"段）
+*.pcap
+*.pcapng
+*.cap
+*.raw

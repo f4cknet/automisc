@@ -63,20 +63,21 @@ class TestMainWindow:
 # ---------- 2. Menu dock ----------
 class TestToolMenuDock:
     def test_menu_categories(self, qtbot):
-        """8 adapter + 1 快捷 + 2 decoder = 12 分类 (v0.5-coords-qr 新增)"""
+        """TOOL_CATEGORIES (13) + cipher 自动聚合 (3) = 16 分类.
+        v0.5-pcap-protocol-router 不新增分类 (加到 Network 现有分类)."""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
-        assert dock.tree.topLevelItemCount() == 12
+        assert dock.tree.topLevelItemCount() == 16  # 13 TC + 3 cipher
 
     def test_menu_total_tools(self, qtbot):
-        """22 adapter + 4 快捷 + 3 decoder = 29 (v0.5-coords-qr)."""
+        """TOOL_CATEGORIES 工具 (48) + cipher 工具 (14) = 62 工具."""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
         count = 0
         for i in range(dock.tree.topLevelItemCount()):
             cat = dock.tree.topLevelItem(i)
             count += cat.childCount()
-        assert count == 29  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 + 1 + 1 + 1 (coords-qr)
+        assert count == 62  # 48 TC + 14 cipher (v0.5-pcap-protocol-router +1 在 TC 48 里)
 
     def test_menu_callback(self, qtbot):
         """点击工具项触发 callback (新 signature: name, kind)."""
@@ -91,10 +92,12 @@ class TestToolMenuDock:
         assert selected == [("file", "adapter")]
 
     def test_menu_tool_categories_constant(self):
-        """TOOL_CATEGORIES 字典含 12 分类 29 工具 (22+4+3)."""
-        assert len(TOOL_CATEGORIES) == 12
+        """TOOL_CATEGORIES 字典含 13 分类 48 工具 (v0.5-cipher-decoders 加 cipher 进 cipher 分类,
+        实际 TOOL_CATEGORIES 老字典 22+4+3+1(pcap_protocol_router)=30, 但 cipher 自动聚合也加进
+        同一字典, 所以总数 = 48 = 老 30 + 18 cipher 在 tool_categories 的额外)."""
+        assert len(TOOL_CATEGORIES) == 13
         total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
-        assert total == 29
+        assert total == 48
 
     def test_menu_v5_shortcut_actions(self, qtbot):
         """v0.5 快捷工具 4 个: lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar."""

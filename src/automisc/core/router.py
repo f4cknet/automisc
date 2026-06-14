@@ -65,9 +65,18 @@ EXTENSION_ROUTES: dict[str, list[tuple[str, str, int]]] = {
     ".mp4": [("ffprobe", "MP4 stream info", 10), ("ffmpeg_video", "视频元数据", 8), ("strings", "字幕/标签", 3)],
     ".avi": [("ffprobe", "AVI stream", 10), ("ffmpeg_video", "视频元数据", 8)],
     ".mkv": [("ffprobe", "MKV stream", 10), ("ffmpeg_video", "视频元数据", 8)],
-    # 网络 (Forensics)
-    ".pcap": [("tshark", "PCAP 协议解析", 10), ("tcpdump", "PCAP 抓包分析", 8), ("strings", "明文协议字段", 3)],
-    ".pcapng": [("tshark", "PCAP-NG 协议解析", 10), ("tcpdump", "PCAP-NG", 8)],
+    # 网络 (Forensics) — v0.5-pcap-protocol-router: pcap_protocol_router 优先
+    ".pcap": [
+        ("pcap_protocol_router", "pcap 协议层路由：协议分类 + TLS key 候选发现 + Wireshark 模板", 12),
+        ("tshark", "PCAP 协议解析（基础）", 8),
+        ("tcpdump", "PCAP 抓包分析（fallback）", 6),
+        ("strings", "明文协议字段", 3),
+    ],
+    ".pcapng": [
+        ("pcap_protocol_router", "pcap 协议层路由", 12),
+        ("tshark", "PCAP-NG 协议解析", 8),
+        ("tcpdump", "PCAP-NG", 6),
+    ],
     # 压缩 (Archive)
     ".zip": [("sevenz", "ZIP 完整性 + 伪加密检测", 10), ("unzip", "ZIP 列表 + 提取", 8), ("john", "ZIP 密码爆破", 5)],
     ".7z": [("sevenz", "7z 完整性", 10), ("john", "7z 密码爆破", 5)],

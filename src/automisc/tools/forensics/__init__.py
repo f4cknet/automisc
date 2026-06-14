@@ -4,7 +4,11 @@ v0.1.0b-PR3 范围：
 - tshark —— 解析 pcap/pcapng/cap，输出协议摘要
 - tcpdump —— pcap 解析（fallback）
 
+v0.5-pcap-protocol-router 范围：
+- pcap_protocol_router —— 协议分类 + TLS key 候选发现 + Wireshark 模板
+
 详细 import 见 ``automisc.tools.__init__``（共享 adapter 触发 @register_tool）。
 """
 from automisc.tools.forensics.network import tshark  # noqa: F401
 from automisc.tools.forensics.network import tcpdump  # noqa: F401
+from automisc.tools.forensics.network import protocol_router  # noqa: F401  (v0.5-pcap-protocol-router)

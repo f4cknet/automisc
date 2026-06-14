@@ -32,7 +32,7 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "steghide"],
-    "Forensics/Network (PR3)": ["tshark", "tcpdump"],
+    "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
         "ffmpeg_audio",
         "ffprobe",

@@ -66,7 +66,7 @@ automisc/
 │       ├── base.py               ToolAdapter 抽象基类
 │       ├── shared/               跨类型工具 (binwalk/file/foremost/strings/xxd/exiftool)
 │       ├── forensics/            Forensics 类
-│       │   ├── network/          tshark / tcpdump
+│       │   ├── network/          tshark / tcpdump / pcap_protocol_router (v0.5-pcap-protocol-router)
 │       │   ├── log/              grep / evtx_dump
 │       │   └── memory/           vol (volatility3)
 │       ├── steganography/        Stego 类
@@ -131,7 +131,7 @@ automisc/
 
 | Subflow | 工具 |
 |---|---|
-| Forensics/Network | `tshark`, `tcpdump` |
+| Forensics/Network | `tshark`, `tcpdump`, `pcap_protocol_router` (v0.5-pcap-protocol-router) |
 | Forensics/Log | `grep`, `evtx_dump` |
 | Forensics/Memory | `vol` (volatility3) |
 | Stego/Image | `zsteg`, `steghide` |
