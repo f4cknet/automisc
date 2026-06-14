@@ -1,23 +1,23 @@
 Foremost version 1.5.7 by Jesse Kornblum, Kris Kendall, and Nick Mikus
 Audit File
 
-Foremost started at Sun Jun 14 09:40:25 2026
+Foremost started at Sun Jun 14 10:06:34 2026
 Invocation: /usr/local/bin/foremost -t all -i Challenge/steg.png -o /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/steg__foremost/foremost_out 
 Output directory: /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/steg__foremost/foremost_out
 Configuration file: /usr/local/etc/foremost.conf
 ------------------------------------------------------------------
 File: Challenge/steg.png
-Start: Sun Jun 14 09:40:25 2026
+Start: Sun Jun 14 10:06:34 2026
 Length: Unknown
  
 Num	 Name (bs=512)	       Size	 File Offset	 Comment 
 
 0:	00000000.png 	     227 KB 	          0 	  (800 x 600)
-Finish: Sun Jun 14 09:40:25 2026
+Finish: Sun Jun 14 10:06:34 2026
 
 1 FILES EXTRACTED
 	
 png:= 1
 ------------------------------------------------------------------
 
-Foremost finished at Sun Jun 14 09:40:25 2026
+Foremost finished at Sun Jun 14 10:06:34 2026

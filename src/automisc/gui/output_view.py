@@ -92,11 +92,8 @@ class InputOutputView(QWidget):
 
         bar.addStretch()
 
-        # Hex → ASCII 按钮 (Owner 2026-06-14 需求)
-        self.btn_hex_ascii = QPushButton("Hex → ASCII")
-        self.btn_hex_ascii.setToolTip("把当前 input 区文本当 hex/binary/base64/base32 转换 → ASCII")
-        self.btn_hex_ascii.clicked.connect(self.run_hex_to_ascii)
-        bar.addWidget(self.btn_hex_ascii)
+        # v0.5-hex-ascii-fix: 删除原顶 bar [Hex → ASCII] 按钮 (与菜单栏 hex-ascii 重复)
+        # 原因 (per Owner 2026-06-14 09:50): "既然左侧菜单工具栏中有 hex 转 ascii, 那就没必要右上角放一个 hex->ascii 按钮了"
 
         layout.addLayout(bar)
 
@@ -275,11 +272,15 @@ class InputOutputView(QWidget):
     def run_hex_to_ascii(self) -> None:
         """把当前 input 区文本当 hex/binary/base64/base32 → ASCII.
 
+        v0.5-hex-ascii-fix (2026-06-14): 此方法现在**仅供 main_window 内部用**,
+        顶 bar 按钮已删 (per Owner "既然菜单栏有了就没必要").
+        GUI 用户应通过菜单栏 Tools -> 🔢 进制转换 -> Hex → ASCII 触发.
+
         Owner 2026-06-14 真实场景:
           1. 拖 meihuai.jpg -> 跑 tools, strings 报 hex
           2. 用户在 output 里看到 hex
           3. 用户点 [Clear] + 点 [Read-only: OFF] + 点 [Paste] 粘自己复制的 hex
-          4. 点 [Hex → ASCII] -> 输出 (7,7) 等 text
+          4. 点菜单 [Hex → ASCII] -> output (7,7) 等 text
         """
         from automisc.core.decoders.base_convert import (
             BaseConvertError,
@@ -291,26 +292,7 @@ class InputOutputView(QWidget):
             self.append_text("[hex→ascii] input is empty; please paste some hex/binary/base64/base32 text first")
             return
 
-        # 选 input 候选: 优先用 selected text; 否则用最后"看起来像 base-encoded"的行
-        cursor = self.text_edit.textCursor()
-        if cursor.hasSelection():
-            candidate = cursor.selectedText().strip()
-        else:
-            # 过滤: 跳过 log 行 ([xxx] / === / 空), 找最后像 base 的非空行
-            def looks_like_base(s: str) -> bool:
-                if not s or len(s) < 2:
-                    return False
-                if s.startswith("[") or s.startswith("=") or s.startswith("---"):
-                    return False
-                # 必须全是 base 字符 (0-9 a-z A-Z + / = \n \r \t 空格)
-                import re
-                return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
-
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            base_lines = [ln for ln in lines if looks_like_base(ln)]
-            # 最后一行 (最像 user 输入)
-            candidate = base_lines[-1] if base_lines else (lines[-1] if lines else text)
-
+        candidate = self.extract_base_candidate()
         if not candidate:
             self.append_text("[hex→ascii] no candidate found; please select text or paste base-encoded input")
             return
@@ -330,6 +312,49 @@ class InputOutputView(QWidget):
         fmt_obj.setFontWeight(QFont.Bold)
         text_out = f"\n[Hex → ASCII] detected={fmt}\n  input:  {candidate[:100]}{'...' if len(candidate) > 100 else ''}\n  output: {decoded}\n"
         cursor.insertText(text_out, fmt_obj)
+
+    def extract_base_candidate(self) -> str | None:
+        """从 input 区抽 candidate (selection 优先, 否则最后像 base 的行).
+
+        v0.5-hex-ascii-fix: 抽出为公共方法, 让 main_window._run_decoder
+        (菜单栏 hex-ascii) 和 InputOutputView.run_hex_to_ascii 共享同一逻辑.
+
+        Returns:
+            candidate string 或 None (空 input)
+
+        Logic:
+        1. 用户有 selection -> 用 selection
+        2. 否则过每一行, 跳过 log 装饰 ([xxx] / === / ---), 找最后"看起来像
+           base-encoded"的非空行 (全 [0-9a-zA-Z+/= \n\r\t] 字符)
+        3. 都没找到 -> 用最后非空行 (兜底)
+        """
+        import re
+        text = self.text_edit.toPlainText().strip()
+        if not text or text == "[cleared]":
+            return None
+
+        # 1. selection 优先
+        cursor = self.text_edit.textCursor()
+        if cursor.hasSelection():
+            sel = cursor.selectedText().strip()
+            if sel:
+                return sel
+
+        # 2. 找最后像 base 的行
+        def looks_like_base(s: str) -> bool:
+            if not s or len(s) < 2:
+                return False
+            if s.startswith("[") or s.startswith("=") or s.startswith("---"):
+                return False
+            return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
+
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        base_lines = [ln for ln in lines if looks_like_base(ln)]
+        if base_lines:
+            return base_lines[-1]
+        if lines:
+            return lines[-1]
+        return None
 
     def toPlainText(self) -> str:
         """兼容 QPlainTextEdit 接口 + 历史 test (w.output_view.toPlainText())."""

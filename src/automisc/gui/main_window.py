@@ -105,46 +105,8 @@ class MainWindow(QMainWindow):
         if not local_path:
             return
 
-        # 停止之前的 auto_runner（如果还在跑）
-        if self._auto_runner and self._auto_runner.isRunning():
-            self._auto_runner.stop()
-            self._auto_runner.wait(2000)
-
-        self.current_file = Path(local_path)
-        self.statusBar().showMessage(f"已选文件: {self.current_file.name}")
-
-        # v0.1.1：FileRouter 智能推荐（per Architecture §3.5）
-        try:
-            route = FileRouter().route(self.current_file)
-            self._current_recommendations = route.recommendations
-            self.output_view.append_text(
-                f"[drop] file={self.current_file}\n"
-                f"        size={route.file_size} bytes\n"
-                f"        magic={route.detected_magic or 'unknown'}\n"
-                f"        recommendations ({len(route.recommendations)}):\n"
-            )
-            for rec in route.recommendations[:5]:
-                self.output_view.append_text(
-                    f"          {rec.score:3d}  {rec.tool_name:15s}  {rec.reason}\n"
-                )
-        except Exception as e:  # noqa: BLE001
-            # 路由失败（如文件不可读）→ 兜底
-            self._current_recommendations = []
-            self.output_view.append_text(
-                f"[drop] file={self.current_file}\n"
-                f"        router error: {e}\n"
-            )
-
-        # v0.1.1-auto-run: auto-run 开启则自动启动 AutoRunner 跑 top 5
-        if self._auto_run_enabled and self._current_recommendations:
-            self.output_view.append_text(
-                f"\n[auto-run] 启动串行跑 top 5 推荐工具...\n"
-            )
-            self._start_auto_run(self._current_recommendations)
-        elif not self._auto_run_enabled:
-            self.output_view.append_text(
-                f"\n[auto-run disabled] 点左侧菜单手动选工具跑\n"
-            )
+        # v0.5-clear-on-new-file: 拖入新文件时先清空 output, 避免旧文件的信息残留
+        self._on_new_file_selected(Path(local_path), source="drop")
 
         event.acceptProposedAction()
 
@@ -400,9 +362,71 @@ class MainWindow(QMainWindow):
 
         path, _ = QFileDialog.getOpenFileName(self, "选择 CTF 题目文件")
         if path:
-            self.current_file = Path(path)
-            self.statusBar().showMessage(f"已选文件: {self.current_file.name}")
-            self.output_view.append_text(f"[open] {self.current_file}\n")
+            # v0.5-clear-on-new-file: 同 drop, 走统一入口
+            self._on_new_file_selected(Path(path), source="open")
+
+    def _on_new_file_selected(self, file_path: Path, source: str = "drop") -> None:
+        """新文件拖入 / 打开时统一入口 (v0.5-clear-on-new-file).
+
+        行为:
+        1. 停止之前还在跑的 runner (auto_run / tool / chain / decoder)
+        2. **清空 output 区** (避免旧文件信息残留)
+        3. 设 current_file
+        4. 跑 FileRouter 拿推荐
+        5. auto-run 开启则启动 AutoRunner
+        """
+        # 1. 停所有 runner
+        for runner in (self._auto_runner, self._runner, self._chain_runner, self._decode_runner):
+            if runner and runner.isRunning():
+                try:
+                    runner.stop()
+                except Exception:
+                    pass
+                runner.wait(2000)
+
+        # 2. 清空 output (核心: per Owner 2026-06-14 "每次有新的 input 就要清空原来的 output")
+        self.output_view.clear()
+        # 清完留下 [cleared] 标记, 但 read-only 模式不便用户编辑 — 同时切到可编辑
+        # 实际上用户拖入新文件后通常不会马上编辑, 保持 read-only 即可
+        # 仍打 [cleared] 标记保留线索
+        self.output_view.append_text(
+            f"[新文件] {file_path.name}  (v0.5-clear-on-new-file 已清空旧 output)"
+        )
+
+        self.current_file = file_path
+        self.statusBar().showMessage(f"已选文件: {self.current_file.name}")
+
+        # 3. FileRouter 智能推荐
+        try:
+            route = FileRouter().route(self.current_file)
+            self._current_recommendations = route.recommendations
+            self.output_view.append_text(
+                f"\n[{source}] file={self.current_file}\n"
+                f"        size={route.file_size} bytes\n"
+                f"        magic={route.detected_magic or 'unknown'}\n"
+                f"        recommendations ({len(route.recommendations)}):\n"
+            )
+            for rec in route.recommendations[:5]:
+                self.output_view.append_text(
+                    f"          {rec.score:3d}  {rec.tool_name:15s}  {rec.reason}\n"
+                )
+        except Exception as e:  # noqa: BLE001
+            self._current_recommendations = []
+            self.output_view.append_text(
+                f"\n[{source}] file={self.current_file}\n"
+                f"        router error: {e}\n"
+            )
+
+        # 4. auto-run 开启则启动 AutoRunner
+        if self._auto_run_enabled and self._current_recommendations:
+            self.output_view.append_text(
+                f"\n[auto-run] 启动串行跑 top 5 推荐工具...\n"
+            )
+            self._start_auto_run(self._current_recommendations)
+        elif not self._auto_run_enabled:
+            self.output_view.append_text(
+                f"\n[auto-run disabled] 点左侧菜单手动选工具跑\n"
+            )
 
     def _show_about(self) -> None:
         QMessageBox.about(
@@ -617,12 +641,13 @@ class MainWindow(QMainWindow):
         跟 _run_chain/_run_tool 同样的并发保护:
         - 不能同时跑多个 decoder
         - 不能在 tool 跑着时跑 decoder
-        """
-        if not self.current_file:
-            self.statusBar().showMessage("请先拖入或打开文件")
-            self.output_view.append_text("[!] no file selected\n")
-            return
 
+        v0.5-hex-ascii-fix (2026-06-14):
+        - 对 hex-ascii 类 decoder: 从 input 区读 selection/最后 base 行 (text 模式)
+        - 其他 decoder (e.g. base64-image): 仍走 current_file (file 模式)
+        - 之前 menu 触发 hex-ascii 把 current_file (e.g. 233KB meihuai.jpg) 当 hex 解
+          触发卡死 + 乱码, 因为 hex-ascii 是给"短 hex 串"设计的
+        """
         if self._decode_runner and self._decode_runner.isRunning():
             self.statusBar().showMessage("前一个 decoder 还在跑，请稍等…")
             return
@@ -633,20 +658,66 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
             return
 
-        self.statusBar().showMessage(
-            f"running decoder={decoder_name} on {self.current_file.name} (async)…"
-        )
-        self.output_view.append_text(f"\n=== Decoder: {decoder_name} ===\n")
-        self.output_view.append_text(f"=== File:    {self.current_file}\n")
+        # v0.5-hex-ascii-fix: text-based decoders 走 input 区, 不需要 current_file
+        text_based_decoders = {"hex-ascii"}
+        is_text_based = decoder_name in text_based_decoders
 
-        self._decode_runner = DecodeRunner(
-            decoder_name=decoder_name,
-            file_path=str(self.current_file),
-        )
+        if is_text_based:
+            # 从 input 区抽 candidate
+            candidate = self._extract_input_candidate()
+            if not candidate:
+                self.statusBar().showMessage(
+                    "input 区为空; 请先粘贴 hex/binary/base64/base32 文本"
+                )
+                self.output_view.append_text(
+                    f"\n=== Decoder: {decoder_name} ===\n"
+                    f"[!] input 区为空, 没东西可解.\n"
+                    f"  提示: 在 input 区粘贴 hex 串 (e.g. '28372c37290a') 然后再点菜单 {decoder_name}\n"
+                )
+                return
+
+            self.statusBar().showMessage(
+                f"running decoder={decoder_name} (text mode, len={len(candidate)})…"
+            )
+            self.output_view.append_text(
+                f"\n=== Decoder: {decoder_name} (text mode) ===\n"
+                f"  input_len: {len(candidate)} chars\n"
+            )
+
+            self._decode_runner = DecodeRunner(
+                decoder_name=decoder_name,
+                text=candidate,
+            )
+        else:
+            # 传统 file-based decoder (e.g. base64-image)
+            if not self.current_file:
+                self.statusBar().showMessage("请先拖入或打开文件")
+                self.output_view.append_text("[!] no file selected\n")
+                return
+
+            self.statusBar().showMessage(
+                f"running decoder={decoder_name} on {self.current_file.name} (async)…"
+            )
+            self.output_view.append_text(f"\n=== Decoder: {decoder_name} ===\n")
+            self.output_view.append_text(f"=== File:    {self.current_file}\n")
+
+            self._decode_runner = DecodeRunner(
+                decoder_name=decoder_name,
+                file_path=str(self.current_file),
+            )
+
         self._decode_runner.started_run.connect(self._on_decoder_started)
         self._decode_runner.finished_with_result.connect(self._on_decoder_finished)
         self._decode_runner.failed_with_error.connect(self._on_decoder_failed)
         self._decode_runner.start()
+
+    def _extract_input_candidate(self) -> str | None:
+        """从 input 区抽 candidate (selection 优先, 否则最后像 base 的行).
+
+        复用 InputOutputView 的相同逻辑, 保证顶 bar [Hex → ASCII] 按钮和
+        菜单栏 [hex-ascii] 工具行为一致.
+        """
+        return self.output_view.extract_base_candidate()
 
     def _on_decoder_started(self, decoder_name: str, file_path: str) -> None:
         self.statusBar().showMessage(
@@ -659,6 +730,9 @@ class MainWindow(QMainWindow):
         """Decoder 跑成功 → 渲染 result 字段 (类似 chain summary)."""
         self.output_view.append_text(f"\n--- decoder result ---")
         for k, v in vars(result).items():
+            # 截断 input/output_text 以免爆炸
+            if isinstance(v, str) and len(v) > 500:
+                v = v[:500] + f"... (truncated, total {len(v)} chars)"
             self.output_view.append_text(f"  {k}: {v}")
         # 特殊: 如果 result 含 output_path, 高亮并附提示
         output_path = getattr(result, "output_path", None)

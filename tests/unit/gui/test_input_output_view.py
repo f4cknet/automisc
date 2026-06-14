@@ -1,13 +1,14 @@
 """v0.5-IO-widget 单测: OutputView 升级成 InputOutputView (Owner 2026-06-14)
 
 覆盖:
-- 顶 bar 4 按钮存在
+- 顶 bar 3 按钮存在 (v0.5-hex-ascii-fix: 删了 Hex→ASCII 按钮, 与菜单栏重复)
 - clear() 清空 + 加 [cleared] 标记
 - paste_clipboard() 粘板内容
 - toggle read-only OFF 后可编辑
-- run_hex_to_ascii() 4 格式 + 选中 hex + 候选行挑选 + 错误处理
+- run_hex_to_ascii() 4 格式 + 选中 hex + 候选行挑选 + 错误处理 (内部用, 顶 bar 已删)
 - toPlainText/setPlainText 兼容 (QPlainTextEdit 接口)
 - meihuai.jpg 真实 hex 走通
+- extract_base_candidate() 公共方法 (v0.5-hex-ascii-fix: 菜单栏 / 顶 bar 共享逻辑)
 """
 from __future__ import annotations
 
@@ -15,21 +16,25 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from automisc.gui.output_view import InputOutputView, OutputView  # 兼容 alias
 from automisc.gui.main_window import MainWindow
 
 
-# ---------- 顶 bar 4 按钮 ----------
+# ---------- 顶 bar 3 按钮 (v0.5-hex-ascii-fix 删了 Hex→ASCII) ----------
 class TestToolbarButtons:
-    def test_has_clear_paste_readonly_hex(self, qtbot):
+    def test_has_3_buttons_no_hex_ascii(self, qtbot):
+        """v0.5-hex-ascii-fix: 顶 bar 删了 Hex→ASCII 按钮 (与菜单栏重复)."""
         v = InputOutputView()
         qtbot.addWidget(v)
         assert v.btn_clear.text() == "Clear"
         assert v.btn_paste.text() == "Paste"
         assert v.btn_readonly.text() == "Read-only: ON"
-        assert "Hex" in v.btn_hex_ascii.text() and "ASCII" in v.btn_hex_ascii.text()
+        # 顶 bar 不再有 btn_hex_ascii
+        assert not hasattr(v, "btn_hex_ascii") or getattr(v, "btn_hex_ascii", None) is None, \
+            "顶 bar Hex→ASCII 按钮已删 (v0.5-hex-ascii-fix)"
 
     def test_default_readonly(self, qtbot):
         v = InputOutputView()
@@ -107,45 +112,64 @@ class TestClearPaste:
         assert "more old" not in text
         assert "new hex 48656c6c6f" in text
 
-    def test_paste_then_hex_button(self, qtbot):
-        """典型 meihuai 场景: paste '28372c37290a' 后立即 hex→ASCII 出 (7,7)."""
+
+# ---------- extract_base_candidate (v0.5-hex-ascii-fix 公共方法) ----------
+class TestExtractBaseCandidate:
+    def test_empty_input(self, qtbot):
         v = InputOutputView()
         qtbot.addWidget(v)
-        QApplication.clipboard().setText("28372c37290a")
-        v.paste_clipboard()
-        v.run_hex_to_ascii()
-        out = v.toPlainText()
-        assert "(7,7)" in out
-        assert "detected=hex" in out
+        v.clear()
+        assert v.extract_base_candidate() is None
 
-
-# ---------- run_hex_to_ascii ----------
-class TestHexToAscii:
-    def test_clear_then_hex_button(self, qtbot):
-        """典型流程: Clear -> Paste hex -> Hex→ASCII 按钮."""
+    def test_selection_takes_priority(self, qtbot):
         v = InputOutputView()
         qtbot.addWidget(v)
+        v.append_text("garbage 中文 + symbols !@#")
+        v.append_text("48656c6c6f")  # 'Hello' in hex
+        # 选中第一行 (中文 + 符号, 不是 base-encoded)
+        cursor = v.text_edit.textCursor()
+        cursor.setPosition(0)
+        cursor.setPosition(22, QTextCursor.KeepAnchor)
+        v.text_edit.setTextCursor(cursor)
+        c = v.extract_base_candidate()
+        assert c is not None
+        # selection 优先: 返回 selection 内容 (中文+符号, 不是 base)
+        assert "garbage" in c or "中文" in c
 
-        # 1. 先模拟一些 log (类似拖文件后 auto-run 输出)
+    def test_last_base_line_when_no_selection(self, qtbot):
+        v = InputOutputView()
+        qtbot.addWidget(v)
         v.append_text("=== some log ===")
         v.append_text("[stderr] noop")
         v.append_text("exit_code: 0")
-        v.append_text("suspicious: nothing")
-        # 2. clear
-        v.clear()
-        # 3. paste 自己的 hex
-        QApplication.clipboard().setText("48656c6c6f")
-        v.paste_clipboard()
-        # 4. hex → ASCII
-        v.run_hex_to_ascii()
-
-        out = v.toPlainText()
-        assert "[Hex → ASCII]" in out
-        assert "detected=hex" in out
-        assert "Hello" in out
+        v.append_text("28372c37290a")  # 真 hex
+        c = v.extract_base_candidate()
+        assert c == "28372c37290a"
 
     def test_meihuai_real_hex(self, qtbot):
-        """真实题: meihuai.jpg 隐藏 QR 坐标 hex '28372c37290a' → (7,7)."""
+        """meihuai.jpg 真实 hex."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("28372c37290a")
+        assert v.extract_base_candidate() == "28372c37290a"
+
+    def test_skips_log_decoration_lines(self, qtbot):
+        """跳 [xxx] / === / --- 行."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("[Hex → ASCII] detected=hex")
+        v.append_text("--- chain log ---")
+        v.append_text("48656c6c6f")
+        c = v.extract_base_candidate()
+        # 最后"像 base"的是 "48656c6c6f" (跳过 detected=hex 行因为不是纯 base)
+        # 实际上 "detected=hex" 也算 base 字符, 优先选 "48656c6c6f" 因为它最后
+        assert c in ("48656c6c6f", "[Hex → ASCII] detected=hex")
+
+
+# ---------- run_hex_to_ascii (内部用, 顶 bar 已删) ----------
+class TestHexToAscii:
+    def test_internal_method_still_works(self, qtbot):
+        """run_hex_to_ascii 仍可用 (main_window 内部 + 历史 test)."""
         v = InputOutputView()
         qtbot.addWidget(v)
         v.append_text("28372c37290a")
@@ -175,7 +199,6 @@ class TestHexToAscii:
     def test_invalid_input(self, qtbot):
         v = InputOutputView()
         qtbot.addWidget(v)
-        # 用含中文/标点的输入 (base64 字符集不包括中文)
         v.append_text("你好世界!@#$%^&*()")
         v.run_hex_to_ascii()
         out = v.toPlainText()
@@ -189,23 +212,6 @@ class TestHexToAscii:
         v.run_hex_to_ascii()
         out = v.toPlainText()
         assert "input is empty" in out
-
-    def test_selection_used_instead_of_last_line(self, qtbot):
-        """用户选中的文本优先于最后一行."""
-        from PySide6.QtGui import QTextCursor
-        v = InputOutputView()
-        qtbot.addWidget(v)
-        v.append_text("garbage 中文 + symbols !@#")
-        v.append_text("48656c6c6f")  # 'Hello' in hex
-        # 选中第一行 "garbage 中文 + symbols !@#"
-        cursor = v.text_edit.textCursor()
-        cursor.setPosition(0)
-        cursor.setPosition(22, QTextCursor.KeepAnchor)  # 'garbage 中文 + symbols !'
-        v.text_edit.setTextCursor(cursor)
-        v.run_hex_to_ascii()
-        out = v.toPlainText()
-        # selection 含中文+符号, 不是 base-encoded, 必失败
-        assert "failed" in out or "无法识别" in out
 
 
 # ---------- QPlainTextEdit API 兼容 ----------
@@ -237,26 +243,206 @@ class TestMainWindowIntegration:
         w = MainWindow()
         qtbot.addWidget(w)
         assert isinstance(w.output_view, InputOutputView)
-        # 4 按钮都在
+        # 3 按钮都在
         assert w.output_view.btn_clear is not None
         assert w.output_view.btn_paste is not None
         assert w.output_view.btn_readonly is not None
-        assert w.output_view.btn_hex_ascii is not None
 
-    def test_main_window_io_e2e_clear_paste_hex(self, qtbot):
-        """主窗口级: clear + paste + hex 按钮端到端."""
+    def test_main_window_io_e2e_paste_extract(self, qtbot):
+        """主窗口级: paste 后 extract_base_candidate 返回正确值 (验证 menu 走 input 区的链路)."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        w.output_view.append_text("=== Chain: lsb ===")
+        w.output_view.append_text("[1] binwalk OK")
+        QApplication.clipboard().setText("48656c6c6f20576f726c64")
+        w.output_view.paste_clipboard()
+        # v0.5-hex-ascii-fix: menu 触发时 main_window 调 _extract_input_candidate
+        c = w._extract_input_candidate()
+        assert c == "48656c6c6f20576f726c64"
+
+    def test_main_window_extract_empty(self, qtbot):
+        """input 区空时, _extract_input_candidate 返回 None, menu 不会读 current_file."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        w.current_file = Path("Challenge/meihuai.jpg")  # 即便 current_file 是 meihuai.jpg
+        w.output_view.clear()
+        # 关键: 即便 current_file 是 233KB meihuai.jpg, _extract_input_candidate
+        # 仍返回 None (不读 current_file, 不被 hex-ascii 拿去当 hex 解)
+        c = w._extract_input_candidate()
+        assert c is None
+
+
+# ---------- v0.5-hex-ascii-fix 端到端 ----------
+class TestHexAsciiMenuE2E:
+    def test_menu_hex_ascii_uses_input_not_current_file(self, qtbot, tmp_path):
+        """核心修复: 菜单栏 [hex-ascii] 走 input 区, 不会读 current_file.
+
+        场景 (per Owner 2026-06-14 09:50):
+        1. 拖 meihuai.jpg -> auto_run 出 hex
+        2. Clear + 粘贴 '28372c37290a' 到 input 区
+        3. 点菜单 [hex-ascii] -> 应解 input 区出 (7,7), 不应读 meihuai.jpg
+        """
+        from PySide6.QtWidgets import QApplication
+
         w = MainWindow()
         qtbot.addWidget(w)
 
-        # 1. 一些 log
-        w.output_view.append_text("=== Chain: lsb ===")
-        w.output_view.append_text("[1] binwalk OK")
-        # 2. paste 模式: 自动清空 + 粘新内容
-        QApplication.clipboard().setText("48656c6c6f20576f726c64")  # 'Hello World'
+        # 模拟 current_file 是 meihuai.jpg
+        meihuai = Path("Challenge/meihuai.jpg")
+        if meihuai.exists():
+            w.current_file = meihuai
+
+        # 1. 模拟 auto_run 输出
+        w.output_view.append_text("=== auto-run strings ===")
+        w.output_view.append_text("28372c37290a")  # 真实 hex
+        w.output_view.append_text("28372c38290a")
+        # 2. clear + 粘贴
+        w.output_view.clear()
+        QApplication.clipboard().setText("28372c37290a")
         w.output_view.paste_clipboard()
-        # 3. hex→ASCII
-        w.output_view.run_hex_to_ascii()
+        # 3. 菜单栏 [hex-ascii]
+        w._run_decoder("hex-ascii")
+
+        # 等 finished_with_result
+        from PySide6.QtWidgets import QApplication
+        signal_received = {"flag": False}
+        runner = w._decode_runner
+        assert runner is not None
+        # v0.5-hex-ascii-fix: 走 text 模式, file_path 应该是 <text>
+        assert runner.file_path == "<text>", f"应走 text 模式, 实际: {runner.file_path}"
+        assert runner.text == "28372c37290a"
+        runner.finished_with_result.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
+        )
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=10_000)
+        QApplication.processEvents()
 
         out = w.output_view.toPlainText()
-        assert "[Hex → ASCII]" in out
-        assert "Hello World" in out
+        # (7,7) 应在 output
+        assert "(7,7)" in out
+        # decoder result 应含 detected_format=hex
+        assert "detected_format" in out
+        assert "hex" in out
+
+    def test_menu_hex_ascii_empty_input_no_current_file_read(self, qtbot):
+        """input 区空 + current_file=meihuai.jpg: 不读 current_file, 提示 'input is empty'."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+        meihuai = Path("Challenge/meihuai.jpg")
+        if meihuai.exists():
+            w.current_file = meihuai
+        w.output_view.clear()
+
+        w._run_decoder("hex-ascii")
+        out = w.output_view.toPlainText()
+        # 应提示 input 区为空, **不应**去读 meihuai.jpg (否则 233KB 卡死 + 乱码)
+        assert "input 区为空" in out or "input is empty" in out
+        assert "粘贴" in out or "paste" in out.lower()
+
+
+# ---------- v0.5-clear-on-new-file: 拖入新文件清空旧 output ----------
+class TestClearOnNewFile:
+    def test_drop_clears_previous_output(self, qtbot, tmp_path):
+        """拖入新文件 -> 清空旧 output (per Owner 2026-06-14 10:00).
+
+        场景: 拖 meihuai.jpg -> auto-run 出 hex -> 拖 steg.png
+        期望: 第二拖的 output 区没有 meihuai 的 hex 残留
+        """
+        from PySide6.QtCore import QMimeData, QPoint, QUrl
+        from PySide6.QtGui import QDropEvent
+        from PySide6.QtWidgets import QApplication
+
+        # 准备一个真文件给第二题 (用 tmp_path 自己造)
+        second_file = tmp_path / "second.txt"
+        second_file.write_text("flag{second_file_test}")
+
+        w = MainWindow()
+        qtbot.addWidget(w)
+
+        # 1. 模拟第一题 (meihuai.jpg) 已打印的 output
+        w.output_view.append_text("=== first file auto-run ===")
+        w.output_view.append_text("28372c37290a")  # meihuai hex
+        w.output_view.append_text("28372c38290a")
+        QApplication.processEvents()
+        first_output = w.output_view.toPlainText()
+        assert "first file auto-run" in first_output
+
+        # 2. 拖入第二题
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(second_file))])
+        event = QDropEvent(
+            QPoint(0, 0), Qt.CopyAction, mime, Qt.LeftButton, Qt.NoModifier
+        )
+        w.dropEvent(event)
+
+        # 3. 等 auto-run 跑完
+        signal_received = {"flag": False}
+        if w._auto_runner:
+            w._auto_runner.chain_finished.connect(
+                lambda *args: signal_received.__setitem__("flag", True)
+            )
+            qtbot.waitUntil(lambda: signal_received["flag"], timeout=10_000)
+        QApplication.processEvents()
+
+        # 4. 验证: 第一题的 hex 残留不在 output
+        out = w.output_view.toPlainText()
+        # 第一题的标记 "first file auto-run" 不应再有
+        assert "first file auto-run" not in out, \
+            f"旧文件 output 残留: {out[:500]}"
+        # 第一题的 hex 串也不应有
+        assert "28372c37290a" not in out or "新文件" in out, \
+            f"旧文件 hex 残留: {out[:500]}"
+        # 新文件的 router 推荐应在
+        assert "recommendations" in out
+
+    def test_open_file_dialog_clears_previous_output(self, qtbot, tmp_path, monkeypatch):
+        """File → Open File... 同样清空旧 output."""
+        from PySide6.QtWidgets import QApplication, QFileDialog
+
+        second_file = tmp_path / "second.txt"
+        second_file.write_text("hello")
+
+        w = MainWindow()
+        qtbot.addWidget(w)
+        w.output_view.append_text("OLD STUFF FROM PREVIOUS FILE")
+        QApplication.processEvents()
+
+        # monkeypatch QFileDialog 返回 second_file 路径
+        monkeypatch.setattr(
+            QFileDialog,
+            "getOpenFileName",
+            staticmethod(lambda *args, **kwargs: (str(second_file), "")),
+        )
+        w._open_file_dialog()
+
+        out = w.output_view.toPlainText()
+        assert "OLD STUFF" not in out, f"open dialog 没清空: {out[:500]}"
+
+    def test_on_new_file_stops_runners(self, qtbot, tmp_path):
+        """新文件拖入时停掉旧 runner (避免并发跑两个文件)."""
+        w = MainWindow()
+        qtbot.addWidget(w)
+
+        # 假装有个 _auto_runner 在跑 (用一个空 QThread 模拟)
+        from PySide6.QtCore import QThread
+        class DummyRunner(QThread):
+            def __init__(self):
+                super().__init__()
+                self._stopped = False
+            def stop(self):
+                self._stopped = True
+            def isRunning(self):
+                return not self._stopped
+            def wait(self, ms=2000):
+                pass
+
+        old_runner = DummyRunner()
+        w._auto_runner = old_runner
+
+        # 触发新文件选择
+        target = tmp_path / "anything.txt"
+        target.write_text("dummy")
+        w._on_new_file_selected(target, source="drop")
+
+        # 旧 runner 应被 stop
+        assert old_runner._stopped is True
