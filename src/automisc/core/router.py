@@ -52,9 +52,9 @@ class RouteResult:
 # extension → 推荐工具 + 理由 + 默认 score
 EXTENSION_ROUTES: dict[str, list[tuple[str, str, int]]] = {
     # 图片 (Stego)
-    ".png": [("zsteg", "PNG LSB 隐写常用", 10), ("steghide", "PNG/BMP 隐写", 8), ("exiftool", "EXIF metadata", 6), ("binwalk", "PNG 内嵌文件检测", 5)],
+    ".png": [("zsteg", "PNG LSB 隐写常用", 10), ("steghide", "PNG/BMP 隐写", 8), ("exiftool", "EXIF metadata", 6), ("binwalk", "PNG 内嵌文件检测", 5), ("strings", "可疑字符串 (rule_scanner)", 3)],
     ".bmp": [("steghide", "BMP 隐写", 10), ("exiftool", "BMP metadata", 6)],
-    ".jpg": [("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5)],
+    ".jpg": [("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5), ("strings", "可疑字符串 (rule_scanner)", 4)],
     ".jpeg": [("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5)],
     ".gif": [("exiftool", "GIF metadata", 6), ("binwalk", "GIF 内嵌", 5)],
     # 音视频 (Stego)
