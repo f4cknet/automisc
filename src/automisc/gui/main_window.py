@@ -69,7 +69,8 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
         # 左侧菜单树
-        self.menu_dock = ToolMenuDock(list_tools, on_tool_selected=self._run_tool)
+        # callback 签名 (name, kind) - kind: adapter | action | decoder
+        self.menu_dock = ToolMenuDock(list_tools, on_tool_selected=self._on_dock_item_selected)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.menu_dock)
 
         # 中央输出区
@@ -412,6 +413,20 @@ class MainWindow(QMainWindow):
         )
 
     # ---------- tool runner (async) ----------
+    def _on_dock_item_selected(self, name: str, kind: str) -> None:
+        """左侧工具栏点击 -> dispatch 到对应 runner.
+
+        kind:
+        - "adapter": 22 个 core.adapter 工具 (subprocess + parse)
+        - "action": v0.5+ 4 快捷 action (fix_pseudo_zip / bruteforce_zip / lsb_extract / bruteforce_rar)
+        - "decoder": v0.5+ decoder (base64-image / hex-ascii)
+        """
+        if kind == "decoder":
+            self._run_decoder(name)
+        else:
+            # adapter + action 都走 _run_tool (action 名是 action 名, 已在 ACTION_REGISTRY)
+            self._run_tool(name)
+
     def _run_tool(self, tool_name: str) -> None:
         """异步跑工具（QThread 包装，不阻塞 GUI）."""
         if not self.current_file:
@@ -517,6 +532,16 @@ class MainWindow(QMainWindow):
         log = context.get("__log__", [])
         self.output_view.append_text(f"\n--- chain log ({len(log)} steps) ---")
         self.output_view.append_chain_log(log)
+
+        # v0.5-bug-fix-3: LSB 抽到的整段 text 高亮 (整段深黄底 + 敏感词红底黄字)
+        last_result = context.get("__last_result__")
+        if last_result and last_result.data:
+            lsb_text = last_result.data.get("lsb_text", {})
+            if lsb_text and lsb_text.get("text"):
+                self.output_view.append_lsb_text(
+                    lsb_text["text"], channel=lsb_text.get("channel", "")
+                )
+
         self.output_view.append_chain_summary(context)
 
         # journal 累积 (suspicious points from all steps)

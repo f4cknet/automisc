@@ -63,41 +63,42 @@ class TestMainWindow:
 # ---------- 2. Menu dock ----------
 class TestToolMenuDock:
     def test_menu_categories(self, qtbot):
-        """8 个分类 + 1 快捷工具分类 = 9（v0.5+）."""
-        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        """8 adapter + 1 快捷 + 2 decoder = 11 分类（v0.5+）."""
+        dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
-        assert dock.tree.topLevelItemCount() == 9
+        assert dock.tree.topLevelItemCount() == 11
 
     def test_menu_total_tools(self, qtbot):
-        """22 adapter + 4 快捷 action = 26."""
-        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        """22 adapter + 4 快捷 + 2 decoder = 28."""
+        dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
         count = 0
         for i in range(dock.tree.topLevelItemCount()):
             cat = dock.tree.topLevelItem(i)
             count += cat.childCount()
-        assert count == 26  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 (v0.5 快捷)
+        assert count == 28  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 + 1 + 1
 
     def test_menu_callback(self, qtbot):
-        """点击工具项触发 callback."""
+        """点击工具项触发 callback (新 signature: name, kind)."""
         selected = []
-        dock = ToolMenuDock(on_tool_selected=selected.append)
+        dock = ToolMenuDock(on_tool_selected=lambda n, k: selected.append((n, k)))
         qtbot.addWidget(dock)
         # 找第一个可点击的子项
         cat = dock.tree.topLevelItem(0)
         first_child = cat.child(0)
         dock._on_item_clicked(first_child, 0)
-        assert selected == ["file"]  # PR1 第一个是 file
+        # 第一个 adapter = "file", kind="adapter"
+        assert selected == [("file", "adapter")]
 
     def test_menu_tool_categories_constant(self):
-        """TOOL_CATEGORIES 字典含 9 分类 26 工具（22 adapter + 4 快捷 action）."""
-        assert len(TOOL_CATEGORIES) == 9
+        """TOOL_CATEGORIES 字典含 11 分类 28 工具（22+4+2）。"""
+        assert len(TOOL_CATEGORIES) == 11
         total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
-        assert total == 26
+        assert total == 28
 
     def test_menu_v5_shortcut_actions(self, qtbot):
         """v0.5 快捷工具 4 个: lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar."""
-        dock = ToolMenuDock(on_tool_selected=lambda _: None)
+        dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
 
         # 找 "快捷工具 (v0.5 Actions)" 分类
@@ -117,6 +118,41 @@ class TestToolMenuDock:
 
         for expected in ("lsb_extract", "fix_pseudo_zip", "bruteforce_zip", "bruteforce_rar"):
             assert expected in action_names, f"快捷工具缺 {expected}; 实际: {action_names}"
+
+    def test_menu_v5_decoders(self, qtbot):
+        """v0.5+ 解码器 2 个: base64-image / hex-ascii."""
+        dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
+        qtbot.addWidget(dock)
+
+        # 找 "🔓 解码工具" + "🔢 进制转换" 分类
+        decoder_names = []
+        for i in range(dock.tree.topLevelItemCount()):
+            cat = dock.tree.topLevelItem(i)
+            if "解码工具" in cat.text(0) or "进制转换" in cat.text(0):
+                for j in range(cat.childCount()):
+                    decoder_names.append(cat.child(j).data(0, Qt.UserRole))
+
+        # base64-image 走 prefix "decoder:"
+        for expected in ("decoder:base64-image", "decoder:hex-ascii"):
+            assert expected in decoder_names, f"decoder 缺 {expected}; 实际: {decoder_names}"
+
+    def test_menu_callback_kind_dispatch(self, qtbot):
+        """callback kind 正确区分: adapter / action / decoder."""
+        selected = []
+        dock = ToolMenuDock(on_tool_selected=lambda n, k: selected.append((n, k)))
+        qtbot.addWidget(dock)
+
+        # 找 decoder:base64-image 模拟点击
+        from PySide6.QtCore import QPoint
+        for i in range(dock.tree.topLevelItemCount()):
+            cat = dock.tree.topLevelItem(i)
+            for j in range(cat.childCount()):
+                child = cat.child(j)
+                if child.data(0, Qt.UserRole) == "decoder:base64-image":
+                    dock._on_item_clicked(child, 0)
+                    assert selected == [("base64-image", "decoder")]
+                    return
+        assert False, "decoder:base64-image 未找到"
 
 
 # ---------- 3. Output view ----------

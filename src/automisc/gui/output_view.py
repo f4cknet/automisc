@@ -93,6 +93,61 @@ class OutputView(QPlainTextEdit):
         cursor.insertText(text, fmt)
         cursor.insertText("\n")
 
+    def append_lsb_text(self, lsb_text: str, channel: str = "") -> None:
+        """v0.5-bug-fix-3: LSB 抽到的整段 text 高亮显示 + 敏感词特别标记.
+
+        Bug 现象: LSB 抽到 "...the secret key is: st3g0..." 整段被当普通颜色显示,
+                  关键字 secret/key 不突出.
+        修复: 整段用深黄底色高亮 + 敏感关键词 (key/flag/secret/ctf/password)
+              用更深的红底+粗体额外标记.
+
+        Args:
+            lsb_text: LSB 抽到的整段 text
+            channel: LSB 通道 (e.g. "b1,rgb,lsb,xy")
+        """
+        from automisc.core.utils.rule_scanner import _SENSITIVE_KEYWORDS
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.End)
+
+        # 标题
+        fmt_title = QTextCharFormat()
+        fmt_title.setForeground(QColor(255, 215, 0))  # 金黄
+        fmt_title.setFontWeight(QFont.Bold)
+        header = f"\n[LSB text] channel={channel or '?'}, len={len(lsb_text)}\n"
+        cursor.insertText(header, fmt_title)
+
+        # 整段底色 (浅黄)
+        fmt_body = QTextCharFormat()
+        fmt_body.setBackground(QColor(80, 60, 0))  # 深黄底
+        fmt_body.setForeground(QColor(255, 255, 200))  # 浅黄字
+        cursor.insertText(lsb_text, fmt_body)
+
+        # 敏感词额外高亮 (在整段上覆盖)
+        text_lower = lsb_text.lower()
+        for kw in _SENSITIVE_KEYWORDS:
+            start = 0
+            while True:
+                idx = text_lower.find(kw, start)
+                if idx < 0:
+                    break
+                # 重新定位 cursor 到 idx
+                pos = cursor.position()
+                # 退到整段起点
+                cursor.setPosition(pos - len(lsb_text) + idx, QTextCursor.MoveAnchor)
+                cursor.setPosition(
+                    pos - len(lsb_text) + idx + len(kw), QTextCursor.KeepAnchor
+                )
+                fmt_kw = QTextCharFormat()
+                fmt_kw.setBackground(QColor(180, 0, 0))  # 深红底
+                fmt_kw.setForeground(QColor(255, 255, 0))  # 黄字
+                fmt_kw.setFontWeight(QFont.Bold)
+                fmt_kw.setFontUnderline(True)
+                cursor.setCharFormat(fmt_kw)
+                start = idx + len(kw)
+                # cursor 回到末尾
+                cursor.setPosition(pos, QTextCursor.MoveAnchor)
+        cursor.insertText("\n")
+
     def append_chain_log(self, log: list[dict]) -> None:
         """渲染 DAG chain 日志 (step / node / success / message).
 

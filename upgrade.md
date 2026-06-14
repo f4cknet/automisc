@@ -53,7 +53,8 @@
 | v0.5-lsb-bug | 修 LSBExtractAction 抽 raw 含 0xff 抛 UnicodeDecodeError | ✅ done | main `f1a55ca` | [`upgrade/2026-06-14-new-fixtures.md`](upgrade/2026-06-14-new-fixtures.md) |
 | v0.5-base64-image | base64 -> 图片工具 (CLI `automisc decode base64-image`) | ✅ done | main `100189c` | [`upgrade/v0.5-base64-image.md`](upgrade/v0.5-base64-image.md) |
 | v0.5-rule-scanner | rule_scanner 独立规则库 + strings|grep 集成 + auto_run 兜底 | ✅ done | main `4573369` | [`upgrade/v0.5-rule-scanner.md`](upgrade/v0.5-rule-scanner.md) |
-| v0.5-decoder-menu | CLI decoder 迁移到 GUI Tools 菜单 (registry 单一事实来源) | ✅ done | main (待 push) | [`upgrade/v0.5-decoder-menu.md`](upgrade/v0.5-decoder-menu.md) |
+| v0.5-decoder-menu | CLI decoder 迁移到 GUI Tools 菜单 (registry 单一事实来源) | ✅ done | main `9e9002d` | [`upgrade/v0.5-decoder-menu.md`](upgrade/v0.5-decoder-menu.md) |
+| v0.5-GUI-bugfix | 3 bug 修: 工具栏 base64/hex 入口 + LSB secret/key 高亮 | ✅ done | main (待 push) | [`upgrade/v0.5-GUI-bugfix.md`](upgrade/v0.5-GUI-bugfix.md) |
 
 ---
 

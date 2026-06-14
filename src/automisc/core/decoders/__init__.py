@@ -17,6 +17,7 @@ from automisc.core.decoders.registry import (
 
 # 触发所有 decoder 注册 (import side-effect)
 from automisc.core.decoders import base64_image  # noqa: F401, E402
+from automisc.core.decoders import base_convert  # noqa: F401, E402
 
 __all__ = [
     "DecoderSpec",
