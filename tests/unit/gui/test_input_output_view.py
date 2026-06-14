@@ -303,8 +303,7 @@ class TestHexAsciiMenuE2E:
         # 3. 菜单栏 [hex-ascii]
         w._run_decoder("hex-ascii")
 
-        # 等 finished_with_result
-        from PySide6.QtWidgets import QApplication
+        # v0.5-short-circuit-fix: 等 finished_with_result 信号 (避免 isRunning()=False 后立刻 read)
         signal_received = {"flag": False}
         runner = w._decode_runner
         assert runner is not None
@@ -315,6 +314,7 @@ class TestHexAsciiMenuE2E:
             lambda *args: signal_received.__setitem__("flag", True)
         )
         qtbot.waitUntil(lambda: signal_received["flag"], timeout=10_000)
+        # 多等一帧让 slot (append_text) 执行完
         QApplication.processEvents()
 
         out = w.output_view.toPlainText()

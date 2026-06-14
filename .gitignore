@@ -34,3 +34,8 @@ Challenge/__*__*.zip
 Challenge/__*__*.7z
 Challenge/__*__*.rar
 Challenge/.automisc_*
+
+Challenge/**/audit.txt
+Challenge/**/foremost_out/
+Challenge/**/FOREMOST/
+Challenge/**/__extract/

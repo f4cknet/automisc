@@ -7,6 +7,11 @@
 - 命中行 + 上下文 → 进 SuspiciousPoint
 - 限制最大输出（防大日志 OOM）
 
+**v0.5-truncate-output 改造** (2026-06-14 10:46):
+- **不再** 存 raw stdout (grep -C 1 命中 100 行也是 300 行, 大日志占满 GUI 窗口)
+- 改存 **rendered** 版本: 命中行 + summary, 上下文省略
+- raw stdout 仍可拿: `grep -E -i -n -C 1 <pattern> <file>` 直接跑
+
 **注**：与 shared/strings.py 不同：
 - strings 提取**所有**可打印字符串
 - grep 是**模式匹配**，命中关键字才报
@@ -59,6 +64,8 @@ class GrepAdapter(ToolAdapter):
     description = "关键字搜索 CTF log 关键字（password/secret/webshell/flag 等）"
 
     default_timeout = 30.0
+    # v0.5-truncate-output: 渲染版最多保留多少个 suspicious 命中行
+    MAX_RENDERED_HITS = 20
 
     def run(self, file_path: str) -> ToolResult:
         # -E: extended regex
@@ -75,17 +82,17 @@ class GrepAdapter(ToolAdapter):
             pattern,
             file_path,
         ]
-        exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
+        exit_code, raw_stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []
 
         # 1. 通用扫描（捕获 flag{...}）
         suspicious.extend(scan_output_for_suspicious(
-            tool_name=self.name, file_path=file_path, stdout=stdout,
+            tool_name=self.name, file_path=file_path, stdout=raw_stdout,
         ))
 
         # 2. 命中行解析 + 关键字严重度
-        for line in stdout.splitlines():
+        for line in raw_stdout.splitlines():
             line_lower = line.lower()
 
             # 跳过 "--" 上下文分隔行
@@ -116,11 +123,44 @@ class GrepAdapter(ToolAdapter):
                     )
                     break  # 每行只报一个最强关键字
 
+        # v0.5-truncate-output: 渲染版 stdout (只显示命中行 + summary)
+        rendered_stdout = self._render_output(raw_stdout, suspicious)
+
         return ToolResult(
             tool_name=self.name,
             exit_code=exit_code,
-            stdout=stdout,
+            stdout=rendered_stdout,
             stderr=stderr,
             suspicious_points=suspicious,
             duration_ms=duration_ms,
         )
+
+    def _render_output(self, raw_stdout: str, suspicious: list[SuspiciousPoint]) -> str:
+        """v0.5-truncate-output: 渲染版 stdout.
+
+        grep 命中行 + offset, 无上下文, max MAX_RENDERED_HITS
+        """
+        if not suspicious:
+            return (
+                f"=== grep 摘要 (v0.5-truncate-output) ===\n"
+                f"  suspicious: 0 (无关键字命中)\n"
+                f"  └─ raw stdout 已省略, 想看原文: `grep -E -i -n -h -C 1 <file>`\n"
+            )
+
+        out_lines = [
+            f"=== grep 摘要 (v0.5-truncate-output) ===",
+            f"  suspicious: {len(suspicious)} (raw stdout 含上下文已省略)",
+            "",
+            f"--- 命中行 (max {self.MAX_RENDERED_HITS} 显示) ---",
+        ]
+        shown = 0
+        for sp in suspicious:
+            if shown >= self.MAX_RENDERED_HITS:
+                out_lines.append(f"  ... 还有 {len(suspicious) - shown} 行未显示")
+                break
+            # offset 在 log_keyword 类里
+            out_lines.append(f"  L{sp.offset}: {sp.matched_pattern[:200]}")
+            shown += 1
+
+        return "\n".join(out_lines)
+

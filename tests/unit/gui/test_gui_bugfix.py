@@ -147,18 +147,23 @@ class TestLsbTextHighlight:
         if not Path("Challenge/steg.png").exists():
             pytest.skip("Challenge/steg.png not found")
 
+        from PySide6.QtWidgets import QApplication
+
         window = MainWindow()
         qtbot.addWidget(window)
         window.current_file = Path("Challenge/steg.png")
 
+        # 等 finished_with_context 信号 (避免 race: isRunning()=False 时 slot 还没排到事件循环)
+        signal_received = {"flag": False}
+        window._chain_runner = None
         window._run_chain("lsb")
-        qtbot.waitUntil(
-            lambda: window._chain_runner is None
-            or not window._chain_runner.isRunning(),
-            timeout=30_000,
+        runner = window._chain_runner
+        assert runner is not None
+        runner.finished_with_context.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
-        if window._chain_runner:
-            window._chain_runner.wait()
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=30_000)
+        QApplication.processEvents()
 
         out = window.output_view.toPlainText()
         # 整段 LSB text 应在 output (Bug 3 修复目标)

@@ -122,6 +122,7 @@ class MainWindow(QMainWindow):
         self._auto_runner.tool_finished.connect(self._on_auto_tool_finished)
         self._auto_runner.chain_finished.connect(self._on_auto_chain_finished)
         self._auto_runner.chain_failed.connect(self._on_auto_chain_failed)
+        self._auto_runner.short_circuited.connect(self._on_auto_short_circuited)
         self._auto_runner.start()
 
     def _on_auto_tool_started(self, tool_name: str, index: int, total: int) -> None:
@@ -280,6 +281,16 @@ class MainWindow(QMainWindow):
     def _on_auto_chain_failed(self, tool_name: str, error_msg: str) -> None:
         self.output_view.append_text(
             f"[!] auto-run chain failed at {tool_name}: {error_msg}\n"
+        )
+
+    def _on_auto_short_circuited(self, tool_name: str, reason: str) -> None:
+        """v0.5-short-circuit: 命中 severity>=5, 终止后续 tools."""
+        self.output_view.append_text(
+            f"\n[short-circuit] {tool_name} {reason}\n"
+            f"  └─ 后续 tools 跳过, auto-run 结束\n"
+        )
+        self.statusBar().showMessage(
+            f"auto-run short-circuited at {tool_name}: 已命中关键线索"
         )
 
     # ---------- menu actions ----------

@@ -11,6 +11,12 @@
 - 每个工具跑完 emit ``tool_finished(tool_name, result)`` 增量更新 UI
 - 整个链跑完 emit ``chain_finished(summaries)`` 总结
 
+**v0.5-short-circuit-on-flag** (2026-06-14 10:46 per Owner):
+- 任一工具命中 **severity >= 5** (sensitive_keyword) → **终止整个链**
+- 原因: steg.png LSB 已命中 "secret key is: st3g0_saurus_wr3cks",
+  后续 strings/binwalk/... 没必要再跑
+- 终止时仍 emit tool_finished + chain_finished (让 GUI 知道为什么停)
+
 v0.1.1 范围：串行（v0.5+ 范围：并发池 QThreadPool）
 """
 
@@ -25,6 +31,10 @@ from automisc.core.exceptions import AutomiscError
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.result import ToolResult
 from automisc.core.router import RouteRecommendation
+
+
+# v0.5-short-circuit: 触发 short-circuit 的最低 severity
+SHORT_CIRCUIT_SEVERITY = 5
 
 
 @dataclass
@@ -61,6 +71,8 @@ class AutoRunner(QThread):
     chain_failed = Signal(str, str)
     # Signal: 整体进度 (current_index, total)
     progress = Signal(int, int)
+    # v0.5-short-circuit: 链因命中 severity>=5 终止 (reason=str)
+    short_circuited = Signal(str, str)  # tool_name, reason
 
     def __init__(
         self,
@@ -137,6 +149,18 @@ class AutoRunner(QThread):
             # 传完整 ToolResult 给 GUI（避免重复执行）
             self.tool_finished.emit(tool_name, summary, result)
 
+            # v0.5-short-circuit: 命中 severity>=5 -> 终止链
+            max_severity = max(
+                (sp.severity for sp in result.suspicious_points),
+                default=0,
+            )
+            if max_severity >= SHORT_CIRCUIT_SEVERITY:
+                self.short_circuited.emit(
+                    tool_name,
+                    f"命中 severity={max_severity} (>= {SHORT_CIRCUIT_SEVERITY}), 终止后续 tools",
+                )
+                break
+
         # 链结束
         self.progress.emit(total, total)
         self.chain_finished.emit(self._summaries)
@@ -145,4 +169,4 @@ class AutoRunner(QThread):
         return list(self._summaries)
 
 
-__all__ = ["AutoRunner", "AutoRunSummary"]
+__all__ = ["AutoRunner", "AutoRunSummary", "SHORT_CIRCUIT_SEVERITY"]
