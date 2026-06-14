@@ -20,6 +20,10 @@ class ToolResult:
     suspicious_points: list[SuspiciousPoint] = field(default_factory=list)
     duration_ms: int = 0
     error: str | None = None  # 进程级错误（超时 / 未找到 / PermissionError）
+    # v0.5-hex-router-journal: 工具写的副作用文件 (e.g. hex_router saved 路径列表)
+    # GUI caller 用来推 journal + status bar, 不混进 stdout
+    # 格式: {"written_files": [{"path": ..., "kind": "hex转文件", "source": "strings"}]}
+    metadata: dict = field(default_factory=dict)
 
     @property
     def is_success(self) -> bool:
@@ -28,3 +32,11 @@ class ToolResult:
 
     def has_suspicious_points(self) -> bool:
         return len(self.suspicious_points) > 0
+
+    def add_written_file(self, path: str, kind: str, source: str = "") -> None:
+        """记录工具写的副作用文件 (v0.5-hex-router-journal)."""
+        self.metadata.setdefault("written_files", []).append({
+            "path": path,
+            "kind": kind,
+            "source": source or self.tool_name,
+        })

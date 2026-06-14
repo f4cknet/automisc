@@ -196,20 +196,28 @@ class TestStringsAdapterIntegration:
         f.write_text(body)
         a = StringsAdapter()
         r = a.run(str(f))
-        # 渲染版应含 hex_router summary
-        assert "v0.5-hex-router" in r.stdout
-        assert "已自动 route" in r.stdout
+        # v0.5-hex-router-journal (per Owner 14:43):
+        # 不再混进 stdout, 改走 metadata.written_files (给 caller 推 journal)
+        assert "v0.5-hex-router" not in r.stdout, "stdout 不应再含 v0.5-hex-router summary"
+        assert "saved=" not in r.stdout, "stdout 不应再含 saved= (改走 metadata)"
+        assert "magic=" not in r.stdout, "stdout 不应再含 magic= (改走 metadata)"
         # 命中行应是占位符 (不含 35000 字符实际 hex)
         assert "<hex_router 已自动处理" in r.stdout
-        # 35000 字符不应直接出现
-        # (但前 60 字符的 preview "89504e47..." 可能出现, 验证主要 body 不出现)
-        # 跑 magic 探测部分
-        assert "magic=image" in r.stdout
-        assert "saved=" in r.stdout
+        # 关键: metadata.written_files 应有 1 条
+        assert "written_files" in r.metadata
+        assert len(r.metadata["written_files"]) == 1
+        wf = r.metadata["written_files"][0]
+        assert wf["kind"] == "hex转文件"
+        assert wf["source"] == "strings"
+        assert Path(wf["path"]).exists()
         # cleanup routed file
         import glob
         for ff in glob.glob("/tmp/automisc_text_outputs/hex_router_image_*"):
             ff.unlink(missing_ok=True)
+        # 也清 samedir
+        from automisc.core.utils.output_path import is_in_tmp
+        if not is_in_tmp(wf["path"]):
+            Path(wf["path"]).unlink(missing_ok=True)
 
     def test_long_hex_routed_file_is_valid_png(self, tmp_path):
         """长 hex 自动路由产出的文件是真 PNG (magic 头 + 可被 zbar/file 识别)."""
@@ -308,21 +316,19 @@ class TestRouteHexToFileSamedir:
         from automisc.tools.shared.strings import StringsAdapter
         a = StringsAdapter()
         r = a.run(str(f))
-        # 找 saved=
-        saved_line = next(
-            (l for l in r.stdout.splitlines() if "saved=" in l), None
-        )
-        assert saved_line is not None, f"应该有 saved= 行, 实际 stdout: {r.stdout!r}"
+        # v0.5-hex-router-journal (per Owner 14:43):
+        # saved 路径已从 stdout 改走 metadata.written_files
+        assert "saved=" not in r.stdout
+        assert "written_files" in r.metadata
+        assert len(r.metadata["written_files"]) == 1
+        wf = r.metadata["written_files"][0]
+        saved_path = wf["path"]
         # saved 应在 f.parent (samedir)
-        assert str(f.parent) in saved_line, f"saved 不在 samedir: {saved_line}"
+        assert Path(saved_path).parent.resolve() == f.parent.resolve(), \
+            f"saved 不在 samedir: {saved_path} vs {f.parent}"
         # 不应在 /private/var/folders (旧 gettempdir)
-        assert "/private/var/folders" not in saved_line
-
+        assert "/private/var/folders" not in saved_path
         # cleanup
         from automisc.core.utils.output_path import is_in_tmp
-        import re
-        m = re.search(r"saved=(\S+?)(?:,|\s|$)", saved_line)
-        if m:
-            saved_path = m.group(1)
-            if not is_in_tmp(saved_path):
-                Path(saved_path).unlink(missing_ok=True)
+        if not is_in_tmp(saved_path):
+            Path(saved_path).unlink(missing_ok=True)

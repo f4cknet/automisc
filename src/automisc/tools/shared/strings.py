@@ -60,9 +60,13 @@ class StringsAdapter(ToolAdapter):
         suspicious = self._scan_with_rule_scanner(file_path, raw_stdout)
 
         # v0.5-truncate-output: 渲染版 stdout (只显示命中行 + summary, 不显示 raw)
-        rendered_stdout = self._render_output(raw_stdout, suspicious, file_path=file_path)
+        # v0.5-hex-router-journal: 返回 tuple (rendered, written_files)
+        #   written_files 给 GUI caller 推 journal + status bar, 不再混进 stdout
+        rendered_stdout, written_files = self._render_output(
+            raw_stdout, suspicious, file_path=file_path
+        )
 
-        return ToolResult(
+        result = ToolResult(
             tool_name=self.name,
             exit_code=exit_code,
             stdout=rendered_stdout,
@@ -70,6 +74,12 @@ class StringsAdapter(ToolAdapter):
             suspicious_points=suspicious,
             duration_ms=duration_ms,
         )
+        # 推 written_files 到 metadata
+        for wf in written_files:
+            result.add_written_file(
+                path=wf["path"], kind=wf["kind"], source=wf.get("source", "strings")
+            )
+        return result
 
     def _scan_with_rule_scanner(
         self, file_path: str, stdout: str
@@ -122,7 +132,7 @@ class StringsAdapter(ToolAdapter):
                 )
         return results
 
-    def _render_output(self, raw_stdout: str, suspicious: list[SuspiciousPoint], file_path: str = "") -> str:
+    def _render_output(self, raw_stdout: str, suspicious: list[SuspiciousPoint], file_path: str = ""):
         """v0.5-truncate-output: 渲染版 stdout.
 
         Args:
@@ -131,31 +141,41 @@ class StringsAdapter(ToolAdapter):
             file_path: 输入文件路径 (用于提示 "想看原文: strings -a -n 4 <file>")
 
         Returns:
-            渲染版: header + 命中行 (max MAX_RENDERED_HITS) + summary
-            (省略 raw 中未命中行, 防大文件占满窗口)
+            v0.5-hex-router-journal (per Owner 14:43) tuple:
+                (rendered_stdout: str, written_files: list[dict])
+            - rendered_stdout: header + 命中行 (max MAX_RENDERED_HITS) + summary
+              (省略 raw 中未命中行, 防大文件占满窗口)
+            - written_files: [{"path", "kind", "source"}] 给 caller 推 journal + status bar
 
         v0.5-hex-router (2026-06-14 13:39 per Owner):
         - 短 hex 串 (< HEX_AUTO_ROUTER_MIN_LEN=200): 仍打印 L<line>: <前 200 字符>
-        - 长 hex 串 (>= 200): **不打印** 实际内容, 提示 "已 hex_router 自动写文件到 /tmp/..."
+        - 长 hex 串 (>= 200): **不打印** 实际内容, 提示 "已 hex_router 自动处理"
           (避免 35000 字符撑爆 GUI 窗口 + 强制 auto-run 走 DAG 流程)
+
+        v0.5-hex-router-journal (per Owner 14:43):
+        - 长 hex 写文件信息**不**再混进 stdout
+        - 改走 written_files list, GUI caller 推 journal_panel.add_event()
         """
         from automisc.core.actions.hex_router import HEX_AUTO_ROUTER_MIN_LEN
 
         lines = raw_stdout.splitlines()
         total_lines = len(lines)
+        # v0.5-hex-router-journal: 长 hex 写文件信息 (给 caller 推 journal)
+        written_files: list[dict] = []
 
         if not suspicious:
             return (
                 f"=== strings 摘要 (v0.5-truncate-output) ===\n"
                 f"  total_lines: {total_lines}\n"
                 f"  suspicious: 0\n"
-                f"  └─ 无可疑特征, raw stdout 已省略 (想看原文: `strings -a -n 4 {file_path}`)\n"
+                f"  └─ 无可疑特征, raw stdout 已省略 (想看原文: `strings -a -n 4 {file_path}`)\n",
+                written_files,
             )
 
         # 提取 line_no from suspicious category (e.g. "hex_line42")
         hit_line_nos: set[int] = set()
-        # 收集 long hex 命中的 line + 自动 trigger hex_router
-        long_hex_routed: list[str] = []  # 自动 trigger 的文件路径
+        # v0.5-hex-router-journal: 收集 long hex 命中的 line + 自动 trigger hex_router
+        # 不再在 stdout 拼 summary 段, 改用 written_files 给 caller
         for sp in suspicious:
             try:
                 ln_str = sp.category.rsplit("_line", 1)[-1]
@@ -180,30 +200,27 @@ class StringsAdapter(ToolAdapter):
                         router_result = route_hex_to_file(
                             hex_text, input_path=file_path
                         )
-                        long_hex_routed.append(
-                            f"L{sp.category.rsplit('_line', 1)[-1]}: {hex_text[:60]}... "
-                            f"-> magic={router_result.magic}, "
-                            f"saved={router_result.output_path}, "
-                            f"follow_up={router_result.follow_up_stdout or router_result.follow_up}"
-                        )
+                        # v0.5-hex-router-journal (per Owner 14:43):
+                        # 不再混进 stdout 拼 summary, 改走 written_files 给 caller 推 journal
+                        written_files.append({
+                            "path": router_result.output_path,
+                            "kind": "hex转文件",
+                            "source": "strings",
+                        })
                     except Exception as e:  # noqa: BLE001
-                        long_hex_routed.append(
-                            f"L{sp.category.rsplit('_line', 1)[-1]}: hex_router failed: {e}"
-                        )
+                        # 失败也记, kind 不同, 让 caller 推 journal
+                        written_files.append({
+                            "path": f"hex_router failed: {e}",
+                            "kind": "hex转文件失败",
+                            "source": "strings",
+                        })
 
-        # 拼渲染版
+        # 拼渲染版 (不再含 v0.5-hex-router summary 段, 改走 journal)
         out_lines = [
             f"=== strings 摘要 (v0.5-truncate-output) ===",
             f"  total_lines: {total_lines}",
             f"  suspicious:  {len(suspicious)} (raw stdout 1000+ 行已省略, 只显示命中行)",
         ]
-        if long_hex_routed:
-            out_lines.extend([
-                "",
-                f"--- v0.5-hex-router: {len(long_hex_routed)} 个超长 hex 串已自动 route ---",
-            ])
-            for r in long_hex_routed:
-                out_lines.append(f"  {r}")
         out_lines.extend([
             "",
             f"--- 命中行 (max {self.MAX_RENDERED_HITS} 显示) ---",
@@ -231,11 +248,11 @@ class StringsAdapter(ToolAdapter):
                         break
                 if is_long_hex:
                     out_lines.append(
-                        f"  L{line_no}: <hex_router 已自动处理, 见上方 summary>"
+                        f"  L{line_no}: <hex_router 已自动处理, 见下方 Journal>"
                     )
                 else:
                     out_lines.append(f"  L{line_no}: {line_content[:200]}")
                 shown += 1
 
-        return "\n".join(out_lines)
+        return "\n".join(out_lines), written_files
 

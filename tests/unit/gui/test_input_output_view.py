@@ -567,9 +567,33 @@ class TestMainWindowStringsOutputSize:
         text = w.output_view.toPlainText()
         # 关键: total < 2000 字符 (vs 之前的 650802)
         assert len(text) < 2000, f"output_view 不应爆 < 2000 字符, 实际: {len(text)}"
+        # v0.5-hex-router-journal (per Owner 14:43):
+        # stdout 不应再含 'v0.5-hex-router: N 个' / 'saved=' / 'magic=' summary
+        assert "v0.5-hex-router:" not in text, "stdout 不应再含 v0.5-hex-router summary"
+        assert "saved=" not in text, "saved= 已改走 journal"
+        assert "magic=" not in text, "magic= 已改走 journal"
+
+        # 关键: journal_panel 收到 written_files event
+        # 找 kind="hex转文件" 的 row
+        journal = w.journal_panel
+        found_event = False
+        for i in range(journal.tree.topLevelItemCount()):
+            item = journal.tree.topLevelItem(i)
+            if item.text(journal.COL_KIND) == "hex转文件":
+                v = item.text(journal.COL_VALUE)
+                assert "文件保存在" in v
+                assert "hex_router_unknown_" in v
+                assert item.text(journal.COL_FILE) == "meihuai.jpg"
+                found_event = True
+                break
+        assert found_event, "journal 应有 hex_router 写文件事件 (kind=hex转文件)"
 
         # cleanup
         import glob
+        from pathlib import Path as _P
 
         for f in glob.glob("/tmp/automisc_text_outputs/hex_router_*"):
-            f.unlink(missing_ok=True)
+            _P(f).unlink(missing_ok=True)
+        # 也清 samedir
+        for f in glob.glob("Challenge/hex_router_*"):
+            _P(f).unlink(missing_ok=True)

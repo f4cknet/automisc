@@ -171,15 +171,27 @@ class MainWindow(QMainWindow):
         for sp in result.suspicious_points:
             self.journal_panel.add_suspicious(tool_name, self.current_file, sp)
 
-        # v0.5-hex-router-samedir (per Owner 14:24):
-        # 工具写了文件时, status bar 弹提示 (除了 stdout / journal 已含 saved=...)
-        # 让 Owner 看到 'auto-run 写文件到 ...' 知道 samedir
-        if stdout and "saved=" in stdout:
-            import re
-            m = re.search(r"saved=(\S+?)(?:,|\s|$)", stdout)
-            if m:
-                self.statusBar().showMessage(
-                    f"auto-run 写文件: {m.group(1)}", 8000  # 8s 显示
+        # v0.5-hex-router-journal (per Owner 14:43):
+        # 工具写的副作用文件 (e.g. hex_router saved 路径) 推到 journal_panel,
+        # **不**再混在 stdout / output 区. 格式:
+        #   time, tool, file, sev=0, kind="hex转文件", value="文件保存在/path"
+        # 同时 status bar 弹 8s 提示 (除 journal 外的 GUI 可见)
+        written_files = result.metadata.get("written_files", []) if result.metadata else []
+        if written_files:
+            # status bar: 弹最后一条
+            last = written_files[-1]
+            self.statusBar().showMessage(
+                f"auto-run 写文件: {last['path']}", 8000
+            )
+            # journal: 每条都记
+            for wf in written_files:
+                self.journal_panel.add_event(
+                    tool_name=wf.get("source", tool_name),
+                    kind=wf["kind"],
+                    value=f"文件保存在{wf['path']}" if "失败" not in wf["kind"]
+                          else wf["path"],
+                    file_path=self.current_file,
+                    severity=0,  # 信息级, 灰色
                 )
 
     def _on_auto_chain_finished(self, summaries) -> None:
