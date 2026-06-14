@@ -26,3 +26,11 @@ extend_tools/
 *.zip.bak
 *.rar.bak
 
+Challenge/__*__*.jpg
+Challenge/__*__*.jpg
+Challenge/__*__*.png
+Challenge/__*__*.bin
+Challenge/__*__*.zip
+Challenge/__*__*.7z
+Challenge/__*__*.rar
+Challenge/.automisc_*
