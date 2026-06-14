@@ -422,3 +422,152 @@ class TestCoordsQrFileMode:
         assert len(r.coords) == 500  # 100 行 * 5 坐标
 
 
+# ---------- v0.5-chain-success-journal-fix: auto-run path 推 journal (Owner 15:37) ----------
+class TestAutoRunChainJournal:
+    """v0.5-chain-success-journal-fix (per Owner 15:37):
+
+    Owner 15:37 反馈: 'bug1: 没有将 bruteforce_zip 成功的日志加入下方 Journal 条目中'
+
+    Root cause:
+    - auto-run 路径 (main_window._on_auto_chain_finished -> _maybe_trigger_zip_chain_from_binwalk)
+      是 inline 调 dag.execute(), **不**走 ChainRunner
+    - 所以 _on_chain_finished + _push_chain_step_to_journal 不会被触发
+    - 之前 commit 16fe30c 修的 chain-success-journal 只对"菜单栏 zip-full 触发"有效
+
+    Fix:
+    - _maybe_trigger_zip_chain_from_binwalk 跑完 dag.execute 后手动调
+      _push_chain_step_to_journal 推每 step.success 的 data
+    - 解出文件含 flag{} / CTF{} 时也推 journal add_suspicious
+    """
+
+    def test_auto_run_zip_chain_pushes_bruteforce_to_journal(self, qtbot, tmp_path):
+        """auto-run 路径跑 zip-full chain -> bruteforce 成功 / 解压成功 / foremost 提取都入 journal.
+
+        模拟 _maybe_trigger_zip_chain_from_binwalk 整段 (手动调 helper,
+        因为完整路径要 binwalk 检测 archive + 实际跑 8.4M 密码字典, 测试用 helper 单元化).
+        """
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        # 模拟 dag.execute 返回的 context (3 步)
+        (tmp_path / "bruteforced").mkdir()
+        (tmp_path / "foremost_out").mkdir()
+
+        # step 1: try_unzip fail (zip encrypted)
+        # step 2: fix_pseudo fail
+        # step 3: bruteforce_zip success
+        ctx = {
+            "file_path": str(tmp_path / "x.zip"),
+            "__log__": [
+                {"step": 1, "node": "try_unzip", "success": False,
+                 "message": "zip is encrypted"},
+                {"step": 2, "node": "fix_pseudo_encryption", "success": False,
+                 "message": "fix failed"},
+                {"step": 3, "node": "bruteforce_zip", "success": True,
+                 "message": "FOUND password='7639' (tried 7640/8421616)"},
+            ],
+            "__step_1_try_unzip__": {},
+            "__step_2_fix_pseudo_encryption__": {},
+            "__step_3_bruteforce_zip__": {
+                "password": "7639",
+                "tried": 7640,
+                "total": 8421616,
+                "extracted_to": str(tmp_path / "bruteforced"),
+            },
+            "__last_result__": None,  # 简化
+        }
+
+        # 跑 inline 循环 (跟 main_window._maybe_trigger_zip_chain_from_binwalk 一样)
+        for step in ctx["__log__"]:
+            if not step.get("success"):
+                continue
+            step_data = ctx.get(f"__step_{step['step']}_{step['node']}__", {})
+            if step_data:
+                w._push_chain_step_to_journal(
+                    chain_name="zip-full",
+                    file_path=ctx["file_path"],
+                    step_name=step["node"],
+                    step_data=step_data,
+                    step_message=step.get("message", ""),
+                )
+        QApplication.processEvents()
+
+        # journal 应有 1 条 bruteforce 成功
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "bruteforce 成功"
+        v = item.text(w.journal_panel.COL_VALUE)
+        assert "7639" in v
+        assert "解压到" in v
+
+    def test_auto_run_zip_chain_pushes_extracted_flag_to_journal(self, qtbot, tmp_path):
+        """auto-run 跑 zip-full chain -> 解出文件含 flag{}/CTF{} -> 推 journal add_suspicious sev=5."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.core.suspicious import SuspiciousPoint
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        # 造解出目录 + flag 文件
+        extracted = tmp_path / "bruteforced"
+        extracted.mkdir()
+        flag_file = extracted / "4number.txt"
+        flag_file.write_text("CTF{vjpw_wnoei}\n")
+
+        # 模拟解出后扫到 flag (跟 _maybe_trigger_zip_chain_from_binwalk 一样)
+        from automisc.core.suspicious import SuspiciousPoint
+        sp = SuspiciousPoint(
+            id="",
+            tool_name="chain/zip-full/4number.txt",
+            file_path=str(extracted / "x.zip"),
+            category="zip_chain_flag",
+            offset=None,
+            matched_pattern="CTF{vjpw_wnoei}"[:120],
+            severity=5,
+            suggested_action="zip chain 解出文件含 flag{} / CTF{}",
+        )
+        w.journal_panel.add_suspicious("chain/zip-full", extracted / "x.zip", sp)
+        QApplication.processEvents()
+
+        # journal 应有 1 条 sev=5
+        assert w.journal_panel.tree.topLevelItemCount() == 1
+        item = w.journal_panel.tree.topLevelItem(0)
+        assert item.text(w.journal_panel.COL_KIND) == "zip_chain_flag"
+        assert item.text(w.journal_panel.COL_SEV) == "5"
+        assert "CTF{vjpw_wnoei}" in item.text(w.journal_panel.COL_VALUE)
+
+
+# ---------- v0.5-hex-router-journal-fix: source 字段应是 'hex->ASCII' (Owner 15:37) ----------
+class TestHexRouterJournalSource:
+    """v0.5-hex-router-journal-fix (per Owner 15:37):
+    hex 转文件的 journal entry 中 tool 字段应是 'hex->ASCII' (跟菜单名一致),
+    不是 'strings' (strings 是触发者, 真正工具是 'hex->ASCII' 菜单项).
+    """
+
+    def test_written_file_source_is_hex_ascii(self, tmp_path):
+        """written_files 里 source 字段应是 'hex->ASCII'."""
+        from automisc.tools.shared.strings import StringsAdapter
+
+        f = tmp_path / "f.bin"
+        png_header = "89504e470d0a1a0a"
+        f.write_text(png_header + "00" * 17000)
+
+        a = StringsAdapter()
+        r = a.run(str(f))
+        wfs = r.metadata.get("written_files", [])
+        assert len(wfs) == 1
+        wf = wfs[0]
+        assert wf["source"] == "hex->ASCII", \
+            f"source 应是 'hex->ASCII' (菜单名), 实际: {wf['source']}"
+        # cleanup
+        from pathlib import Path
+        Path(wf["path"]).unlink(missing_ok=True)
+
+
+

@@ -202,17 +202,21 @@ class StringsAdapter(ToolAdapter):
                         )
                         # v0.5-hex-router-journal (per Owner 14:43):
                         # 不再混进 stdout 拼 summary, 改走 written_files 给 caller 推 journal
+                        # v0.5-hex-router-journal-fix (per Owner 15:37):
+                        # tool 字段应是 'hex->ASCII' (跟菜单名一致), 不是 'strings'
+                        # 因为 hex_router 是 strings 触发的内部子动作, 真正的"工具"是
+                        # 'hex->ASCII' (menu 中 Tools 菜单的 🔢 Hex → ASCII 简称)
                         written_files.append({
                             "path": router_result.output_path,
                             "kind": "hex转文件",
-                            "source": "strings",
+                            "source": "hex->ASCII",
                         })
                     except Exception as e:  # noqa: BLE001
                         # 失败也记, kind 不同, 让 caller 推 journal
                         written_files.append({
                             "path": f"hex_router failed: {e}",
                             "kind": "hex转文件失败",
-                            "source": "strings",
+                            "source": "hex->ASCII",
                         })
 
         # 拼渲染版 (不再含 v0.5-hex-router summary 段, 改走 journal)

@@ -289,6 +289,23 @@ class MainWindow(QMainWindow):
                 self.output_view.append_text(
                     f"  [{step['step']}] {step['node']}: {step['message']}\n"
                 )
+            # v0.5-chain-success-journal-fix (per Owner 15:37):
+            # auto-run 路径 inline 调 dag.execute, **不**走 ChainRunner, 所以
+            # _on_chain_finished + _push_chain_step_to_journal 不会被触发
+            # 手动调 helper 推 journal (bruteforce 成功 / 解压成功 / foremost 提取)
+            for step in log:
+                if not step.get("success"):
+                    continue
+                step_data = ctx.get(f"__step_{step['step']}_{step['node']}__", {})
+                if step_data:
+                    self._push_chain_step_to_journal(
+                        chain_name="zip-full",
+                        file_path=zip_path,
+                        step_name=step["node"],
+                        step_data=step_data,
+                        step_message=step.get("message", ""),
+                    )
+
             # 渲染 flag_candidate (如果 lsb chain 抽到) - 但 zip chain 没这字段
             last_result = ctx.get("__last_result__")
             if last_result and last_result.data:
@@ -308,6 +325,22 @@ class MainWindow(QMainWindow):
                                         self.output_view.append_flag_candidate(
                                             content.strip()[:200],
                                             channel=f"zip_chain/{f.name}",
+                                        )
+                                        # v0.5-chain-success-journal-fix (per Owner 15:37):
+                                        # 推到 journal add_suspicious (sev=5, kind=zip_chain_flag)
+                                        from automisc.core.suspicious import SuspiciousPoint
+                                        sp = SuspiciousPoint(
+                                            id="",
+                                            tool_name=f"chain/zip-full/{f.name}",
+                                            file_path=zip_path,
+                                            category="zip_chain_flag",
+                                            offset=None,
+                                            matched_pattern=content.strip()[:120],
+                                            severity=5,
+                                            suggested_action="zip chain 解出文件含 flag{} / CTF{}",
+                                        )
+                                        self.journal_panel.add_suspicious(
+                                            f"chain/zip-full", Path(zip_path), sp
                                         )
                                 except Exception:
                                     pass

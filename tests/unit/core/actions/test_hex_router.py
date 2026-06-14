@@ -208,7 +208,9 @@ class TestStringsAdapterIntegration:
         assert len(r.metadata["written_files"]) == 1
         wf = r.metadata["written_files"][0]
         assert wf["kind"] == "hex转文件"
-        assert wf["source"] == "strings"
+        # v0.5-hex-router-journal-fix (per Owner 15:37): source 改 'hex->ASCII'
+        # (跟菜单名一致, 不是 'strings' 因为 strings 是触发者, hex->ASCII 才是工具)
+        assert wf["source"] == "hex->ASCII"
         assert Path(wf["path"]).exists()
         # cleanup routed file
         import glob
