@@ -274,22 +274,18 @@ class TestMainWindowIntegration:
 
 # ---------- v0.5-hex-ascii-fix 端到端 ----------
 class TestHexAsciiMenuE2E:
-    def test_menu_hex_ascii_uses_input_not_current_file(self, qtbot, tmp_path, monkeypatch):
+    def test_menu_hex_ascii_uses_input_not_current_file(self, qtbot, tmp_path):
         """核心修复: 菜单栏 [hex-ascii] 走 input 区, 不会读 current_file.
 
         场景 (per Owner 2026-06-14 09:50):
         1. 拖 meihuai.jpg -> auto_run 出 hex
         2. Clear + 粘贴 '28372c37290a' 到 input 区
         3. 点菜单 [hex-ascii] -> 应解 input 区出 (7,7), 不应读 meihuai.jpg
-        """
-        from PySide6.QtWidgets import QApplication, QFileDialog
 
-        # v0.5-tmp-text-mode: monkey-patch QFileDialog 返回 tmp_path (避免弹 native dialog 卡住)
-        monkeypatch.setattr(
-            QFileDialog,
-            "getExistingDirectory",
-            staticmethod(lambda *args, **kwargs: str(tmp_path)),
-        )
+        v0.5-tmp-text-mode-2 (per Owner 12:44): hex-ascii 不输出文件,
+        **不**弹 QFileDialog. Test 不需要 monkey-patch dialog.
+        """
+        from PySide6.QtWidgets import QApplication
 
         w = MainWindow()
         qtbot.addWidget(w)
@@ -331,17 +327,11 @@ class TestHexAsciiMenuE2E:
         assert "detected_format" in out
         assert "hex" in out
 
-    def test_menu_hex_ascii_empty_input_no_current_file_read(self, qtbot, tmp_path, monkeypatch):
-        """input 区空 + current_file=meihuai.jpg: 不读 current_file, 提示 'input is empty'."""
-        from PySide6.QtWidgets import QFileDialog
+    def test_menu_hex_ascii_empty_input_no_current_file_read(self, qtbot, tmp_path):
+        """input 区空 + current_file=meihuai.jpg: 不读 current_file, 提示 'input is empty'.
 
-        # v0.5-tmp-text-mode: monkey-patch 避免弹 native dialog
-        monkeypatch.setattr(
-            QFileDialog,
-            "getExistingDirectory",
-            staticmethod(lambda *args, **kwargs: str(tmp_path)),
-        )
-
+        v0.5-tmp-text-mode-2: hex-ascii 不弹 QFileDialog (不写文件).
+        """
         w = MainWindow()
         qtbot.addWidget(w)
         meihuai = Path("Challenge/meihuai.jpg")
@@ -354,6 +344,49 @@ class TestHexAsciiMenuE2E:
         # 应提示 input 区为空, **不应**去读 meihuai.jpg (否则 233KB 卡死 + 乱码)
         assert "input 区为空" in out or "input is empty" in out
         assert "粘贴" in out or "paste" in out.lower()
+
+    def test_hex_ascii_no_qfiledialog_no_write_file(self, qtbot, tmp_path):
+        """v0.5-tmp-text-mode-2 (per Owner 12:44): hex-ascii 不输出文件 -> 不弹 QFileDialog.
+
+        之前 (v0.5-tmp-text-mode) 所有 text-based 都弹 dialog, 不合理.
+        修后: 仅 spec.run 签名带 output_dir 的 decoder 才弹 (即"真要写文件"才弹).
+        """
+        from PySide6.QtWidgets import QFileDialog, QApplication
+
+        # 标记是否被调用
+        dialog_called = {"flag": False}
+
+        def fake_dialog(*args, **kwargs):
+            dialog_called["flag"] = True
+            return str(tmp_path)
+
+        original = QFileDialog.getExistingDirectory
+        QFileDialog.getExistingDirectory = staticmethod(fake_dialog)
+        try:
+            w = MainWindow()
+            qtbot.addWidget(w)
+            QApplication.clipboard().setText("28372c37290a")  # 真实 hex
+            w.output_view.paste_clipboard()
+            # 调 _run_decoder 但 input 有内容, 跑 hex-ascii -> 不应弹 dialog
+            # 等 signal 避免 race
+            w._decode_runner = None
+            w._run_decoder("hex-ascii")
+            signal_received = {"flag": False}
+            if w._decode_runner:
+                w._decode_runner.finished_with_result.connect(
+                    lambda *args: signal_received.__setitem__("flag", True)
+                )
+                qtbot.waitUntil(lambda: signal_received["flag"], timeout=10_000)
+            QApplication.processEvents()
+
+            # QFileDialog **不应**被调用 (hex-ascii 不写文件)
+            assert dialog_called["flag"] is False, \
+                f"hex-ascii 不写文件, 不应弹 QFileDialog (但被调用了)"
+            # 但 output 应有 (7,7)
+            out = w.output_view.toPlainText()
+            assert "(7,7)" in out
+        finally:
+            QFileDialog.getExistingDirectory = original
 
 
 # ---------- v0.5-clear-on-new-file: 拖入新文件清空旧 output ----------

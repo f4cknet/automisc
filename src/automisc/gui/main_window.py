@@ -701,31 +701,53 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # v0.5-tmp-text-mode: 弹 QFileDialog 让用户选 output 目录
-            # 之前没弹, GUI 默认写到无关的 current_file 同目录 (误导)
+            # v0.5-tmp-text-mode-2 (per Owner 12:44): QFileDialog 只在 decoder 真有文件输出时弹
+            # - hex-ascii / base_convert: result 是 string, 不写文件 -> 不弹
+            # - coords-qr: result 含 output_path (写 PNG) -> 弹
+            from automisc.core.decoders.registry import get_decoder
             from PySide6.QtWidgets import QFileDialog
-            out_dir = QFileDialog.getExistingDirectory(
-                self,
-                f"选择 {decoder_name} 输出目录 (text 模式无 current_file)",
-                str(self.output_dir_for_text_decoder),  # 上次选的 / 默认 cwd
-            )
-            if not out_dir:
-                self.statusBar().showMessage("已取消 (没选 output dir)")
-                self.output_view.append_text(
-                    f"\n=== Decoder: {decoder_name} (text mode) ===\n"
-                    f"[!] 用户取消 QFileDialog, 没选 output dir\n"
-                )
-                return
-            self.output_dir_for_text_decoder = out_dir  # 记住
+            spec = get_decoder(decoder_name)
+            produces_file = False
+            if spec and "output_path" in spec.description.lower():
+                # 简单 heuristic: description 提 output_path 就是有文件输出
+                produces_file = True
+            # 更稳: 直接看 spec 的 run 签名是否接 output_dir (v0.5+ 约定)
+            if spec:
+                import inspect
+                sig = inspect.signature(spec.run)
+                produces_file = "output_dir" in sig.parameters
 
-            self.statusBar().showMessage(
-                f"running decoder={decoder_name} (text mode, len={len(candidate)}, out_dir={out_dir})…"
+            out_dir = None
+            if produces_file:
+                out_dir = QFileDialog.getExistingDirectory(
+                    self,
+                    f"选择 {decoder_name} 输出目录 (text 模式无 current_file)",
+                    str(self.output_dir_for_text_decoder),  # 上次选的 / 默认 cwd
+                )
+                if not out_dir:
+                    self.statusBar().showMessage("已取消 (没选 output dir)")
+                    self.output_view.append_text(
+                        f"\n=== Decoder: {decoder_name} (text mode) ===\n"
+                        f"[!] 用户取消 QFileDialog, 没选 output dir\n"
+                    )
+                    return
+                self.output_dir_for_text_decoder = out_dir  # 记住
+
+            status_msg = (
+                f"running decoder={decoder_name} (text mode, len={len(candidate)}, "
+                f"out_dir={out_dir})…"
+            ) if out_dir else (
+                f"running decoder={decoder_name} (text mode, len={len(candidate)})…"
             )
-            self.output_view.append_text(
+            self.statusBar().showMessage(status_msg)
+
+            out_line = (
                 f"\n=== Decoder: {decoder_name} (text mode) ===\n"
                 f"  input_len: {len(candidate)} chars\n"
-                f"  out_dir:   {out_dir}\n"
             )
+            if out_dir:
+                out_line += f"  out_dir:   {out_dir}\n"
+            self.output_view.append_text(out_line)
 
             self._decode_runner = DecodeRunner(
                 decoder_name=decoder_name,
