@@ -49,3 +49,7 @@ Challenge/hex_router_*
 Challenge/*_bruteforced/
 Challenge/*_unzipped/
 Challenge/*.bak
+
+# v0.5-coords-qr-file-mode: coords-qr CLI / GUI 跑出的 PNG
+Challenge/coords_qr_*
+Challenge/*__coords_qr.png
