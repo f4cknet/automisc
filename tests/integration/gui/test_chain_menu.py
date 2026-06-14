@@ -132,15 +132,21 @@ class TestMainWindowChain:
         qtbot.addWidget(window)
         window.current_file = Path(sample_steg_png)
 
+        # 等 finished_with_context 信号 -> 渲染 slot 已执行 -> 再 check
+        # (避免 race: isRunning()=False 时 slot 还没排到 Qt 事件循环)
+        signal_received = {"flag": False}
+        window._chain_runner = None  # 让 _run_chain 自己 new
         window._run_chain("lsb")
-        # 等待 ChainRunner 跑完
-        qtbot.waitUntil(
-            lambda: window._chain_runner is None
-            or not window._chain_runner.isRunning(),
-            timeout=30_000,
+        # 拿到 _chain_runner (在 _run_chain 内部 new), 接信号
+        from PySide6.QtWidgets import QApplication
+        runner = window._chain_runner
+        assert runner is not None
+        runner.finished_with_context.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
-        if window._chain_runner:
-            window._chain_runner.wait()
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=30_000)
+        # 等一帧 Qt 事件循环让 slot 执行完
+        QApplication.processEvents()
 
         output_text = window.output_view.toPlainText()
         # 应有 chain log + summary

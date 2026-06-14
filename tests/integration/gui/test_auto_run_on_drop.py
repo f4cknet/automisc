@@ -36,6 +36,7 @@ class TestAutoRunOnDrop:
 
         from PySide6.QtCore import QMimeData, QPoint, QUrl
         from PySide6.QtGui import QDropEvent
+        from PySide6.QtWidgets import QApplication
 
         mime = QMimeData()
         mime.setUrls([QUrl.fromLocalFile(str(sample_text))])
@@ -44,12 +45,15 @@ class TestAutoRunOnDrop:
         )
         w.dropEvent(event)
 
-        # 跑完 auto-run（文字文件 router 推荐 7 个但 max_tools=5 → 5 个）
-        qtbot.waitUntil(
-            lambda: w._auto_runner is not None
-            and not w._auto_runner.isRunning(),
-            timeout=10000,
+        # 等 chain_finished 信号 (避免 race: isRunning()=False 时 slot 还没排到事件循环)
+        signal_received = {"flag": False}
+        # 拿到 _auto_runner 后接信号
+        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
+        w._auto_runner.chain_finished.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
+        QApplication.processEvents()
 
         # 验证 output 区有 router 推荐 + auto-run 结果
         text = w.output_view.toPlainText()
@@ -67,6 +71,7 @@ class TestAutoRunOnDrop:
 
         from PySide6.QtCore import QMimeData, QPoint, QUrl
         from PySide6.QtGui import QDropEvent
+        from PySide6.QtWidgets import QApplication
 
         mime = QMimeData()
         mime.setUrls([QUrl.fromLocalFile(str(sample_png))])
@@ -75,11 +80,13 @@ class TestAutoRunOnDrop:
         )
         w.dropEvent(event)
 
-        qtbot.waitUntil(
-            lambda: w._auto_runner is not None
-            and not w._auto_runner.isRunning(),
-            timeout=10000,
+        signal_received = {"flag": False}
+        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
+        w._auto_runner.chain_finished.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
+        QApplication.processEvents()
 
         # 推荐 zsteg/steghide 跑过（无 fixture，zsteg 可能 exit_code != 0 但 tool 应跑过）
         text = w.output_view.toPlainText()
@@ -115,6 +122,7 @@ class TestAutoRunOnDrop:
 
         from PySide6.QtCore import QMimeData, QPoint, QUrl
         from PySide6.QtGui import QDropEvent
+        from PySide6.QtWidgets import QApplication
 
         mime = QMimeData()
         mime.setUrls([QUrl.fromLocalFile(str(sample_text))])
@@ -123,11 +131,13 @@ class TestAutoRunOnDrop:
         )
         w.dropEvent(event)
 
-        qtbot.waitUntil(
-            lambda: w._auto_runner is not None
-            and not w._auto_runner.isRunning(),
-            timeout=10000,
+        signal_received = {"flag": False}
+        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
+        w._auto_runner.chain_finished.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
+        QApplication.processEvents()
 
         # journal 至少 1 条 (strings 跑出 flag)
         assert w.journal_panel.tree.topLevelItemCount() >= 1

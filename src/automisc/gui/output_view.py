@@ -1,10 +1,40 @@
-"""输出区（中央 QPlainTextEdit）— 工具 stdout + suspicious_points 高亮."""
+"""输出/输入区（中央 widget）— v0.5-IO-widget.
+
+设计 (per Owner 2026-06-14):
+- 中央 widget 同时支持:
+  1. **工具输出** —— 跟之前一样 append_text/append_suspicious/append_chain_log...
+  2. **人工输入** —— 拖入文件识别出 hex 后, 用户能清空 + 粘贴自己的 hex + 点 hex→ASCII 按钮出 text
+  3. **Clear 按钮** —— 一键清空
+  4. **Paste 按钮** —— 显式 paste
+  5. **Hex→ASCII 按钮** —— 当前 input 区 text -> base_convert.convert_text_to_ascii
+  6. **Read-only toggle** —— 切到 "input mode" 才能编辑, 切回 "output mode" 防止误改
+
+布局:
+```
++----------------------------------------+
+| [Clear] [Paste] [Read-only OFF] [Hex→ASCII] |  <- 顶 bar
++----------------------------------------+
+|                                        |
+|  QPlainTextEdit (output + 可编辑 input)|
+|                                        |
++----------------------------------------+
+```
+
+历史 API 兼容 (append_text / append_suspicious / append_result / ...):
+- 全部保留, 不破坏现有 _on_chain_finished / _on_runner_finished 等调用
+"""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from automisc.core.result import ToolResult
 from automisc.core.suspicious import SuspiciousPoint
@@ -20,31 +50,74 @@ SEVERITY_COLORS: dict[int, QColor] = {
 }
 
 
-class OutputView(QPlainTextEdit):
-    """automisc 输出区（中央）。
+class InputOutputView(QWidget):
+    """automisc 中央 widget (v0.5-IO-widget).
 
-    支持：
-    - append_text  普通文本
-    - append_suspicious  按 severity 高亮
+    提供:
+    - append_text / append_suspicious / append_result (v0.1 兼容)
+    - append_flag_candidate / append_lsb_text / append_chain_log / append_chain_summary (v0.5 兼容)
+    - clear() / paste_clipboard() / run_hex_to_ascii() (v0.5+ 新)
+    - toPlainText() (用于 hex→ASCII 输入)
+    - read_only toggle (默认 True, 用户切换后可编辑)
     """
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setReadOnly(True)
-        self.setFont(QFont("Menlo", 11))
-        # 深色背景便于看高亮
-        self.setStyleSheet(
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        # 顶 bar: 按钮
+        bar = QHBoxLayout()
+        bar.setContentsMargins(4, 4, 4, 4)
+
+        self.btn_clear = QPushButton("Clear")
+        self.btn_clear.setToolTip("清空 output/input 区")
+        self.btn_clear.clicked.connect(self.clear)
+        bar.addWidget(self.btn_clear)
+
+        self.btn_paste = QPushButton("Paste")
+        self.btn_paste.setToolTip("从剪贴板粘贴到光标位置")
+        self.btn_paste.clicked.connect(self.paste_clipboard)
+        bar.addWidget(self.btn_paste)
+
+        # Read-only toggle
+        self.btn_readonly = QPushButton("Read-only: ON")
+        self.btn_readonly.setCheckable(True)
+        self.btn_readonly.setChecked(True)
+        self.btn_readonly.setToolTip("ON=锁住防止误改 (默认); OFF=可编辑用作 input")
+        self.btn_readonly.toggled.connect(self._toggle_readonly)
+        bar.addWidget(self.btn_readonly)
+
+        bar.addStretch()
+
+        # Hex → ASCII 按钮 (Owner 2026-06-14 需求)
+        self.btn_hex_ascii = QPushButton("Hex → ASCII")
+        self.btn_hex_ascii.setToolTip("把当前 input 区文本当 hex/binary/base64/base32 转换 → ASCII")
+        self.btn_hex_ascii.clicked.connect(self.run_hex_to_ascii)
+        bar.addWidget(self.btn_hex_ascii)
+
+        layout.addLayout(bar)
+
+        # 中央 text edit
+        self.text_edit = QPlainTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setFont(QFont("Menlo", 11))
+        self.text_edit.setStyleSheet(
             "QPlainTextEdit { background-color: #1e1e1e; color: #d4d4d4; }"
         )
-        self.setMaximumBlockCount(5000)  # 限制最大行数
+        self.text_edit.setMaximumBlockCount(5000)
+        layout.addWidget(self.text_edit)
 
+    # ---------- 兼容 OutputView API (历史 append_* 方法) ----------
     def append_text(self, text: str) -> None:
         """追加普通文本."""
-        self.appendPlainText(text.rstrip("\n"))
+        self.text_edit.appendPlainText(text.rstrip("\n"))
 
     def append_suspicious(self, sp: SuspiciousPoint) -> None:
-        """追加 suspicious point（按 severity 高亮）."""
-        cursor = self.textCursor()
+        """追加 suspicious point (按 severity 高亮)."""
+        cursor = self.text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
 
         color = SEVERITY_COLORS.get(sp.severity, QColor("white"))
@@ -52,7 +125,6 @@ class OutputView(QPlainTextEdit):
         fmt.setForeground(color)
         fmt.setFontWeight(QFont.Bold)
 
-        # 实际 schema：category + matched_pattern + context
         text = f"  [{sp.severity}] {sp.category}: {sp.matched_pattern}"
         if sp.context:
             text += f"  ({sp.context})"
@@ -60,7 +132,7 @@ class OutputView(QPlainTextEdit):
         cursor.insertText("\n")
 
     def append_result(self, result: ToolResult) -> None:
-        """完整结果输出（stdout + suspicious_points）."""
+        """完整结果输出 (stdout + suspicious_points)."""
         self.append_text(f"exit_code: {result.exit_code}")
         if result.stdout:
             self.append_text(result.stdout.rstrip("\n"))
@@ -71,21 +143,15 @@ class OutputView(QPlainTextEdit):
         for sp in result.suspicious_points:
             self.append_suspicious(sp)
 
-    # ---------- v0.5 chain 输出辅助 (GUI 同步 CLI) ----------
     def append_flag_candidate(self, candidate: str, channel: str = "") -> None:
-        """高亮打印 flag 候选 (v0.5-LSB-router 触发).
-
-        Args:
-            candidate: 候选 flag 字符串
-            channel: LSB 通道 (e.g. "b1,rgb,lsb,xy")
-        """
-        cursor = self.textCursor()
+        """高亮打印 flag 候选 (v0.5-LSB-router 触发)."""
+        cursor = self.text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
 
         fmt = QTextCharFormat()
-        fmt.setForeground(QColor(255, 64, 64))  # 致命红
+        fmt.setForeground(QColor(255, 64, 64))
         fmt.setFontWeight(QFont.Bold)
-        fmt.setBackground(QColor(80, 0, 0))  # 深红背景
+        fmt.setBackground(QColor(80, 0, 0))
 
         text = f"\n[!!! FLAG CANDIDATE !!!] {candidate}"
         if channel:
@@ -94,35 +160,25 @@ class OutputView(QPlainTextEdit):
         cursor.insertText("\n")
 
     def append_lsb_text(self, lsb_text: str, channel: str = "") -> None:
-        """v0.5-bug-fix-3: LSB 抽到的整段 text 高亮显示 + 敏感词特别标记.
-
-        Bug 现象: LSB 抽到 "...the secret key is: st3g0..." 整段被当普通颜色显示,
-                  关键字 secret/key 不突出.
-        修复: 整段用深黄底色高亮 + 敏感关键词 (key/flag/secret/ctf/password)
-              用更深的红底+粗体额外标记.
-
-        Args:
-            lsb_text: LSB 抽到的整段 text
-            channel: LSB 通道 (e.g. "b1,rgb,lsb,xy")
-        """
+        """v0.5-bug-fix-3: LSB 抽到的整段 text 高亮 + 敏感词额外标记."""
         from automisc.core.utils.rule_scanner import _SENSITIVE_KEYWORDS
-        cursor = self.textCursor()
+        cursor = self.text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
 
         # 标题
         fmt_title = QTextCharFormat()
-        fmt_title.setForeground(QColor(255, 215, 0))  # 金黄
+        fmt_title.setForeground(QColor(255, 215, 0))
         fmt_title.setFontWeight(QFont.Bold)
         header = f"\n[LSB text] channel={channel or '?'}, len={len(lsb_text)}\n"
         cursor.insertText(header, fmt_title)
 
-        # 整段底色 (浅黄)
+        # 整段底色
         fmt_body = QTextCharFormat()
-        fmt_body.setBackground(QColor(80, 60, 0))  # 深黄底
-        fmt_body.setForeground(QColor(255, 255, 200))  # 浅黄字
+        fmt_body.setBackground(QColor(80, 60, 0))
+        fmt_body.setForeground(QColor(255, 255, 200))
         cursor.insertText(lsb_text, fmt_body)
 
-        # 敏感词额外高亮 (在整段上覆盖)
+        # 敏感词额外高亮
         text_lower = lsb_text.lower()
         for kw in _SENSITIVE_KEYWORDS:
             start = 0
@@ -130,30 +186,23 @@ class OutputView(QPlainTextEdit):
                 idx = text_lower.find(kw, start)
                 if idx < 0:
                     break
-                # 重新定位 cursor 到 idx
                 pos = cursor.position()
-                # 退到整段起点
                 cursor.setPosition(pos - len(lsb_text) + idx, QTextCursor.MoveAnchor)
                 cursor.setPosition(
                     pos - len(lsb_text) + idx + len(kw), QTextCursor.KeepAnchor
                 )
                 fmt_kw = QTextCharFormat()
-                fmt_kw.setBackground(QColor(180, 0, 0))  # 深红底
-                fmt_kw.setForeground(QColor(255, 255, 0))  # 黄字
+                fmt_kw.setBackground(QColor(180, 0, 0))
+                fmt_kw.setForeground(QColor(255, 255, 0))
                 fmt_kw.setFontWeight(QFont.Bold)
                 fmt_kw.setFontUnderline(True)
                 cursor.setCharFormat(fmt_kw)
                 start = idx + len(kw)
-                # cursor 回到末尾
                 cursor.setPosition(pos, QTextCursor.MoveAnchor)
         cursor.insertText("\n")
 
     def append_chain_log(self, log: list[dict]) -> None:
-        """渲染 DAG chain 日志 (step / node / success / message).
-
-        Args:
-            log: DAG.execute 返回的 __log__ 字段
-        """
+        """渲染 DAG chain 日志."""
         for step in log:
             status = "OK  " if step["success"] else "FAIL"
             line = f"  [{step['step']}] {step['node']:<20s} {status}   {step['message']}"
@@ -161,36 +210,157 @@ class OutputView(QPlainTextEdit):
         self.append_text("")
 
     def append_chain_summary(self, context: dict) -> None:
-        """渲染 chain 总结 + flag_candidate (如有)."""
+        """渲染 chain 总结 + flag_candidate."""
         log = context.get("__log__", [])
         total = len(log)
         ok = sum(1 for s in log if s.get("success"))
 
-        # summary
         self.append_text(f"\n--- chain summary ---")
         self.append_text(f"  total:   {total} steps")
         self.append_text(f"  success: {ok}")
         self.append_text(f"  failure: {total - ok}")
 
-        # flag_candidate 高亮 (v0.5-LSB-router)
         last_step = context.get("__last_result__")
         if last_step and last_step.data:
             flag_candidate = last_step.data.get("flag_candidate")
             if flag_candidate:
-                # 找 channel (从 lsb_text)
                 lsb_text = last_step.data.get("lsb_text", {})
                 channel = lsb_text.get("channel", "") if lsb_text else ""
                 self.append_flag_candidate(flag_candidate, channel=channel)
 
-            # extracted_files (binwalk / foremost / lsb file 通道)
             extracted = last_step.data.get("extracted_files", [])
             if extracted:
                 self.append_text(f"  extracted_files: {len(extracted)}")
                 for f in extracted[:5]:
                     self.append_text(f"    - {f}")
 
-        # last_step.data 全部 dump (供调试)
         if last_step and last_step.data and "--debug" in str(context):
             import json
             self.append_text("\n[debug] last step data:")
             self.append_text(json.dumps(last_step.data, indent=2, default=str)[:2000])
+
+    # ---------- v0.5-IO-widget 新增 ----------
+    def clear(self) -> None:
+        """清空 output/input 区."""
+        self.text_edit.clear()
+        self.append_text("[cleared]")
+
+    def paste_clipboard(self) -> None:
+        """从剪贴板粘贴到当前光标位置.
+
+        行为:
+        - 总是先 clear, 再 paste (替代模式 - 用户意图是"用粘贴板内容替换")
+        - paste 后追加 newline 让 run_hex_to_ascii 选最后一行能选中
+        - 如果 read-only, 自动切到可编辑模式 (因为用户要粘贴)
+        """
+        from PySide6.QtWidgets import QApplication
+        cb = QApplication.clipboard()
+        text = cb.text()
+        if not text:
+            self.append_text("[paste] clipboard is empty")
+            return
+        # 如果 read-only, 自动切到可编辑模式 (因为用户要粘贴)
+        if self.text_edit.isReadOnly():
+            self._toggle_readonly(False)
+        # 总是先 clear 旧内容 (per Owner 2026-06-14 设计:
+        # "用户可以删除 input 窗口所有内容, 然后把那串数粘贴进去")
+        self.text_edit.clear()
+        cursor = self.text_edit.textCursor()
+        cursor.insertText(text)
+        # 末尾补 newline 让 run_hex_to_ascii 选最后一行能拿到完整内容
+        if not text.endswith("\n"):
+            cursor.insertText("\n")
+        self.append_text(f"[pasted {len(text)} chars]")
+
+    def run_hex_to_ascii(self) -> None:
+        """把当前 input 区文本当 hex/binary/base64/base32 → ASCII.
+
+        Owner 2026-06-14 真实场景:
+          1. 拖 meihuai.jpg -> 跑 tools, strings 报 hex
+          2. 用户在 output 里看到 hex
+          3. 用户点 [Clear] + 点 [Read-only: OFF] + 点 [Paste] 粘自己复制的 hex
+          4. 点 [Hex → ASCII] -> 输出 (7,7) 等 text
+        """
+        from automisc.core.decoders.base_convert import (
+            BaseConvertError,
+            detect_and_decode,
+        )
+
+        text = self.text_edit.toPlainText().strip()
+        if not text or text == "[cleared]":
+            self.append_text("[hex→ascii] input is empty; please paste some hex/binary/base64/base32 text first")
+            return
+
+        # 选 input 候选: 优先用 selected text; 否则用最后"看起来像 base-encoded"的行
+        cursor = self.text_edit.textCursor()
+        if cursor.hasSelection():
+            candidate = cursor.selectedText().strip()
+        else:
+            # 过滤: 跳过 log 行 ([xxx] / === / 空), 找最后像 base 的非空行
+            def looks_like_base(s: str) -> bool:
+                if not s or len(s) < 2:
+                    return False
+                if s.startswith("[") or s.startswith("=") or s.startswith("---"):
+                    return False
+                # 必须全是 base 字符 (0-9 a-z A-Z + / = \n \r \t 空格)
+                import re
+                return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
+
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            base_lines = [ln for ln in lines if looks_like_base(ln)]
+            # 最后一行 (最像 user 输入)
+            candidate = base_lines[-1] if base_lines else (lines[-1] if lines else text)
+
+        if not candidate:
+            self.append_text("[hex→ascii] no candidate found; please select text or paste base-encoded input")
+            return
+
+        try:
+            fmt, decoded = detect_and_decode(candidate)
+        except BaseConvertError as e:
+            self.append_text(f"[hex→ascii] failed: {e}")
+            self.append_text(f"  input: {candidate[:100]!r}")
+            return
+
+        # 高亮打印
+        cursor = self.text_edit.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        fmt_obj = QTextCharFormat()
+        fmt_obj.setForeground(QColor(0, 255, 128))  # 亮绿
+        fmt_obj.setFontWeight(QFont.Bold)
+        text_out = f"\n[Hex → ASCII] detected={fmt}\n  input:  {candidate[:100]}{'...' if len(candidate) > 100 else ''}\n  output: {decoded}\n"
+        cursor.insertText(text_out, fmt_obj)
+
+    def toPlainText(self) -> str:
+        """兼容 QPlainTextEdit 接口 + 历史 test (w.output_view.toPlainText())."""
+        return self.text_edit.toPlainText()
+
+    def setPlainText(self, text: str) -> None:
+        """兼容 QPlainTextEdit 接口."""
+        self.text_edit.setPlainText(text)
+
+    def appendPlainText(self, text: str) -> None:
+        """兼容 QPlainTextEdit 接口."""
+        self.text_edit.appendPlainText(text)
+
+    # QPlainTextEdit 风格 properties — 让 test 能直接 w.output_view.toPlainText() 工作
+    @property
+    def isReadOnly(self) -> bool:
+        return self.text_edit.isReadOnly()
+
+    def setReadOnly(self, ro: bool) -> None:
+        self.text_edit.setReadOnly(ro)
+        # 同步按钮状态
+        self.btn_readonly.setChecked(ro)
+        self.btn_readonly.setText(f"Read-only: {'ON' if ro else 'OFF'}")
+
+    def _toggle_readonly(self, checked: bool) -> None:
+        """切换 read-only 模式."""
+        self.text_edit.setReadOnly(checked)
+        self.btn_readonly.setText(f"Read-only: {'ON' if checked else 'OFF'}")
+        if not checked:
+            self.append_text("[input mode ON] 可编辑, 用于粘贴待解码文本 (点 [Hex → ASCII] 转换)")
+
+
+# 旧名 alias — 避免破坏外部 import (tests 等)
+OutputView = InputOutputView

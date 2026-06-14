@@ -209,14 +209,18 @@ class TestMainWindowToolsMenu:
         qtbot.addWidget(window)
         window.current_file = Path(sample_key_exe)
 
+        # 等 finished_with_result 信号 (避免 race: isRunning()=False 时 slot 还没排到事件循环)
+        signal_received = {"flag": False}
+        window._decode_runner = None
         window._run_decoder("base64-image")
-        qtbot.waitUntil(
-            lambda: window._decode_runner is None
-            or not window._decode_runner.isRunning(),
-            timeout=15_000,
+        runner = window._decode_runner
+        assert runner is not None
+        runner.finished_with_result.connect(
+            lambda *args: signal_received.__setitem__("flag", True)
         )
-        if window._decode_runner:
-            window._decode_runner.wait()
+        qtbot.waitUntil(lambda: signal_received["flag"], timeout=15_000)
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
         out = window.output_view.toPlainText()
         assert "Decoder: base64-image" in out
