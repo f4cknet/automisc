@@ -61,7 +61,8 @@
 | v0.5-coords-qr | 坐标串 → QR PNG → zbar (菜单栏新增 🔳 QR 工具 分类) | ✅ done | main `ea70001` | [`upgrade/v0.5-coords-qr.md`](upgrade/v0.5-coords-qr.md) |
 | v0.5-truncate-output + v0.5-short-circuit | strings/grep 渲染版 stdout (不打印 raw) + AutoRunner 命中 severity>=5 终止链 | ✅ done | main `386e3c0` | [`upgrade/v0.5-truncate-output.md`](upgrade/v0.5-truncate-output.md) |
 | v0.5-tmp-text-mode | text 模式 (无 file_path) 写 /tmp + GUI 弹 QFileDialog 选 dir | ✅ done | main `abf2ff4` | [`upgrade/v0.5-tmp-text-mode.md`](upgrade/v0.5-tmp-text-mode.md) |
-| v0.5-tmp-text-mode-2 | QFileDialog 只在 decoder 真写文件时弹 (hex-ascii 不弹) | ✅ done | main (待 push) | [`upgrade/v0.5-dialog-when-write-file.md`](upgrade/v0.5-dialog-when-write-file.md) |
+| v0.5-tmp-text-mode-2 | QFileDialog 只在 decoder 真写文件时弹 (hex-ascii 不弹) | ✅ done | main `94794c9` | [`upgrade/v0.5-dialog-when-write-file.md`](upgrade/v0.5-dialog-when-write-file.md) |
+| v0.5-hex-router | strings 命中长 hex (>=200 chars) 自动探测 magic + 写 /tmp + 调 zbar/unzip; 短 hex 仍打印 | ✅ done | main (待 push) | [`upgrade/v0.5-hex-router.md`](upgrade/v0.5-hex-router.md) |
 
 ---
 
