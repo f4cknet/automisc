@@ -1,0 +1,19 @@
+"""手工构造 base64 stego 测试样本（per v0.5-base-rot-decoders PR2）
+
+**构造方法**：
+- 原文: 22 个 'A' (b"AAAAAAAAAAAAAAAAAAAAAA", 22 bytes = 7×3 + 1)
+- 标准 base64: "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQQ=="
+- 隐藏数据: b"secret" (6 bytes)
+- stego base64: "RXEDRWFBRWEDRXECRWFBRXFAQUFBQQ=="
+
+**解码验证**：
+```python
+from automisc.core.encoders.base64_stego import decode_base64_stego
+hidden = decode_base64_stego("RXEDRWFBRWEDRXECRWFBRXFAQUFBQQ==")
+# → b"secret"
+```
+
+⚠️ 注意: 简化算法会破坏原 base64 decode（22 bytes → 前 21 bytes 乱码），
+   但隐藏数据可通过 extract_hidden_with_size_hint(6) 准确提取。
+"""
+RXEDRWFBRWEDRXECRWFBRXFAQUFBQQ==
