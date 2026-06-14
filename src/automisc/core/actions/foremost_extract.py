@@ -8,16 +8,21 @@ v0.5 设计:
 - foremost 1.5.7 在 macOS 稳定
 - 支持任意 file type (-t all)
 - 输出结构: <output_dir>/<type>/00000NNN.<ext>
+
+v0.5-output-samedir 改造 (2026-06-14):
+- 提取目录从 /tmp/foremost_xxxxxx/ 改成 <input_dir>/<input_stem>__foremost/
+- 原因: Owner "所有文件输出都跟输入同目录"
+- 跑完不删 (caller 决定; CLI 默认保留, GUI 默认保留)
 """
 from __future__ import annotations
 
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from automisc.core.dag import Action, ActionResult
+from automisc.core.utils.output_path import extract_dir_for
 
 
 def find_foremost_extract(output_dir: Path) -> list[str]:
@@ -39,6 +44,9 @@ class ForemostExtractAction(Action):
 
     foremost 把文件放在 ``<output_dir>/<type>/00000NNN.<ext>``.
     输出目录必须不存在 (foremost 限制), 用前会先 rmtree.
+
+    v0.5-output-samedir: 默认 extract_dir = ``<input_dir>/<input_stem>__foremost/``,
+    与输入同目录, 不写到 /tmp.
     """
 
     name = "foremost_extract"
@@ -56,13 +64,16 @@ class ForemostExtractAction(Action):
         if not src.exists():
             return ActionResult(success=False, message=f"file not found: {src}")
 
-        # 提取目录
+        # 提取目录 (v0.5-output-samedir: 默认与 input 同目录)
         extract_dir = context.get("extract_dir")
         if extract_dir:
             extract_dir = Path(extract_dir)
         else:
-            extract_dir = Path(tempfile.mkdtemp(prefix="foremost_"))
+            extract_dir = extract_dir_for(src, purpose="foremost")
 
+        # 清理旧 (foremost 拒绝非空目录)
+        if extract_dir.exists():
+            shutil.rmtree(extract_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
 
         foremost = shutil.which("foremost")
@@ -72,7 +83,7 @@ class ForemostExtractAction(Action):
                 message="foremost not found in PATH",
             )
 
-        # foremost 输出目录必须不存在
+        # foremost 输出目录 (放 extract_dir 下, foremost 仍要求 "目录不存在")
         foremost_dir = extract_dir / "foremost_out"
         if foremost_dir.exists():
             shutil.rmtree(foremost_dir)

@@ -246,8 +246,9 @@ class MainWindow(QMainWindow):
         for arch in archives[:5]:
             self.output_view.append_text(f"  {arch}\n")
 
-        # 跑提取
-        extract_dir = Path("/tmp/automisc_extract")
+        # 跑提取 (v0.5-output-samedir: extract_dir = input 同目录)
+        from automisc.core.utils.output_path import extract_dir_for
+        extract_dir = extract_dir_for(self.current_file, purpose="extract")
         extract_dir.mkdir(parents=True, exist_ok=True)
         binwalk_result = result  # 已跑过
         if "extracted_files" in result.suspicious_points[0].__dict__ if result.suspicious_points else False:

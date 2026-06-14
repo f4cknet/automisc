@@ -266,7 +266,8 @@ def build_parser() -> argparse.ArgumentParser:
         p_sub.add_argument("--file", required=True, help="目标文件路径", dest="file_path")
         # 通用 args: --out-dir, --keep
         p_sub.add_argument(
-            "--out-dir", default=None, help="输出目录 (None = /tmp)"
+            "--out-dir", default=None,
+            help="输出目录 (None = 与 input 同目录, v0.5-output-samedir)"
         )
         p_sub.add_argument(
             "--keep", action="store_true", help="保留 output 文件（默认删）"

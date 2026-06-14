@@ -55,7 +55,8 @@
 | v0.5-rule-scanner | rule_scanner 独立规则库 + strings|grep 集成 + auto_run 兜底 | ✅ done | main `4573369` | [`upgrade/v0.5-rule-scanner.md`](upgrade/v0.5-rule-scanner.md) |
 | v0.5-decoder-menu | CLI decoder 迁移到 GUI Tools 菜单 (registry 单一事实来源) | ✅ done | main `9e9002d` | [`upgrade/v0.5-decoder-menu.md`](upgrade/v0.5-decoder-menu.md) |
 | v0.5-GUI-bugfix | 3 bug 修: 工具栏 base64/hex 入口 + LSB secret/key 高亮 | ✅ done | main `879738f` | [`upgrade/v0.5-GUI-bugfix.md`](upgrade/v0.5-GUI-bugfix.md) |
-| v0.5-IO-widget | OutputView → InputOutputView (Clear/Paste/Hex→ASCII 4 按钮) | ✅ done | main (待 push) | [`upgrade/v0.5-IO-widget.md`](upgrade/v0.5-IO-widget.md) |
+| v0.5-IO-widget | OutputView → InputOutputView (Clear/Paste/Hex→ASCII 4 按钮) | ✅ done | main `7a61aa5` | [`upgrade/v0.5-IO-widget.md`](upgrade/v0.5-IO-widget.md) |
+| v0.5-output-samedir | 所有文件输出都跟 input 同目录 (不再写 /tmp) | ✅ done | main (待 push) | [`upgrade/v0.5-output-samedir.md`](upgrade/v0.5-output-samedir.md) |
 
 ---
 

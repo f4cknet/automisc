@@ -10,13 +10,17 @@
   2. 预处理: 剥 data URL 头 (data:image/(jpeg|jpg|png|gif|webp|bmp);base64,) -> 记 mime
   3. base64 decode (validate=True 严格) -> raw bytes
      失败 -> Base64ImageError("不是有效 base64")
-  4. 写 raw 到 tmp (suffix 从 mime 推断)
+  4. 写 raw 到 input 同目录, 命名 `<stem>__base64.<ext>` (v0.5-output-samedir)
   5. 用 `file` 命令检测 mime
-     - image/* -> 成功 (返回 tmp 路径)
+     - image/* -> 成功 (返回 path)
      - 非 image -> Base64ImageError("转图片失败, file 检测: <type>")
 ```
 
 **v0.5+ 接入 DAG**：暂不接（per Owner "先单独模块, 后面再决定"）。
+
+**v0.5-output-samedir 改造 (2026-06-14)**:
+- 输出文件从 /tmp/automisc_b64_xxxxxx.<ext> 改成 <input_dir>/<input_stem>__base64.<ext>
+- 原因: Owner "不论是 foremost 还是 base64 转图片, 都把输出文件保存到输入文件的相同目录下"
 
 macOS 依赖：`file`（系统自带，/usr/bin/file）。
 """
@@ -26,9 +30,10 @@ import base64
 import re
 import shutil
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from automisc.core.utils.output_path import output_path_for
 
 
 # 1. data URL 头正则 (per RFC 2397)
@@ -186,36 +191,34 @@ def decode_file_to_image(
             )
         raw, source_mime = result  # 用 fallback 推断的 mime
 
-    # Step 4: 写 tmp
+    # Step 4: 写 output (v0.5-output-samedir: 与 input 同目录, 命名 <stem>__base64.<ext>)
     suffix_map = {
         "image/jpeg": ".jpg", "image/jpg": ".jpg",
         "image/png": ".png", "image/gif": ".gif",
         "image/webp": ".webp", "image/bmp": ".bmp",
     }
     suffix = suffix_map.get(source_mime, ".png")  # fallback .png 让 file 有 hint
+
     if output_dir:
+        # caller 显式指定了 output_dir (向后兼容 CLI --out-dir)
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        tmp = tempfile.NamedTemporaryFile(
-            delete=False, prefix="automisc_b64_", suffix=suffix, dir=output_dir
-        )
+        out_path = Path(output_dir) / f"{p.stem}__base64{suffix}"
     else:
-        tmp = tempfile.NamedTemporaryFile(
-            delete=False, prefix="automisc_b64_", suffix=suffix
-        )
-    tmp.write(raw)
-    tmp.close()
+        # 默认: 与 input 同目录 (v0.5-output-samedir)
+        out_path = output_path_for(p, suffix=suffix, purpose="base64")
+    out_path.write_bytes(raw)
 
     # Step 5: `file` 命令检测
-    detected = _file_detect(tmp.name)
+    detected = _file_detect(str(out_path))
     if not _is_image_mime(detected):
         # 不是图片
-        Path(tmp.name).unlink(missing_ok=True)
+        out_path.unlink(missing_ok=True)
         raise Base64ImageError(
             f"转图片失败, file 检测: {detected or '(empty / no file command)'}"
         )
 
     return Base64ImageResult(
-        output_path=tmp.name,
+        output_path=str(out_path),
         detected_mime=detected,
         source_mime_hint=source_mime,
         raw_size=len(raw),

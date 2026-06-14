@@ -1,15 +1,21 @@
 """foremost adapter（per ``tools.md`` §3.5）
 
 ``foremost -t all -o <outdir> -i <file>``：文件雕刻（carving）。
+
+v0.5-output-samedir 改造 (2026-06-14):
+- 输出目录从 /tmp/automisc_foremost_<stem>/ 改成 <input_dir>/<input_stem>__foremost/
+- 原因: Owner "所有文件输出都跟输入同目录"
 """
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 from automisc.core.registry import register_tool
 from automisc.core.result import ToolResult
 from automisc.core.suspicious import SuspiciousPoint
+from automisc.core.utils.output_path import extract_dir_for
 from automisc.tools.base import ToolAdapter
 
 
@@ -31,14 +37,13 @@ class ForemostAdapter(ToolAdapter):
     default_timeout = 120.0  # 大文件雕刻可能很慢
 
     def run(self, file_path: str) -> ToolResult:
-        # foremost 必须有 -o 输出目录（不存在会自动创建）
-        # 临时目录放到 /tmp 下；foremost 拒绝非空目录，先清后用
-        outdir = Path("/tmp") / f"automisc_foremost_{Path(file_path).stem}"
+        # v0.5-output-samedir: 输出目录 = input 同目录 / <stem>__foremost
+        outdir = extract_dir_for(file_path, purpose="foremost")
 
         # 清理旧输出目录（foremost 会因目录非空而 exit 1）
-        import shutil
         if outdir.exists():
             shutil.rmtree(outdir)
+        outdir.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             self.binary_path or "foremost",

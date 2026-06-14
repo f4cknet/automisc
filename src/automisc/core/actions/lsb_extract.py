@@ -26,13 +26,13 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from automisc.core.dag import Action, ActionResult
 from automisc.core.encoding_detector import score_text_severity
 from automisc.core.router import detect_magic
+from automisc.core.utils.output_path import output_path_for
 
 
 # zsteg 输出行格式: "<bit>,<channel>,<order>,<scan>   .. <type>: <content>"
@@ -131,16 +131,17 @@ def _pick_first_file_channel(parsed: list[dict[str, str]]) -> dict[str, str] | N
     return None
 
 
-def _write_tmp_extracted(extracted: bytes, hint_ext: str = ".bin") -> str:
-    """写抽出的 bytes 到 tmp, 返回路径."""
-    tmp = tempfile.NamedTemporaryFile(
-        delete=False,
-        prefix="automisc_lsb_",
-        suffix=hint_ext,
-    )
-    tmp.write(extracted)
-    tmp.close()
-    return tmp.name
+def _write_tmp_extracted(extracted: bytes, file_path: str, hint_ext: str = ".bin") -> str:
+    """写抽出的 bytes 到 output (v0.5-output-samedir: 与 input 同目录, 命名 <stem>__lsb.<ext>).
+
+    Args:
+        extracted: 抽出的 bytes
+        file_path: 原输入文件路径 (用来决定 output 目录)
+        hint_ext: 文件后缀 hint
+    """
+    out_path = output_path_for(file_path, suffix=hint_ext, purpose="lsb")
+    out_path.write_bytes(extracted)
+    return str(out_path)
 
 
 class LSBExtractAction(Action):
@@ -280,7 +281,7 @@ class LSBExtractAction(Action):
                 elif "7z" in magic:
                     ext = ".7z"
 
-            tmp_path = _write_tmp_extracted(raw, hint_ext=ext)
+            tmp_path = _write_tmp_extracted(raw, file_path, hint_ext=ext)
 
             return ActionResult(
                 success=True,
