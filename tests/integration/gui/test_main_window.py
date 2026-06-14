@@ -63,20 +63,20 @@ class TestMainWindow:
 # ---------- 2. Menu dock ----------
 class TestToolMenuDock:
     def test_menu_categories(self, qtbot):
-        """8 adapter + 1 快捷 + 2 decoder = 11 分类（v0.5+）."""
+        """8 adapter + 1 快捷 + 2 decoder = 12 分类 (v0.5-coords-qr 新增)"""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
-        assert dock.tree.topLevelItemCount() == 11
+        assert dock.tree.topLevelItemCount() == 12
 
     def test_menu_total_tools(self, qtbot):
-        """22 adapter + 4 快捷 + 2 decoder = 28."""
+        """22 adapter + 4 快捷 + 3 decoder = 29 (v0.5-coords-qr)."""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
         count = 0
         for i in range(dock.tree.topLevelItemCount()):
             cat = dock.tree.topLevelItem(i)
             count += cat.childCount()
-        assert count == 28  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 + 1 + 1
+        assert count == 29  # 6 + 2 + 2 + 5 + 3 + 2 + 1 + 1 + 4 + 1 + 1 + 1 (coords-qr)
 
     def test_menu_callback(self, qtbot):
         """点击工具项触发 callback (新 signature: name, kind)."""
@@ -91,10 +91,10 @@ class TestToolMenuDock:
         assert selected == [("file", "adapter")]
 
     def test_menu_tool_categories_constant(self):
-        """TOOL_CATEGORIES 字典含 11 分类 28 工具（22+4+2）。"""
-        assert len(TOOL_CATEGORIES) == 11
+        """TOOL_CATEGORIES 字典含 12 分类 29 工具 (22+4+3)."""
+        assert len(TOOL_CATEGORIES) == 12
         total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
-        assert total == 28
+        assert total == 29
 
     def test_menu_v5_shortcut_actions(self, qtbot):
         """v0.5 快捷工具 4 个: lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar."""

@@ -1,4 +1,4 @@
-"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 2 decoder (v0.5+)
+"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 3 decoder (v0.5+)
 
 分类（按 prd.md §4.1）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
@@ -12,6 +12,7 @@
 - 快捷工具 (v0.5 Actions) — fix_pseudo_zip / bruteforce_zip / lsb_extract / bruteforce_rar
 - 解码工具 (v0.5+ Decoders) — base64-image (Bug fix 2026-06-14)
 - 进制转换 (v0.5+ Convert) — hex-ascii (Bug fix 2026-06-14)
+- QR 工具 (v0.5+ QR Tools) — coords-qr (Bug fix 2026-06-14, Owner 10:16)
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 
 
-# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 2 decoder）
+# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 3 decoder）
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "steghide"],
@@ -50,6 +51,9 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     "🔢 进制转换 (v0.5+ Convert)": [
         "decoder:hex-ascii",  # bug fix 2026-06-14: 工具栏入口
     ],
+    "🔳 QR 工具 (v0.5+ QR Tools)": [
+        "decoder:coords-qr",  # 2026-06-14 10:16: 坐标串 → QR PNG → zbar 识别
+    ],
 }
 
 
@@ -61,6 +65,7 @@ ACTION_DISPLAY_NAMES = {
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
     "decoder:base64-image": "🔓 Base64 → 图片",
     "decoder:hex-ascii": "🔢 Hex → ASCII",
+    "decoder:coords-qr": "🔳 坐标 → 二维码",  # v0.5-coords-qr
 }
 
 

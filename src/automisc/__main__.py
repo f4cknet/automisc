@@ -140,9 +140,13 @@ def cmd_decode_dispatcher(args: argparse.Namespace) -> int:
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         return 1
 
-    # 打印 result 字段 (简单 dataclass dump)
+    # 打印 result 字段 (简单 dataclass dump, 长字段截断)
     print(f"=== {spec.display} ===")
     for k, v in vars(result).items():
+        if isinstance(v, str) and len(v) > 500:
+            v = v[:500] + f"... (truncated, total {len(v)} chars)"
+        elif isinstance(v, list) and len(v) > 20:
+            v = v[:20] + [f"... and {len(v) - 20} more"]
         print(f"{k}: {v}")
     return 0
 
@@ -260,10 +264,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_decode_sub = p_decode.add_subparsers(dest="decode_cmd")
     # 触发 decoder 注册 (import 一次即生效)
     from automisc.core.decoders import base64_image  # noqa: F401
+    from automisc.core.decoders import base_convert  # noqa: F401
+    from automisc.core.decoders import coords_to_qr  # noqa: F401
     from automisc.core.decoders.registry import list_decoders
     for spec in list_decoders():
         p_sub = p_decode_sub.add_parser(spec.name, help=spec.description)
-        p_sub.add_argument("--file", required=True, help="目标文件路径", dest="file_path")
+        # v0.5-hex-ascii-fix: --file 不再 required, 允许 --text 文本模式
+        p_sub.add_argument(
+            "--file", required=False, help="目标文件路径", dest="file_path"
+        )
+        # v0.5-hex-ascii-fix + v0.5-coords-qr: text-based decoders 接受 --text
+        p_sub.add_argument(
+            "--text", required=False,
+            help="直接传文本 (跟 --file 二选一; e.g. coords-qr 用 '(7,7),(7,8),...')"
+        )
         # 通用 args: --out-dir, --keep
         p_sub.add_argument(
             "--out-dir", default=None,

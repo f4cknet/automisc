@@ -658,8 +658,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
             return
 
-        # v0.5-hex-ascii-fix: text-based decoders 走 input 区, 不需要 current_file
-        text_based_decoders = {"hex-ascii"}
+        # v0.5-hex-ascii-fix + v0.5-coords-qr: text-based decoders 走 input 区
+        # - hex-ascii: 解 hex/binary/base64/base32 串
+        # - coords-qr: 解 "(r,c)" 坐标串 (per meihuai 手工解法自动化)
+        # 这些都用 input 区的 text, 不用 current_file (避免把图片当文本解)
+        text_based_decoders = {"hex-ascii", "coords-qr"}
         is_text_based = decoder_name in text_based_decoders
 
         if is_text_based:

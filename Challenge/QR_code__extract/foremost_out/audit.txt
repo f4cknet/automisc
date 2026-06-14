@@ -1,0 +1,25 @@
+Foremost version 1.5.7 by Jesse Kornblum, Kris Kendall, and Nick Mikus
+Audit File
+
+Foremost started at Sun Jun 14 10:09:26 2026
+Invocation: /usr/local/bin/foremost -t all -i /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/QR_code.png -o /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/QR_code__extract/foremost_out 
+Output directory: /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/QR_code__extract/foremost_out
+Configuration file: /usr/local/etc/foremost.conf
+------------------------------------------------------------------
+File: /Users/minzhizhou/Desktop/ctf/misc/automisc/Challenge/QR_code.png
+Start: Sun Jun 14 10:09:26 2026
+Length: Unknown
+ 
+Num	 Name (bs=512)	       Size	 File Offset	 Comment 
+
+0:	00000000.zip 	      202 B 	        471 	 
+1:	00000000.png 	      471 B 	          0 	  (280 x 280)
+Finish: Sun Jun 14 10:09:26 2026
+
+2 FILES EXTRACTED
+	
+zip:= 1
+png:= 1
+------------------------------------------------------------------
+
+Foremost finished at Sun Jun 14 10:09:26 2026

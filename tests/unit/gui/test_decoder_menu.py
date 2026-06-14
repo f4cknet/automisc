@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
 
@@ -88,7 +89,7 @@ class TestCLIDispatcher:
 
         r = subprocess.run(
             [
-                "python3", "-m", "automisc",
+                sys.executable, "-m", "automisc",
                 "decode", "base64-image",
                 "--file", "Challenge/KEY.exe",
             ],
@@ -107,13 +108,13 @@ class TestCLIDispatcher:
         import subprocess
 
         r = subprocess.run(
-            ["python3", "-m", "automisc", "decode", "--help"],
+            [sys.executable, "-m", "automisc", "decode", "--help"],
             capture_output=True,
             text=True,
             env={"PYTHONPATH": "src", "PATH": "/usr/bin:/bin"},
         )
-        # 至少含 base64-image
-        assert "base64-image" in r.stdout
+        # 至少含 base64-image + coords-qr
+        assert "base64-image" in r.stdout and "coords-qr" in r.stdout
 
 
 # ---------- DecodeRunner (QThread) ----------

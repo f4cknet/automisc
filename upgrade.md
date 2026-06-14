@@ -57,7 +57,8 @@
 | v0.5-GUI-bugfix | 3 bug 修: 工具栏 base64/hex 入口 + LSB secret/key 高亮 | ✅ done | main `879738f` | [`upgrade/v0.5-GUI-bugfix.md`](upgrade/v0.5-GUI-bugfix.md) |
 | v0.5-IO-widget | OutputView → InputOutputView (Clear/Paste/Hex→ASCII 4 按钮) | ✅ done | main `7a61aa5` | [`upgrade/v0.5-IO-widget.md`](upgrade/v0.5-IO-widget.md) |
 | v0.5-output-samedir | 所有文件输出都跟 input 同目录 (不再写 /tmp) | ✅ done | main `af35fb0` | [`upgrade/v0.5-output-samedir.md`](upgrade/v0.5-output-samedir.md) |
-| v0.5-hex-ascii-fix + v0.5-clear-on-new-file | 删顶 bar 按钮 + hex-ascii 走 input + 拖新文件清空旧 output | ✅ done | main (待 push) | [`upgrade/v0.5-hex-ascii-fix.md`](upgrade/v0.5-hex-ascii-fix.md) |
+| v0.5-hex-ascii-fix + v0.5-clear-on-new-file | 删顶 bar 按钮 + hex-ascii 走 input + 拖新文件清空旧 output | ✅ done | main `aed9bb1` | [`upgrade/v0.5-hex-ascii-fix.md`](upgrade/v0.5-hex-ascii-fix.md) |
+| v0.5-coords-qr | 坐标串 → QR PNG → zbar (菜单栏新增 🔳 QR 工具 分类) | ✅ done | main (待 push) | [`upgrade/v0.5-coords-qr.md`](upgrade/v0.5-coords-qr.md) |
 
 ---
 
