@@ -7,9 +7,18 @@
 - journal 面板累积所有 suspicious_points
 
 macOS only（per AGENTS.md §2.4），需 pip install -e ".[gui]"
+
+**v0.5-coords-qr-fix (2026-06-14 11:46)**: 显式 import `automisc.core.decoders` 触发
+`__init__.py` 里的 side-effect (注册所有 decoder module).
+- 之前只 import `automisc.core.decoders.registry` 不会触发 base64_image / base_convert / coords_to_qr 注册
+- 后果: GUI 菜单栏 [coords-qr] 触发时 DecodeRunner 报 "unknown decoder: coords-qr"
 """
 
 from __future__ import annotations
+
+# 显式 import 触发所有 decoder module 注册 (side-effect import)
+# 见 core.decoders.__init__.py: base64_image / base_convert / coords_to_qr
+from automisc.core import decoders as _decoders  # noqa: F401  # noqa: E402
 
 from pathlib import Path
 from typing import Optional

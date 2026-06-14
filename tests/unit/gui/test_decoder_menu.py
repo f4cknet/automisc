@@ -116,6 +116,24 @@ class TestCLIDispatcher:
         # 至少含 base64-image + coords-qr
         assert "base64-image" in r.stdout and "coords-qr" in r.stdout
 
+    def test_gui_main_window_triggers_all_decoder_registration(self):
+        """v0.5-coords-qr-fix: GUI 启动 (import main_window) 应触发所有 decoder 注册.
+
+        Bug 复现: 之前 GUI 只 import automisc.core.decoders.registry (不触发 __init__.py
+        的 side-effect import), 菜单栏 [coords-qr] 触发时报 'unknown decoder: coords-qr'.
+        """
+        # 重新 import (确保干净状态)
+        import importlib
+        import automisc.core.decoders
+        importlib.reload(automisc.core.decoders)
+        import automisc.gui.main_window  # noqa: F401
+        from automisc.core.decoders import list_decoders
+        names = [s.name for s in list_decoders()]
+        # GUI 启动后 3 个 decoder 都应注册
+        assert "base64-image" in names
+        assert "hex-ascii" in names
+        assert "coords-qr" in names, f"GUI 启动后 coords-qr 未注册: {names}"
+
 
 # ---------- DecodeRunner (QThread) ----------
 class TestDecodeRunner:
