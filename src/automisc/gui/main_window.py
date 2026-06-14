@@ -817,14 +817,34 @@ class MainWindow(QMainWindow):
     def _build_tools_menu(self, menubar) -> None:
         """从 core.decoders.registry 动态构建 Tools 菜单.
 
-        菜单按 category 分组 (decode / convert / extract).
+        **渲染顺序**（v0.5-cipher-decoders）:
+        1. 先按 ``group`` 分组渲染 — "解密工具1/2/3" 一级目录
+        2. 再按 ``category`` 分组兜底 — 老 base/rot/decode/convert/extract
+
         每个 decoder 一个 QAction, 触发 _run_decoder(name).
         """
-        from automisc.core.decoders.registry import list_decoders_by_category
+        from automisc.core.decoders.registry import (
+            list_decoders_by_group,
+            list_decoders_by_category,
+        )
 
         tools_menu = menubar.addMenu("&Tools")
-        grouped = list_decoders_by_category()
-        for category, specs in grouped.items():
+
+        # 1) 按 group 分（v0.5-cipher-decoders — 解密工具1/2/3 一级目录）
+        grouped_by_group = list_decoders_by_group()
+        for group_name, specs in grouped_by_group.items():
+            sub_menu = tools_menu.addMenu(f"&{group_name}")
+            for spec in specs:
+                act = QAction(spec.display, self)
+                act.setToolTip(spec.description)
+                act.triggered.connect(
+                    lambda checked=False, name=spec.name: self._run_decoder(name)
+                )
+                sub_menu.addAction(act)
+
+        # 2) 按 category 分（兜底，老 base_rot/decode/convert/extract）
+        grouped_by_cat = list_decoders_by_category()
+        for category, specs in grouped_by_cat.items():
             sub_menu = tools_menu.addMenu(f"&{category.title()}")
             for spec in specs:
                 act = QAction(spec.display, self)
@@ -833,8 +853,9 @@ class MainWindow(QMainWindow):
                     lambda checked=False, name=spec.name: self._run_decoder(name)
                 )
                 sub_menu.addAction(act)
+
         # 兜底: 如果 registry 是空, 加 "no decoders registered" 提示
-        if not grouped:
+        if not grouped_by_group and not grouped_by_cat:
             noop = QAction("(no decoders registered)", self)
             noop.setEnabled(False)
             tools_menu.addAction(noop)

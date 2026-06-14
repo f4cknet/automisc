@@ -286,6 +286,20 @@ def build_parser() -> argparse.ArgumentParser:
         p_sub.add_argument(
             "--keep", action="store_true", help="保留 output 文件（默认删）"
         )
+        # v0.5-cipher-decoders: cipher decoder 通用参数
+        # (dispatcher 用 inspect 过滤掉 runner 不认识的 kwargs, 这里全加不会出错)
+        p_sub.add_argument(
+            "--shift", type=int, default=None,
+            help="凯撒解密位移 (caesar 用, 默认 3)"
+        )
+        p_sub.add_argument(
+            "--rails", type=int, default=None,
+            help="栅栏解密层数 (rail-fence 用, 默认 2)"
+        )
+        p_sub.add_argument(
+            "--variant", default=None,
+            help="变体参数 (bacon 用 '24'/'26', pigpen 用 'unicode'/'simple')"
+        )
         p_sub.set_defaults(func=cmd_decode_dispatcher, decoder_name=spec.name)
 
     p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")

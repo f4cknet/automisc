@@ -6,6 +6,7 @@
 - base: base16/32/36/58/62/64/85/91/92/100/2048/32768/65536 编码解码
 - base_custom: base64 自定义表编码解码（per v0.5-base-rot-decoders）
 - classical: ROT5/13/18/47 + Caesar + Vigenère + Atbash + Pigpen + Rail Fence + Affine
+- classical_ext（v0.5-cipher-decoders 新）: morse / bacon / xxencode / uuencode / jsfuck / jjencode / quoted-printable / brainfuck / bubblebabble + pigpen 重写
 - custom: BCD / IEEE 754 / UTF-16 endianness / Unicode Tags / Multi-layer auto-decoder
 - base64_stego: base64 末 2 bit 隐写解码（per v0.5-base-rot-decoders PR2）
 
@@ -14,4 +15,6 @@
 - 每个 decoder 调一次可疑点列表
 - v0.1 不做自动编排（v0.5+ 模板/DAG）
 """
-from automisc.core.encoders import base, base_custom, base64_stego, classical, custom  # noqa: F401
+from automisc.core.encoders import (
+    base, base_custom, base64_stego, classical, classical_ext, custom,
+)  # noqa: F401

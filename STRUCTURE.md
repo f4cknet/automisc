@@ -108,14 +108,20 @@ automisc/
 | `core/actions/binwalk_extract.py` | binwalk 检测 + 委托 foremost 提取 | `BinwalkExtractAction` |
 | `core/actions/foremost_extract.py` | 独立 foremost 提取 + helper | `ForemostExtractAction`, `find_foremost_extract` |
 | `core/actions/zip_chain.py` | try_unzip / fix_pseudo / bruteforce 3 Action | `TryUnzipAction`, `FixPseudoEncryptionAction`, `BruteforceZipAction` |
-| `core/actions/lsb_extract.py` | LSB 抽出后智能路由 (v0.5 核心) | `LSBExtractAction` |
+| `core/actions/lsb_extract.py` | LSB 抽取后智能路由 (v0.5 核心) | `LSBExtractAction` |
 | `core/encoding_detector.py` | text 严重度评分 (Q1 决策) | `score_text_severity`, `has_sensitive_keyword` |
 | `core/exceptions.py` | 异常体系 (单 Owner 简化: 1 基类 + 6 子类) | `AutomiscError` + 6 子类 |
 | `core/journal.py` | 操作日志 (累积 + 过滤 + 导出 JSONL) | `Journal`, `JournalEntry` |
 | `core/registry.py` | 工具注册 (单 Owner 简化) | `@register_tool`, `get_tool`, `list_tools` |
 | `core/result.py` | 工具结果统一 schema | `ToolResult` |
 | `core/suspicious.py` | 可疑点统一 schema + 关键字集 | `SuspiciousPoint`, `SUSPICIOUS_PATTERNS` |
-| `core/encoders/` | 自编写编码 (base / classical / custom / base64_stego / base_custom) | — |
+| `core/encoders/` | 自编写编码 (base / classical / classical_ext / custom / base64_stego / base_custom) | — |
+| `core/decoders/registry.py` | decoder 注册表 + group/category 双重渲染 | `DecoderSpec`, `register_decoder`, `list_decoders_by_category`, `list_decoders_by_group` |
+| `core/decoders/base64_image.py` | base64 → 图片 decoder | `decode_file_to_image` |
+| `core/decoders/base_convert.py` | hex/binary/64/32 → ASCII 转换 decoder | — |
+| `core/decoders/base_rot_decoders.py` | 18 个 base/rot decoder 聚合注册 | — |
+| `core/decoders/coords_to_qr.py` | 坐标串 → QR PNG → zbar decoder | — |
+| `core/decoders/cipher_decoders.py` | 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble) + 2 占位 → 解密工具1/2/3 | `run_caesar`, `run_bacon`, ..., `run_bubblebabble`, `run_placeholder` |
 | `gui/main_window.py` | QMainWindow + 5 菜单 + 拖文件 | `MainWindow` |
 | `gui/chain_runner.py` | 链 QThread (v0.5) | `ChainRunner` |
 

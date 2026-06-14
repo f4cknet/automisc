@@ -66,6 +66,7 @@
 | v0.5-tool-install-batch-1 | 装 5 个 tools.md ❌ 工具 (pcapfix/compiled + aircrack-ng + scapy + impacket + python-evtx)，更新 tools.md 状态；意外发现 evtx_dump CLI shim 坏，待 fix | 🔄 in-progress | (无 commit，无代码改动) | [`upgrade/v0.5-tool-install-batch-1.md`](upgrade/v0.5-tool-install-batch-1.md) |
 | v0.5-tool-install-batch-2 | sox brew 装 (❌→✅) + evtx_dump 走 extend_tools/ Rust 0.8.2 (⚠️→✅，跟 python-evtx 不同项目) + python-evtx (⚠️→✅) | ✅ done | (无 commit，无代码改动) | [`upgrade/v0.5-tool-install-batch-2.md`](upgrade/v0.5-tool-install-batch-2.md) |
 | v0.5-base-rot-decoders | base 家族 (36/92/100/32768/65536 + 自定义表) + rot 家族 (5/47/18) + base64 stego 解码封装 → "🔐 Base/ROT 解码" GUI 二级分类 (18 decoder 扁平) | ✅ done | (3 PR 完工：PR1 算法库 92 单测, PR2 base64 stego 15 单测, PR3 decoder + GUI 19+5 单测；总 +24 单测 568→592 passed) | [`upgrade/v0.5-base-rot-decoders.md`](upgrade/v0.5-base-rot-decoders.md) |
+| v0.5-cipher-decoders | 12 个经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble) → "🔤 解密工具1" 一级目录 + "占位 — TBD" 入口放 解密工具2/3 | ✅ done | (1 commit；+54 单测 592→646 passed；DecoderSpec 加 group 字段 + list_decoders_by_group + GUI _build_tools_menu 双重渲染 group→category) | [`upgrade/v0.5-cipher-decoders.md`](upgrade/v0.5-cipher-decoders.md) |
 
 ---
 

@@ -1,10 +1,12 @@
-"""单测: decoder registry + DecodeRunner + GUI Tools 菜单 (v0.5-decoder-menu)
+"""单测: decoder registry + DecodeRunner + GUI Tools 菜单 (v0.5-decoder-menu + v0.5-cipher-decoders)
 
 覆盖:
-- registry 注册 / 查找 / 按 category 分组
+- registry 注册 / 查找 / 按 category 分组 (老)
+- registry 注册 / 查找 / 按 group 分组 (v0.5-cipher-decoders)
 - DecodeRunner QThread 异步跑 + signal
-- main_window _build_tools_menu 动态生成
+- main_window _build_tools_menu 动态生成 (含 group + category 双重渲染)
 - 端到端: KEY.exe 走 GUI 路径
+- v0.5-cipher-decoders: 3 个 "解密工具1/2/3" submenu 存在, 12 cipher action + 老 submenu 还在
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ from automisc.core.decoders.registry import (
     get_decoder,
     list_decoders,
     list_decoders_by_category,
+    list_decoders_by_group,
     register_decoder,
 )
 
@@ -246,6 +249,123 @@ class TestMainWindowToolsMenu:
         assert "decoder result" in out
         assert "133 x 133" in out
         assert "输出文件" in out
+
+
+# ---------- v0.5-cipher-decoders: 3 个新 submenu ----------
+class TestCipherSubmenus:
+    """v0.5-cipher-decoders: Tools 菜单下 3 个新一级目录 (group= 解密工具1/2/3)."""
+
+    def test_tools_menu_has_cipher_group1_submenu(self, qtbot):
+        """Tools 菜单 → '解密工具1' submenu 存在 + 含 12 个 cipher action."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # 找 Tools 菜单
+        tools_menu = None
+        for action in window.menuBar().actions():
+            if action.text() == "&Tools":
+                tools_menu = action.menu()
+                break
+        assert tools_menu is not None, "Tools 菜单未找到"
+
+        # 找 '解密工具1' submenu
+        group1_submenu = None
+        for a in tools_menu.actions():
+            if a.text() == "&解密工具1":
+                group1_submenu = a.menu()
+                break
+        assert group1_submenu is not None, "'解密工具1' submenu 未找到"
+
+        # 验证含 12 个 cipher action (不含占位 — 占位在 group2/3)
+        action_texts = [a.text() for a in group1_submenu.actions()]
+        expected = [
+            "🔤 凯撒解密", "🥓 培根解密", "🚧 栅栏解密", "🐖 猪圈解密",
+            "📡 摩尔斯解密", "✖ xxencode 解密", "📦 uuencode 解密",
+            "🤯 JSFuck 解密", "🌀 JJEncode 解密", "🆎 Quoted-printable 解密",
+            "🧠 BrainFuck 解密", "🫧 BubbleBabble 解密",
+        ]
+        for exp in expected:
+            assert exp in action_texts, f"{exp} 不在 解密工具1 菜单中"
+
+    def test_tools_menu_has_cipher_group2_submenu(self, qtbot):
+        """Tools 菜单 → '解密工具2' submenu 存在 + 占位项."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        tools_menu = None
+        for action in window.menuBar().actions():
+            if action.text() == "&Tools":
+                tools_menu = action.menu()
+                break
+        assert tools_menu is not None
+
+        group2_submenu = None
+        for a in tools_menu.actions():
+            if a.text() == "&解密工具2":
+                group2_submenu = a.menu()
+                break
+        assert group2_submenu is not None, "'解密工具2' submenu 未找到"
+        # 占位项
+        action_texts = [a.text() for a in group2_submenu.actions()]
+        assert any("占位" in t for t in action_texts)
+
+    def test_tools_menu_has_cipher_group3_submenu(self, qtbot):
+        """Tools 菜单 → '解密工具3' submenu 存在 + 占位项."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        tools_menu = None
+        for action in window.menuBar().actions():
+            if action.text() == "&Tools":
+                tools_menu = action.menu()
+                break
+        assert tools_menu is not None
+
+        group3_submenu = None
+        for a in tools_menu.actions():
+            if a.text() == "&解密工具3":
+                group3_submenu = a.menu()
+                break
+        assert group3_submenu is not None, "'解密工具3' submenu 未找到"
+
+    def test_tools_menu_keeps_existing_base_rot_submenu(self, qtbot):
+        """v0.5-cipher-decoders 不能破坏老 'Base/Rot' submenu."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        tools_menu = None
+        for action in window.menuBar().actions():
+            if action.text() == "&Tools":
+                tools_menu = action.menu()
+                break
+        assert tools_menu is not None
+
+        # 老 'Base_Rot' submenu (per v0.5-base-rot-decoders category='base_rot'
+        # 在 _build_tools_menu 里 .title() → 'Base_Rot')
+        submenu_titles = []
+        for a in tools_menu.actions():
+            if a.menu() is not None:
+                submenu_titles.append(a.text())
+
+        assert any("Base" in t for t in submenu_titles), \
+            f"老 Base/Rot submenu 不见了 — {submenu_titles}"
+
+    def test_list_decoders_by_group_returns_three_groups(self):
+        """registry list_decoders_by_group() 返回 3 个 group."""
+        grouped = list_decoders_by_group()
+        assert "解密工具1" in grouped
+        assert "解密工具2" in grouped
+        assert "解密工具3" in grouped
+        # 不包含 general (老 decoder 不渲染到 by_group)
+        assert "general" not in grouped
 
 
 # ---------- Fixtures ----------
