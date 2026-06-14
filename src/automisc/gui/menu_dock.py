@@ -1,6 +1,6 @@
-"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 21 decoder (v0.5+)
+"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 21 decoder + 14 cipher (v0.5+)
 
-分类（按 prd.md §4.1）：
+分类（按 prd.md §4.1 + v0.5-cipher-decoders）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
 - Stego/Image (PR2) — zsteg / steghide
 - Forensics/Network (PR3) — tshark / tcpdump
@@ -14,6 +14,9 @@
 - 进制转换 (v0.5+ Convert) — hex-ascii (Bug fix 2026-06-14)
 - QR 工具 (v0.5+ QR Tools) — coords-qr (Bug fix 2026-06-14, Owner 10:16)
 - 🔐 Base/ROT 解码 (v0.5+ Decoders) — 18 项 (per Owner 17:09 扁平决策, 不分子分类)
+- 🔤 解密工具1 (v0.5-cipher-decoders) — 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble)
+- 📦 解密工具2 (v0.5-cipher-decoders) — 占位 (TBD)
+- 📦 解密工具3 (v0.5-cipher-decoders) — 占位 (TBD)
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 
 
-# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 21 decoder）
+# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 21 decoder + 14 cipher/占位）
+# v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "steghide"],
@@ -83,7 +87,8 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
 
 
 # 快捷 action / decoder 显示名（v0.5 GUI 同步）
-ACTION_DISPLAY_NAMES = {
+# v0.5-cipher-decoders: cipher display name 从 core.decoders.registry 自动拿 (这里只留 fallback)
+ACTION_DISPLAY_NAMES: dict[str, str] = {
     "fix_pseudo_zip": "🔓 修复 Zip 伪加密",
     "bruteforce_zip": "🔨 Zip 暴力破解 (4-6 位)",
     "lsb_extract": "🎨 PNG LSB 智能提取",
@@ -129,6 +134,48 @@ ADAPTER_TOOLS: set[str] = {
 }
 
 
+# v0.5-cipher-decoders: cipher/占位分组定义（左侧 dock 也渲染）
+# display name 从 registry 自动拿, 这里只定义分类标题 + 占位顺序
+CIPHER_DOCK_CATEGORIES: list[tuple[str, str]] = [
+    # (group_name, prefix_emoji)
+    ("解密工具1", "🔤"),
+    ("解密工具2", "📦"),
+    ("解密工具3", "📦"),
+]
+
+
+def _get_cipher_categories_from_registry() -> dict[str, list[str]]:
+    """从 core.decoders.registry 按 group 聚合 cipher + 占位.
+
+    Returns:
+        {category_title: ["decoder:<name>", ...]} — 仅 cipher/占位组
+        category_title 格式: "<emoji> <group> (v0.5-cipher-decoders)"
+    """
+    from automisc.core.decoders.registry import list_decoders_by_group
+
+    result: dict[str, list[str]] = {}
+    grouped = list_decoders_by_group()
+    for group_name, emoji in CIPHER_DOCK_CATEGORIES:
+        specs = grouped.get(group_name, [])
+        if not specs:
+            continue
+        cat_title = f"{emoji} {group_name} (v0.5-cipher-decoders)"
+        result[cat_title] = [f"decoder:{s.name}" for s in specs]
+    return result
+
+
+def _get_cipher_display_names() -> dict[str, str]:
+    """从 core.decoders.registry 拿 cipher + 占位 display name."""
+    from automisc.core.decoders.registry import REGISTRY
+
+    names: dict[str, str] = {}
+    for spec in REGISTRY:
+        if spec.group == "general":
+            continue
+        names[f"decoder:{spec.name}"] = spec.display
+    return names
+
+
 class ToolMenuDock(QDockWidget):
     """工具菜单树（左侧 dock）。
 
@@ -165,16 +212,33 @@ class ToolMenuDock(QDockWidget):
         )
 
     def _populate(self, available_tools: list[str]) -> None:
-        """填充树形结构：分类 → 工具."""
+        """填充树形结构：分类 → 工具.
+
+        v0.5-cipher-decoders: 先固定分类（adapter/快捷action/老 decoder）
+        再从 registry 自动追加 "🔤/📦 解密工具1/2/3" 分类
+        """
         available_set = set(available_tools)
-        for category, tools in TOOL_CATEGORIES.items():
+
+        # 1) 老固定分类
+        categories: dict[str, list[str]] = dict(TOOL_CATEGORIES)
+
+        # 2) v0.5-cipher-decoders: 从 registry 追加 cipher 分类
+        cipher_cats = _get_cipher_categories_from_registry()
+        for cat_title, tools in cipher_cats.items():
+            categories[cat_title] = tools
+
+        # 3) display names: 老字典 + cipher 从 registry 拿
+        display_names = dict(ACTION_DISPLAY_NAMES)
+        display_names.update(_get_cipher_display_names())
+
+        for category, tools in categories.items():
             cat_item = QTreeWidgetItem([category])
             cat_item.setFlags(cat_item.flags() & ~Qt.ItemIsSelectable)
             self.tree.addTopLevelItem(cat_item)
 
             for tool in tools:
                 # 工具显示名
-                display = ACTION_DISPLAY_NAMES.get(tool, tool)
+                display = display_names.get(tool, tool)
                 # adapter 检查是否注册 (decoder 不需要)
                 is_adapter = tool in ADAPTER_TOOLS
                 marker = (
