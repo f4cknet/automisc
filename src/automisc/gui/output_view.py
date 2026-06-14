@@ -113,7 +113,15 @@ class InputOutputView(QWidget):
         self.text_edit.appendPlainText(text.rstrip("\n"))
 
     def append_suspicious(self, sp: SuspiciousPoint) -> None:
-        """追加 suspicious point (按 severity 高亮)."""
+        """追加 suspicious point (按 severity 高亮).
+
+        v0.5-hex-router-fix (per Owner 14:11):
+        - matched_pattern 截断 200 字符 (避免 650000 字符 hex 撑爆 GUI)
+        - 长 hex 串 (>= 200 chars 且 '十六进制' 类别): 显示占位符 + 提示 '已自动处理'
+        - sp.context 也截断 200
+        """
+        from automisc.core.actions.hex_router import HEX_AUTO_ROUTER_MIN_LEN
+
         cursor = self.text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
 
@@ -122,9 +130,19 @@ class InputOutputView(QWidget):
         fmt.setForeground(color)
         fmt.setFontWeight(QFont.Bold)
 
-        text = f"  [{sp.severity}] {sp.category}: {sp.matched_pattern}"
+        # v0.5-hex-router-fix: 长 hex 串 (>= HEX_AUTO_ROUTER_MIN_LEN) 显占位符
+        is_long_hex = (
+            ("十六进制" in sp.category or "hex" in sp.category.lower())
+            and len(sp.matched_pattern) >= HEX_AUTO_ROUTER_MIN_LEN
+        )
+        if is_long_hex:
+            display = "<hex_router 已自动处理, 见 strings 摘要>"
+        else:
+            display = sp.matched_pattern[:200]
+
+        text = f"  [{sp.severity}] {sp.category}: {display}"
         if sp.context:
-            text += f"  ({sp.context})"
+            text += f"  ({sp.context[:200]})"
         cursor.insertText(text, fmt)
         cursor.insertText("\n")
 

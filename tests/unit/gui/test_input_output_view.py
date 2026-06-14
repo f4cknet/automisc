@@ -495,3 +495,81 @@ class TestClearOnNewFile:
 
         # 旧 runner 应被 stop
         assert old_runner._stopped is True
+
+
+# ---------- v0.5-hex-router-fix: append_suspicious 截断 (Owner 14:11) ----------
+class TestAppendSuspiciousTruncation:
+    def test_long_hex_suspicious_does_not_print_650000_chars(self, qtbot):
+        """v0.5-hex-router-fix: append_suspicious 对长 hex 显示占位符, 不打 650000 字符.
+
+        Owner 14:11 截图: 'program 卡顿, 打印了 35000+ 字符'.
+        根因: output_view.append_suspicious 之前无截断, 把 sp.matched_pattern 整打.
+        修: 长 hex (>= HEX_AUTO_ROUTER_MIN_LEN) 显示 <hex_router 已自动处理> 占位符.
+        """
+        from automisc.core.suspicious import SuspiciousPoint
+        from automisc.core.actions.hex_router import HEX_AUTO_ROUTER_MIN_LEN
+
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        # 造一个长 hex matched_pattern
+        long_hex = "28372c37290a" * 50000  # 600000 chars (meihuai L226 真实)
+        sp = SuspiciousPoint(
+            id="",
+            tool_name="strings",
+            file_path="Challenge/meihuai.jpg",
+            category="十六进制串_line226",
+            offset=226,
+            matched_pattern=long_hex,
+            severity=4,
+            suggested_action="",
+        )
+        v.append_suspicious(sp)
+        text = v.toPlainText()
+        # 关键: 不应包含 600000 字符的 hex 内容
+        assert len(text) < 500, f"占位符后仍应 < 500 字符, 实际: {len(text)}"
+        # 应含占位符
+        assert "<hex_router 已自动处理" in text
+        # 不应含 hex 字符预览
+        assert "28372c37290a" not in text
+
+
+# ---------- v0.5-hex-router-fix: main_window 实际渲染 size ----------
+class TestMainWindowStringsOutputSize:
+    def test_meihuai_auto_run_does_not_explode(self, qtbot):
+        """v0.5-hex-router-fix: 拖 meihuai.jpg 跑 strings -> output_view < 2000 字符.
+
+        Owner 14:11 截图显示实际 output_view 650802 字符 (整 hex 串打上).
+        修: append_suspicious 截断 + 渲染版 957 字符 -> output_view 总 < 2000.
+        """
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from pathlib import Path
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+        w.current_file = Path("Challenge/meihuai.jpg")
+        if not w.current_file.exists():
+            pytest.skip("Challenge/meihuai.jpg not found")
+
+        # 直接调 strings 拿 ToolResult
+        r = w.core.run_tool("strings", str(w.current_file))
+
+        class _S:
+            pass
+
+        s = _S()
+        s.success = True
+        s.suspicious_count = len(r.suspicious_points)
+        # 模拟 _on_auto_tool_finished
+        w._on_auto_tool_finished("strings", s, r)
+        QApplication.processEvents()
+
+        text = w.output_view.toPlainText()
+        # 关键: total < 2000 字符 (vs 之前的 650802)
+        assert len(text) < 2000, f"output_view 不应爆 < 2000 字符, 实际: {len(text)}"
+
+        # cleanup
+        import glob
+
+        for f in glob.glob("/tmp/automisc_text_outputs/hex_router_*"):
+            f.unlink(missing_ok=True)
