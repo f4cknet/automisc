@@ -19,6 +19,7 @@ from automisc.core.decoders.registry import (
 from automisc.core.decoders import base64_image  # noqa: F401, E402
 from automisc.core.decoders import base_convert  # noqa: F401, E402
 from automisc.core.decoders import coords_to_qr  # noqa: F401, E402
+from automisc.core.decoders import base_rot_decoders  # noqa: F401, E402  # v0.5-base-rot-decoders
 
 __all__ = [
     "DecoderSpec",
@@ -30,4 +31,5 @@ __all__ = [
     "base64_image",
     "base_convert",
     "coords_to_qr",
+    "base_rot_decoders",
 ]

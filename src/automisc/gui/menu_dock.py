@@ -1,4 +1,4 @@
-"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 3 decoder (v0.5+)
+"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 21 decoder (v0.5+)
 
 分类（按 prd.md §4.1）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
@@ -13,6 +13,7 @@
 - 解码工具 (v0.5+ Decoders) — base64-image (Bug fix 2026-06-14)
 - 进制转换 (v0.5+ Convert) — hex-ascii (Bug fix 2026-06-14)
 - QR 工具 (v0.5+ QR Tools) — coords-qr (Bug fix 2026-06-14, Owner 10:16)
+- 🔐 Base/ROT 解码 (v0.5+ Decoders) — 18 项 (per Owner 17:09 扁平决策, 不分子分类)
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 
 
-# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 3 decoder）
+# 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 21 decoder）
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "steghide"],
@@ -54,6 +55,30 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     "🔳 QR 工具 (v0.5+ QR Tools)": [
         "decoder:coords-qr",  # 2026-06-14 10:16: 坐标串 → QR PNG → zbar 识别
     ],
+    "🔐 Base/ROT 解码 (v0.5+ Decoders)": [
+        # 12 个 Base 系列 (per v0.5-base-rot-decoders PR1+PR3)
+        "decoder:base16",
+        "decoder:base32",
+        "decoder:base36",
+        "decoder:base58",
+        "decoder:base62",
+        "decoder:base64",
+        "decoder:base85",
+        "decoder:base91",
+        "decoder:base92",
+        "decoder:base100",
+        "decoder:base32768",
+        "decoder:base65536",
+        # 4 个 ROT 系列
+        "decoder:rot5",
+        "decoder:rot13",
+        "decoder:rot18",
+        "decoder:rot47",
+        # 1 个 Base64 自定义表 (interactive, 弹 QInputDialog)
+        "decoder:base64-custom",
+        # 1 个 Base64 隐写 (per PR2)
+        "decoder:base64-stego",
+    ],
 }
 
 
@@ -66,6 +91,27 @@ ACTION_DISPLAY_NAMES = {
     "decoder:base64-image": "🔓 Base64 → 图片",
     "decoder:hex-ascii": "🔢 Hex → ASCII",
     "decoder:coords-qr": "🔳 坐标 → 二维码",  # v0.5-coords-qr
+    # Base 系列（per v0.5-base-rot-decoders PR3）
+    "decoder:base16": "🔢 Base16",
+    "decoder:base32": "🔢 Base32",
+    "decoder:base36": "🔢 Base36",
+    "decoder:base58": "🔢 Base58",
+    "decoder:base62": "🔢 Base62",
+    "decoder:base64": "🔢 Base64",
+    "decoder:base85": "🔢 Base85",
+    "decoder:base91": "🔢 Base91",
+    "decoder:base92": "🔢 Base92",
+    "decoder:base100": "🔢 Base100",
+    "decoder:base32768": "🔢 Base32768",
+    "decoder:base65536": "🔢 Base65536",
+    # ROT 系列
+    "decoder:rot5": "🅰 ROT5",
+    "decoder:rot13": "🅰 ROT13",
+    "decoder:rot18": "🅰 ROT18",
+    "decoder:rot47": "🌀 ROT47",
+    # 特殊
+    "decoder:base64-custom": "🔐 Base64 自定义表",
+    "decoder:base64-stego": "🕵 Base64 隐写",
 }
 
 

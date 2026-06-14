@@ -50,6 +50,8 @@ class DecodeRunner(QThread):
         text: str | None = None,
         out_dir: str | None = None,
         keep: bool = False,
+        custom_table: str | None = None,
+        hint_bytes: int | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -58,6 +60,8 @@ class DecodeRunner(QThread):
         self.text = text
         self.out_dir = out_dir
         self.keep = keep
+        self.custom_table = custom_table  # v0.5-base-rot-decoders: base64-custom 用
+        self.hint_bytes = hint_bytes  # v0.5-base-rot-decoders: base64-stego 用
         self._result: Optional[Any] = None
         self._error: Optional[str] = None
 
@@ -84,6 +88,12 @@ class DecodeRunner(QThread):
                 kwargs["output_dir"] = self.out_dir
             if "keep_output" in valid_kwargs:
                 kwargs["keep_output"] = self.keep
+            # v0.5-base-rot-decoders PR3: base64-custom 用 custom_table
+            if "custom_table" in valid_kwargs and self.custom_table is not None:
+                kwargs["custom_table"] = self.custom_table
+            # v0.5-base-rot-decoders PR3: base64-stego 用 hint_bytes
+            if "hint_bytes" in valid_kwargs and self.hint_bytes is not None:
+                kwargs["hint_bytes"] = self.hint_bytes
 
             result = spec.run(**kwargs)
             self._result = result

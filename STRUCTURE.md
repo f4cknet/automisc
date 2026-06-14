@@ -48,7 +48,7 @@ automisc/
 │   │   │   ├── zip_chain.py          try_unzip / fix_pseudo / bruteforce 3 步
 │   │   │   └── lsb_extract.py        LSB 智能路由 (v0.5-LSB-router 核心)
 │   │   ├── encoding_detector.py  text 分类 (Q1: 敏感词 + base64/binary/hex)
-│   │   ├── encoders/             自编写编码 (base/classical/custom, 非工具池)
+│   │   ├── encoders/             自编写编码 (base/classical/custom + base64_stego + base_custom, 非工具池)
 │   │   ├── exceptions.py         异常体系 (AutomiscError + 6 子类)
 │   │   ├── journal.py            操作日志 (JSONL flush + filter/export)
 │   │   ├── registry.py           工具注册表 (@register_tool 装饰器)
@@ -115,7 +115,7 @@ automisc/
 | `core/registry.py` | 工具注册 (单 Owner 简化) | `@register_tool`, `get_tool`, `list_tools` |
 | `core/result.py` | 工具结果统一 schema | `ToolResult` |
 | `core/suspicious.py` | 可疑点统一 schema + 关键字集 | `SuspiciousPoint`, `SUSPICIOUS_PATTERNS` |
-| `core/encoders/` | 自编写编码 (base / classical / custom) | — |
+| `core/encoders/` | 自编写编码 (base / classical / custom / base64_stego / base_custom) | — |
 | `gui/main_window.py` | QMainWindow + 5 菜单 + 拖文件 | `MainWindow` |
 | `gui/chain_runner.py` | 链 QThread (v0.5) | `ChainRunner` |
 

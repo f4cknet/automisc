@@ -862,21 +862,53 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
             return
 
-        # v0.5-hex-ascii-fix + v0.5-coords-qr: text-based decoders 走 input 区
+        # v0.5-hex-ascii-fix + v0.5-coords-qr + v0.5-base-rot-decoders:
+        # text-based decoders 走 input 区
         # - hex-ascii: 解 hex/binary/base64/base32 串 (永远走 text 模式)
         # - coords-qr: 解 "(r,c)" 坐标串 (per meihuai 手工解法自动化)
+        # - base/rot 系列 (per v0.5-base-rot-decoders PR3): 12 base + 4 rot + 1 stego + 1 custom
+        #   都是解文本串, 走 text 模式
+        # - base64-image: 解 base64 编码的图片, 走 file 模式 (e.g. 拖了 base64.txt 或 data URL 文件)
         #
         # v0.5-coords-qr-file-mode (per Owner 15:23):
         # coords-qr 有 current_file 时优先 file 模式 (e.g. 拖了 .bin 坐标文件),
         # 走 text 模式会触发 'input_len: 8 chars (CSV text)' bug, 因为
         # extract_base_candidate 抽不到 8 字符坐标, 兜底到 'CSV text' (file 工具把坐标串判成 CSV).
         # 修: coords-qr 且 current_file 存在 -> 走 file 模式让 runner read_text(file_path).
-        text_based_decoders = {"hex-ascii"}
+        text_based_decoders = {
+            "hex-ascii",
+            # base_rot 系列 (per v0.5-base-rot-decoders PR3)
+            "base16", "base32", "base36", "base58", "base62", "base64",
+            "base85", "base91", "base92", "base100", "base32768", "base65536",
+            "rot5", "rot13", "rot18", "rot47",
+            "base64-custom", "base64-stego",
+        }
         is_text_based = decoder_name in text_based_decoders
 
         # coords-qr 特殊: 有 current_file 时走 file 模式
         if decoder_name == "coords-qr" and self.current_file is not None:
             is_text_based = False  # 走 file 模式分支
+
+        # v0.5-base-rot-decoders: base64-custom 是 interactive
+        # 触发时弹 QInputDialog 让用户输入 64 字符表
+        custom_table: str | None = None
+        if decoder_name == "base64-custom":
+            from PySide6.QtWidgets import QInputDialog
+            custom_table, ok = QInputDialog.getText(
+                self,
+                "Base64 自定义表",
+                "输入 64 字符自定义表（必填，例: URL-safe 表 'A-Za-z0-9-_'）:",
+            )
+            if not ok or not custom_table or len(custom_table) != 64:
+                self.statusBar().showMessage(
+                    "base64-custom 已取消 (需 64 字符表)"
+                )
+                self.output_view.append_text(
+                    f"\n=== Decoder: {decoder_name} ===\n"
+                    f"[!] 用户取消或输入表长度 != 64 (got {len(custom_table) if custom_table else 0})\n"
+                    f"  提示: 自定义表是 64 字符的 base64 字母表 (如标准表右移 N 位、URL-safe 表 等)\n"
+                )
+                return
 
         if is_text_based:
             # 从 input 区抽 candidate
@@ -938,12 +970,18 @@ class MainWindow(QMainWindow):
             )
             if out_dir:
                 out_line += f"  out_dir:   {out_dir}\n"
+            # v0.5-base-rot-decoders: base64-custom 显示表头
+            if custom_table:
+                out_line += f"  custom_table: {custom_table[:32]}... (len=64)\n"
             self.output_view.append_text(out_line)
 
+            # v0.5-base-rot-decoders: 传 custom_table 给 DecodeRunner
+            # DecodeRunner inspect 自动识别 runner 签名中的 custom_table 参数
             self._decode_runner = DecodeRunner(
                 decoder_name=decoder_name,
                 text=candidate,
                 out_dir=out_dir,
+                custom_table=custom_table,  # 仅 base64-custom 用，其他 decoder 忽略
             )
         else:
             # 传统 file-based decoder (e.g. base64-image / coords-qr with current_file)
