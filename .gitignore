@@ -44,3 +44,8 @@ Challenge/**/__extract/
 Challenge/hex_router_*
 /tmp/automisc/
 /tmp/automisc_text_outputs/
+
+# v0.5-chain-success-journal: chain 跑出的中间目录 (per Owner 测试)
+Challenge/*_bruteforced/
+Challenge/*_unzipped/
+Challenge/*.bak
