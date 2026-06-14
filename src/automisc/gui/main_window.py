@@ -523,11 +523,19 @@ class MainWindow(QMainWindow):
         - "adapter": 22 个 core.adapter 工具 (subprocess + parse)
         - "action": v0.5+ 4 快捷 action (fix_pseudo_zip / bruteforce_zip / lsb_extract / bruteforce_rar)
         - "decoder": v0.5+ decoder (base64-image / hex-ascii)
+
+        v0.5-action-dispatch-fix (per Owner 15:43):
+        之前 action 也走 _run_tool, 但 core.run_tool 只看 adapter registry,
+        报 ToolNotFoundError: tool not registered: 'bruteforce_zip'
+        修: action 走 _run_chain (ChainRunner 走 ACTION_REGISTRY)
         """
         if kind == "decoder":
             self._run_decoder(name)
+        elif kind == "action":
+            # v0.5+ 4 快捷 action 走 ChainRunner (内部有 _ACTION_REGISTRY)
+            self._run_chain(name)
         else:
-            # adapter + action 都走 _run_tool (action 名是 action 名, 已在 ACTION_REGISTRY)
+            # adapter 走 ToolRunner (subprocess + parse)
             self._run_tool(name)
 
     def _run_tool(self, tool_name: str) -> None:

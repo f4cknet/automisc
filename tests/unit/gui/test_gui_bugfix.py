@@ -570,4 +570,84 @@ class TestHexRouterJournalSource:
         Path(wf["path"]).unlink(missing_ok=True)
 
 
+# ---------- v0.5-action-dispatch-fix: 左侧工具栏 action 走 _run_chain (Owner 15:43) ----------
+class TestActionDispatch:
+    """v0.5-action-dispatch-fix (per Owner 15:43):
+
+    Owner 15:43 反馈: '单测 zip 暴力破解失败, 我把 00000000.zip 拖到程序中,
+    然后点击 zip 暴力破解(4-6)位, 打印: ToolNotFoundError: tool not registered:
+    bruteforce_zip'
+
+    Root cause:
+    - 左侧工具栏 (menu_dock) kind='action' 触发 main_window._on_dock_item_selected
+    - 之前实现: kind='action' 走 _run_tool, 但 _run_tool 调 core.run_tool
+    - core.run_tool 只看 adapter registry (bruteforce_zip 不在)
+    - 报 ToolNotFoundError
+
+    Fix: action 走 _run_chain (ChainRunner 内部有 _ACTION_REGISTRY)
+    """
+
+    def test_action_kind_routes_to_run_chain(self, qtbot):
+        """kind='action' 走 _run_chain, 不走 _run_tool (避免 ToolNotFoundError)."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+        from unittest.mock import patch, MagicMock
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        # Mock _run_tool 应**不**被调, _run_chain 应被调
+        with patch.object(w, "_run_tool") as mock_run_tool, \
+             patch.object(w, "_run_chain") as mock_run_chain, \
+             patch.object(w, "_run_decoder") as mock_run_decoder:
+            w._on_dock_item_selected("bruteforce_zip", "action")
+            QApplication.processEvents()
+
+        mock_run_tool.assert_not_called()
+        mock_run_decoder.assert_not_called()
+        mock_run_chain.assert_called_once_with("bruteforce_zip")
+
+    def test_adapter_kind_routes_to_run_tool(self, qtbot):
+        """kind='adapter' 仍走 _run_tool (subprocess 路径)."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+        from unittest.mock import patch
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        with patch.object(w, "_run_tool") as mock_run_tool, \
+             patch.object(w, "_run_chain") as mock_run_chain, \
+             patch.object(w, "_run_decoder") as mock_run_decoder:
+            w._on_dock_item_selected("strings", "adapter")
+            QApplication.processEvents()
+
+        mock_run_tool.assert_called_once_with("strings")
+        mock_run_chain.assert_not_called()
+        mock_run_decoder.assert_not_called()
+
+    def test_decoder_kind_routes_to_run_decoder(self, qtbot):
+        """kind='decoder' 仍走 _run_decoder."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+        from unittest.mock import patch
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        with patch.object(w, "_run_tool") as mock_run_tool, \
+             patch.object(w, "_run_chain") as mock_run_chain, \
+             patch.object(w, "_run_decoder") as mock_run_decoder:
+            w._on_dock_item_selected("hex-ascii", "decoder")
+            QApplication.processEvents()
+
+        mock_run_decoder.assert_called_once_with("hex-ascii")
+        mock_run_tool.assert_not_called()
+        mock_run_chain.assert_not_called()
+
+
+
 
