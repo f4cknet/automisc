@@ -5,17 +5,17 @@
 
 ---
 
-## 状态（snapshot · 2026-06-13 23:23 · 收官）
+## 状态（snapshot · 2026-06-14 17:50 · v0.5-base-rot-decoders 完工）
 
 | 字段 | 值 |
 |---|---|
-| **当前 main HEAD** | `e2fe29c`（v0.5-session-summary）|
-| **当前版本** | v0.5+（频繁迭代模式，已 9 迭代）|
-| **下一个 milestone** | 待 Owner 决策（**3 个新工具** base64 data URL / JPEG trailer / QR 坐标 4-5h，**优先**）|
+| **当前 main HEAD** | `e2fe29c`（v0.5-session-summary，**未推新 commit**）|
+| **当前版本** | v0.5+（频繁迭代模式，已 13 迭代）|
+| **下一个 milestone** | **v0.5-base-rot-decoders**（PR1+PR2+PR3 全完工，**等 Owner 自审后 commit + push**）|
 | **主分支** | main（per `AGENTS.md §2.4` 单 Owner 简化：直接 main commit）|
 | **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.4 v1.20 治理变更）|
 | **3 件套行数** | AGENTS 101 + prd 93 + STRUCTURE 186 = **380 行**（v3.0 治理）|
-| **测试** | **349 passed**（306 v0.1.1 基线 + 43 v0.5+ 增量）|
+| **测试** | **592 passed**（v0.5-base-rot-decoders +24 单测：PR1 算法库 37 + PR2 base64 stego 15 + PR3 decoder+GUI 24）— 4 failed 跟本次无关（Challenge 文件缺失 + 包安装）|
 | **真 flag 数** | **4**（QR + steg + KEY + meihuai）|
 | **今晚 commit 数** | 8 (4b4af51 → b9226c1) |
 | **真 flag 命中** | 2 (Challenge/QR_code.png `CTF{vjpw_wnoei}` + Challenge/steg.png `st3g0_saurus_wr3cks`) |
@@ -63,6 +63,9 @@
 | v0.5-tmp-text-mode | text 模式 (无 file_path) 写 /tmp + GUI 弹 QFileDialog 选 dir | ✅ done | main `abf2ff4` | [`upgrade/v0.5-tmp-text-mode.md`](upgrade/v0.5-tmp-text-mode.md) |
 | v0.5-tmp-text-mode-2 | QFileDialog 只在 decoder 真写文件时弹 (hex-ascii 不弹) | ✅ done | main `94794c9` | [`upgrade/v0.5-dialog-when-write-file.md`](upgrade/v0.5-dialog-when-write-file.md) |
 | v0.5-hex-router | strings 命中长 hex (>=200 chars) 自动探测 magic + 写 /tmp + 调 zbar/unzip; 短 hex 仍打印 | ✅ done | main (待 push) | [`upgrade/v0.5-hex-router.md`](upgrade/v0.5-hex-router.md) |
+| v0.5-tool-install-batch-1 | 装 5 个 tools.md ❌ 工具 (pcapfix/compiled + aircrack-ng + scapy + impacket + python-evtx)，更新 tools.md 状态；意外发现 evtx_dump CLI shim 坏，待 fix | 🔄 in-progress | (无 commit，无代码改动) | [`upgrade/v0.5-tool-install-batch-1.md`](upgrade/v0.5-tool-install-batch-1.md) |
+| v0.5-tool-install-batch-2 | sox brew 装 (❌→✅) + evtx_dump 走 extend_tools/ Rust 0.8.2 (⚠️→✅，跟 python-evtx 不同项目) + python-evtx (⚠️→✅) | ✅ done | (无 commit，无代码改动) | [`upgrade/v0.5-tool-install-batch-2.md`](upgrade/v0.5-tool-install-batch-2.md) |
+| v0.5-base-rot-decoders | base 家族 (36/92/100/32768/65536 + 自定义表) + rot 家族 (5/47/18) + base64 stego 解码封装 → "🔐 Base/ROT 解码" GUI 二级分类 (18 decoder 扁平) | ✅ done | (3 PR 完工：PR1 算法库 92 单测, PR2 base64 stego 15 单测, PR3 decoder + GUI 19+5 单测；总 +24 单测 568→592 passed) | [`upgrade/v0.5-base-rot-decoders.md`](upgrade/v0.5-base-rot-decoders.md) |
 
 ---
 

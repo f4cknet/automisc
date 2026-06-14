@@ -17,6 +17,7 @@ dependencies = [
     "python-evtx>=0.8.1",  # PR6: Forensics/Log Windows EVTX 日志解析
     "volatility3>=2.0",     # PR7-envfix: Forensics/Memory（vol3 官方 Python 3 port；vol2 留 v0.5+ docker）
     "base91>=1.0.1",        # encoders: base91 编解码（自实现易出 bug，用 PyPI 库）
+    "base65536>=0.1.1",     # encoders: base65536 编解码（per v0.5-base-rot-decoders PR1）
     "PySide6>=6.6",         # v0.1.1 GUI: PySide6 主窗口（按 §2.5.1 简化流程直接 main commit）
 ]
 

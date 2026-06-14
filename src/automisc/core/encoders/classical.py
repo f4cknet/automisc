@@ -31,6 +31,40 @@ def rot_n(s: str, n: int) -> str:
     ))
 
 
+# === ROT5（仅 digits 0-9）===
+def rot5(s: str) -> str:
+    """ROT5 — 数字旋转（0→5, 1→6, ..., 5→0, 6→1, ...）
+
+    仅作用于 digits (0-9)，其他字符不变。
+    """
+    return s.translate(str.maketrans("0123456789", "5678901234"))
+
+
+# === ROT47（ASCII 33-126 整段 94 字符旋转）===
+def rot47(s: str) -> str:
+    """ROT47 — ASCII 33-126 整段旋转 47 位（CTF 藏 base64 结果常用）。
+
+    范围：! (33) 到 ~ (126)，共 94 个字符，每个字符位移 47。
+    """
+    result = []
+    for c in s:
+        o = ord(c)
+        if 33 <= o <= 126:
+            result.append(chr(33 + (o - 33 + 47) % 94))
+        else:
+            result.append(c)
+    return "".join(result)
+
+
+# === ROT18（ROT13 字母 + ROT5 数字）===
+def rot18(s: str) -> str:
+    """ROT18 — ROT13 + ROT5 组合（字母 ROT13，数字 ROT5，其他不变）。
+
+    CTF 经典组合密码。
+    """
+    return rot5(rot13(s))
+
+
 # === Caesar (同 ROT-N，但 N 可变) ===
 def caesar_decrypt(s: str, shift: int) -> str:
     """Caesar 解密（shift = 加密时的位移）"""

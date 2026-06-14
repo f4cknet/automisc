@@ -80,12 +80,17 @@ MISC（根）
 
 | 一级分支 | 子分支数 | 工具总数（✅/⚠️/❌）| v0.1 P0 adapter |
 |---|---|---|---|
-| **Forensics** | 4 | 14（6✅ / 1⚠️ / 7❌）| 6 |
-| **Steganography** | 3 | 22（9✅ / 1⚠️ / 12❌）| 8 |
+| **Forensics** | 4 | 14（**12✅ / 3⚠️ / 6❌** *）| 6 |
+| **Steganography** | 3 | 22（**10✅ / 1⚠️ / 11❌** *）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
 | **Misc Others** | 3 | 10（5✅ / 0⚠️ / 5❌）| 3 |
 | **共享基础工具** | — | 8（8✅）| 5 |
-| **合计** | 14 | 54（28✅ / 2⚠️ / 24❌）| **22** |
+| **合计** | 14 | 54（**37✅ / 2⚠️ / 15❌** *）| **22** |
+
+> **\*** 2026-06-14 更新（per `upgrade/v0.5-tool-install-batch-1.md` + `upgrade/v0.5-tool-install-batch-2.md`）：
+> - **batch-1**：4 个工具❌→✅（pcapfix / aircrack-ng / scapy / impacket）
+> - **batch-2**：sox ❌→✅（brew install）；evtx_dump ⚠️→✅（用 `extend_tools/evtx_dump` Rust 二进制 0.8.2，不用 pyenv shim）；python-evtx ⚠️→✅（包已装，CLI 走 extend_tools 二进制）
+> - §2 数字为**去重后**统计；§3 表格里有跨节重复（如 binwalk/exiftool 同时在 Shared + Stego/Image + Misc/Office），所以 awk 切片会读到 67 个 — 这是原表结构，不影响实际工具池。
 
 > **v0.1 P0 实际 adapter 数**：22 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），22 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
@@ -120,21 +125,112 @@ MISC（根）
 | **tshark** | ✅ | `/usr/local/bin/tshark` | CLI 抓包 + 协议解析 + `--export-objects http` | P0 · v0.1 必须 |
 | **tcpdump** | ✅ | `/usr/sbin/tcpdump` | 原始抓包（速度优先）| P0 · v0.1 必须 |
 | **wireshark** | ✅ | `/Applications/Wireshark.app/Contents/MacOS/wireshark` | GUI 流量分析（GUI 调用）| P1 · v0.5 候选 |
-| **pcapfix** | ❌ | `brew install pcapfix` | 损坏 pcap 修复（缺 magic bytes / 校验和）| v0.5 安装 |
-| **aircrack-ng** | ❌ | `brew install aircrack-ng` | WiFi WPA/WEP 破解 | v0.5 安装 |
-| **multimon-ng** | ❌ | `brew install multimon-ng` | DTMF / POCSAG 解码 | v0.5 安装 |
-| **scapy** | ❌ | `pip install scapy` | Python pcap 操作 | v0.5 安装 |
-| **impacket** | ❌ | `pip install impacket` | NTLMv2 / Kerberos 解析（PCAP 中的 hashcat 提取）| v0.5 安装 |
+| **pcapfix** | ✅ | `/usr/local/bin/pcapfix`（**brew core 无 formula**，从 SourceForge 下源码编译，v0.5-tool-install-batch-1 实施）| 损坏 pcap 修复（缺 magic bytes / 校验和）| v0.5 已装 |
+| **aircrack-ng** | ✅ | `/usr/local/bin/aircrack-ng`（v1.7_2，brew install）| WiFi WPA/WEP 破解 | v0.5 已装 |
+| **multimon-ng** | ❌ | `brew install multimon-ng` | DTMF / POCSAG 解码 | v0.5 候选 |
+| **scapy** | ✅ | pip scapy 2.7.0（v0.5-tool-install-batch-1 实施）| Python pcap 操作 | v0.5 已装 |
+| **impacket** | ✅ | pip impacket 0.13.1（v0.5-tool-install-batch-1 实施）| NTLMv2 / Kerberos 解析（PCAP 中的 hashcat 提取）| v0.5 已装 |
 
 ### 3.4 Forensics / Log Forensics（日志取证）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **grep / awk / sed / sort / uniq** | ✅ | macOS 自带 | 日志关键字 + 异常分析 | P0 |
-| **evtx_dump** | ✅ | `misc/evtx_dump`（PyPI: `python-evtx`）| Windows .evtx 事件日志解析 | P0 · v0.1 必须 |
-| **python-evtx（Python 包）** | ❌ | `pip install python-evtx` | .evtx 解析（提供 `evtx_dump`）| v0.1 必须装 |
+| **evtx_dump** | ✅ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64）| Windows .evtx 事件日志解析（XML / JSON / JSONL）| P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） |
+| **python-evtx（Python 包）** | ✅ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**CLI 入口走 extend_tools/evtx_dump**（Rust 0.8.2），不依赖 shim | .evtx 解析（Python 模块路径）| P0 · v0.5 已装 |
 | **7z** | ✅ | `/usr/local/bin/7z` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
+
+#### 3.4.1 evtx_dump 参数速查（per `evtx_dump --help`）
+
+| 参数 | 类型 | 默认 | 说明 | automisc 封装建议 |
+|---|---|---|---|---|
+| `<INPUT>` | 路径 | （必填）| .evtx 文件路径 | `argv[1]` |
+| `-t, --threads <N>` | int | 0 (=CPU cores) | worker 线程数 | **保持默认**（自动并行） |
+| `-o, --format <F>` | enum | `xml` | 输出格式：`xml` / `json` / `jsonl` | **默认 xml**（grep 友好）；JSONL 适合 journal 结构化落盘 |
+| `-f, --output <FILE>` | 路径 | stdout | 写到文件而不是 stdout（写文件前会问确认） | **加 `--no-confirm-overwrite`**（自动化必加） |
+| `--no-confirm-overwrite` | flag | false | 跳过 `-f` 写文件的覆盖确认 | **自动化场景必加** |
+| `--events <RANGES>` | string | 全输出 | 事件范围，如 `1`（第 1 个）/ `0-10,20-30`（0~10 + 20~30）| 可选，**调试 / 抽样** 用 |
+| `--validate-checksums` | flag | false | 校验 chunk checksum，坏的跳过 | **CTF 场景不推荐**（损坏文件反而记录更多） |
+| `--no-indent` | flag | false | 输出不缩进 | JSONL 自动启用 |
+| `--separate-json-attributes` | flag | false | JSON 模式：XML 属性放 `_attributes` 对象 | 可选，**结构化解析时开** |
+| `--dont-show-record-number` | flag | false | 不打印 `Record <id>` 前缀 | JSONL 自动启用 |
+| `--ansi-codec <C>` | enum | `windows-1252` | ANSI 字符串编码（CJK / 西欧 / 西里尔等）| **默认即可**；CJK 文件可试 `utf-8` / `gbk` / `gb18030` |
+| `--stop-after-one-error` | flag | false | 出错立即停止 | **debug 用**，CTF 跑全文件别开 |
+| `-v` / `-vv` / `-vvv` | flag | 0 | info / debug / trace 日志（trace 只 debug build 有） | **保持默认** |
+| `-V, --version` | flag | — | 打版本 | — |
+| `-h, --help` | flag | — | 打 help | — |
+
+#### 3.4.2 典型调用（5 个 pattern）
+
+```bash
+# 1) XML 到 stdout（默认，最简，GUI 可直接 grep）
+evtx_dump file.evtx | grep -E 'flag|key|password|ctf' -i
+
+# 2) JSONL 到文件（journal 结构化落盘）
+evtx_dump file.evtx -o jsonl --no-indent --dont-show-record-number -f out.jsonl --no-confirm-overwrite
+
+# 3) 仅看前 10 个事件（快速 triage）
+evtx_dump file.evtx --events=0-10
+
+# 4) CJK Windows evtx
+evtx_dump file.evtx --ansi-codec=utf-8
+
+# 5) 损坏 evtx 全捞（跳过 checksum 校验）
+evtx_dump file.evtx | head -1000
+```
+
+#### 3.4.3 adapter 封装模板（per Architecture §6 plug-in）
+
+```python
+# src/automisc/tools/forensics/log/evtx_dump.py
+from pathlib import Path
+from ...base import ToolAdapter, ToolResult
+
+class EVTXDumpAdapter(ToolAdapter):
+    """evtx_dump (Rust evtx crate 0.8.2) — Windows .evtx parser"""
+    name = "evtx_dump"
+    binary = "extend_tools/evtx_dump"  # 相对 repo root，subprocess 走绝对路径
+
+    def run(self, file_path: Path, **kwargs) -> ToolResult:
+        fmt = kwargs.get("format", "xml")           # xml / json / jsonl
+        out_file = kwargs.get("out_file")           # None = stdout
+        threads = kwargs.get("threads", 0)          # 0 = CPU 自动
+
+        cmd = [self.binary, str(file_path), "-o", fmt]
+        if threads:
+            cmd += ["-t", str(threads)]
+        if out_file:
+            cmd += ["-f", str(out_file), "--no-confirm-overwrite"]
+
+        # subprocess.run(cmd, capture_output=True, timeout=60, text=True)
+        # → ToolResult(stdout=..., stderr=..., returncode=...)
+```
+
+**封装决策点**（未来 adapter 实装时定）：
+
+| 决策点 | 建议 | 理由 |
+|---|---|---|
+| binary 路径 | 相对 repo root `extend_tools/evtx_dump` | per AGENTS §2.3 macOS 标准 PATH 简洁 |
+| 默认 format | `xml` | CLI grep 友好 |
+| threads 默认 | `0`（auto）| 多核机器加速 |
+| timeout | `60s` 起，跑挂再加 | 大文件可能 60s+ |
+| 部分失败行为 | **不要 fail-fast** | evtx_dump 对损坏文件部分成功（部分 chunk 输出 + 部分 skip） |
+
+#### 3.4.4 python-evtx Python 模块用法
+
+```python
+# 结构化字段提取（自动遍历 EventID / Provider / Data）
+import Evtx.Views as e
+with Evtx.Evtx("file.evtx") as log:
+    for record in log.records():
+        print(record.root_element().find("EventID").text)
+```
+
+**CLI vs Python 路径分工**：
+- **CLI**（`extend_tools/evtx_dump`）→ **快速 grep / 大文件流式** / 不写代码的场景
+- **Python**（`import Evtx`）→ **结构化字段提取** / 写 adapter 时遍历字段
+
 
 ### 3.5 Steganography / Image Stego（图片隐写）
 
@@ -161,7 +257,7 @@ MISC（根）
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **ffmpeg** | ✅ | `/usr/local/bin/ffmpeg` | 音频转码 + 频谱生成 + showspectrumpic 滤镜 | P0 · v0.1 必须 |
-| **sox** | ❌ | `brew install sox` | 音频处理 + spectrogram 生成 + `sox -m` 多轨减法 | P0 · v0.1 必须装 |
+| **sox** | ✅ | `/usr/local/bin/sox`（brew install，2026-06-14 装）| 音频处理 + spectrogram 生成 + `sox -m` 多轨减法 | P0 · v0.1 必须 |
 | **audacity** | ❌ | `brew install --cask audacity` | GUI 音频分析（GUI 调用）| v0.5 安装 |
 | **sonic-visualiser** | ❌ | `brew install --cask sonic-visualiser` | GUI 频谱分析 | v0.5 安装 |
 | **MP3Stego** | ⚠️ | `misc/MP3Stego/`（源码）| MP3 隐写（口令）| 需编译 `Decode.exe`（Wine） |
@@ -188,17 +284,30 @@ MISC（根）
 
 #### 3.8.1 Base 系列（`core/encoders/base.py`）
 
-- base16 / base32 / base58 / base62 / base64 / base85 / base91
-- base2048 / base32768 / base65536（CTF 罕见但出现过，per ctf-misc/encodings.md）
+- base16 / base32 / base36 / base58 / base62 / base64 / base85 / base91 / base92 / base100
+- base32768（CJK 基本平面 emoji）/ base65536（Unicode BMP）
+- base2048（**fallback to base64** · v0.5+ 仍占位，emoji 实现复杂）
 - `xxencode` / `yenc` / `uuencode`（古典）
+
+> **v0.5+ 已补**（per `upgrade/v0.5-base-rot-decoders.md` PR1 完成）：
+> - ✅ **base36**（0-9 + a-z）
+> - ✅ **base92**（94 个 ASCII 可打印，去掉 `\` 和 `"`）
+> - ⚠️ **base100**（**fallback to base64**，100 进制无法表示 256 字节值，CTF 极罕见）
+> - ✅ **base32768** / **base65536** 真实现（base65536 依赖 PyPI `base65536`）
+> - ✅ **base64 自定义表**（`core/encoders/base_custom.py` · 提供 encode + decode + 自动位移检测）
 
 #### 3.8.2 古典密码（`core/encoders/classical.py`）
 
-- ROT13 / ROT47 / ROT18（ROT13 on letters + ROT5 on digits）
+- ROT5 / ROT13 / ROT18（ROT13+ROT5）/ ROT47（ASCII 33-126）
 - Caesar brute force（穷举 26 个 shift）
 - Vigenère（已知 key / 不知道 key）
 - Atbash / Pigpen / Keyboard Shift（per ctf-misc/encodings.md）
 - Affine / Rail Fence
+
+> **v0.5+ 已补**（per `upgrade/v0.5-base-rot-decoders.md` PR1 完成）：
+> - ✅ **ROT5**（digits 0-9 旋转）
+> - ✅ **ROT47**（ASCII 33-126 整段旋转）
+> - ✅ **ROT18**（ROT13+ROT5 组合）
 
 #### 3.8.3 自定义编码（`core/encoders/custom.py`）
 
@@ -208,11 +317,23 @@ MISC（根）
 - Unicode Tags（U+E0000-U+E007F）/ Variation Selector Supplement（U+E0100-U+E01EF）
 - Multi-layer auto-decoder（hex 优先于 base64，per ctf-misc/encodings.md）
 
+#### 3.8.4 Base64 隐写（`core/encoders/base64_stego.py` · v0.5+ 新模块）
+
+> **原理**：base64 每字符 6 bit 表示数据，但**末尾不足 3 字节时末 2 bit 是冗余的**（因为只用 12/18 bit = 2/3 字符）。CTF 隐写：把 1 byte 隐藏数据拆成 4 个 2-bit，分别塞进 4 个 base64 字符的**末 2 bit**。解码 = 提取每字符末 2 bit → 4 个 2-bit 拼成 1 byte → 这就是隐藏数据。
+>
+> **算法实现**：`decode_base64_stego(s)` / `encode_base64_stego(s, hidden)` / `extract_hidden_with_size_hint(s, hint_bytes=N)`
+>
+> **简化算法**：每字符末 2 bit 都视为可隐藏位 → 4 chars → 1 byte（CTF 常见）。
+>
+> **GUI 入口**：`decoder:base64-stego` 在 "🔐 Base/ROT 解码" 分类下。
+>
+> 详细实现 + GUI 入口见 `upgrade/v0.5-base-rot-decoders.md` PR2 / PR3。
+
 **Python 依赖**：
 
 | 包 | 状态 | 用途 | 备注 |
 |---|---|---|---|
-| **base65536** | ❌ | base65536 编解码 | v0.5 安装 |
+| **base65536** | ✅ `pip install base65536`（v0.5-base-rot-decoders PR1 完成）| base65536 编解码 | v0.5 已装 |
 
 ### 3.9 Misc Others / Archive（压缩包分析）
 
@@ -283,7 +404,7 @@ MISC（根）
 | **segno / pyzbar / qrcode** | ❌ | QR 生成 / 解析 | P2 · `pip install segno pyzbar qrcode` |
 | **stegano / stegolsb / stegcracker** | ❌ | 高级 LSB + 爆破 | P2 · `pip install stegano stegolsb stegcracker` |
 | **base65536** | ❌ | base65536 编码 | P1 · `pip install base65536` |
-| **python-evtx** | ❌ | .evtx 事件日志解析（提供 `evtx_dump` CLI）| P0 · v0.1 必须 `pip install python-evtx` |
+| **python-evtx** | ✅ | .evtx 事件日志解析（Python 模块；**CLI 走 extend_tools/evtx_dump 0.8.2 Rust 二进制**）| P0 · v0.5 已装 |
 
 > **自动检测范围**：v0.1 启动时，Core 调度层应在启动时调用 `check_dependencies()`，对 §6 P0 工具做可达性检查，缺失时 GUI 提示并降级（而非阻塞启动）。
 
@@ -334,11 +455,11 @@ MISC（根）
 | 13 | **unzip** | Misc/Archive | ✅ 已装 |
 | 14 | **xxd** | 通用 | ✅ 已装 |
 | 15 | **grep** | Forensics/Log + 通用 | ✅ 已装 |
-| 16 | **evtx_dump** | Forensics/Log | ⚠️ 需 `pip install python-evtx` |
+| 16 | **evtx_dump** | Forensics/Log | ✅ `extend_tools/evtx_dump`（Rust 0.8.2） |
 | 17 | **vol.py** | Forensics/Memory | ⚠️ **必须先恢复 vol2 安装** |
 | 18 | **john** | Misc/Archive | ❌ v0.1 必须装 `brew install john-jumbo` |
 | 19 | **zbar** | Misc/Brainteaser（QR）| ❌ v0.1 必须装 `brew install zbar` |
-| 20 | **sox** | Stego/Audio | ❌ v0.1 必须装 `brew install sox` |
+| 20 | **sox** | Stego/Audio | ✅ brew install（2026-06-14） |
 | 21 | **python-magic-bin** | 通用（file 类型识别 Python）| ❌ v0.1 必须 `pip install python-magic-bin` |
 | 22 | **numpy** | 通用（图像/频谱处理）| ❌ v0.1 必须 `pip install numpy` |
 
@@ -399,6 +520,8 @@ MISC（根）
 | 2026-06-13 | **2.0** | 重大分支重整：从 9 subflow 改为 11 subflow（Forensics×4 + Stego×3 + Encoding×3 + Misc Others×3）；54 工具（28✅/2⚠️/24❌）；Encoding 内置实现。详见 commit `9401f98`。 |
 | 2026-06-13 | **2.1** | v0.1.0b-PR1 实施完成：6 个共享 adapter 落地（61 tests PASS）。详见 commit `9401f98`。 |
 | 2026-06-13 | **2.2** | v0.1.0b-PR2 实施完成：Stego/Image 2 个 adapter 落地（75 tests PASS）。详见 commit `4ca05e5`（PR #2）。 |
+| 2026-06-14 | **2.3** | v0.5-tool-install-batch-1：4 个工具❌→✅（pcapfix / aircrack-ng / scapy / impacket）；python-evtx ❌→⚠️。详见 [`upgrade/v0.5-tool-install-batch-1.md`](./upgrade/v0.5-tool-install-batch-1.md)。 |
+| 2026-06-14 | **2.4** | v0.5-tool-install-batch-2：sox ❌→✅（brew install）；evtx_dump ⚠️→✅（`extend_tools/evtx_dump` Rust 0.8.2，跟 python-evtx 是不同项目）；python-evtx ⚠️→✅。详见 [`upgrade/v0.5-tool-install-batch-2.md`](./upgrade/v0.5-tool-install-batch-2.md)。 |
 
 ---
 
