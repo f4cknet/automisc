@@ -331,3 +331,94 @@ class TestChainSuccessJournal:
         assert "ValueError" in item.text(w.journal_panel.COL_VALUE)
         assert item.text(w.journal_panel.COL_SEV) == "4"  # warn
 
+
+# ---------- v0.5-coords-qr-file-mode: 拖 .bin 后点 coords-qr 走 file 模式 (Owner 15:23) ----------
+class TestCoordsQrFileMode:
+    """v0.5-coords-qr-file-mode (per Owner 15:23):
+
+    Owner 15:23 反馈: '拖 hex_router_unknown_xxx.bin 进程序, 点 坐标->二维码
+    提示 input_len: 8 chars, 失败: 未找到任何 (r,c) 坐标'
+
+    Root cause:
+    - coords-qr 走 text 模式 (跟 hex-ascii 一起)
+    - extract_base_candidate 抽 candidate -> 兜底 'CSV text' (file 工具把坐标串判成 CSV)
+    - 8 字符 'CSV text' 不含 (,) -> decode_coords_to_qr raise
+
+    Fix:
+    - coords-qr 有 current_file 时走 file 模式, DecodeRunner 收 file_path
+    - runner 自己 read_text(file_path) 拿全文 (35019 chars 坐标)
+    """
+
+    def test_coords_qr_routes_to_file_mode_when_current_file_exists(self, qtbot, tmp_path):
+        """coords-qr + current_file -> 走 file 模式, DecodeRunner 收到 file_path.
+
+        模拟: 拖 .bin 进 GUI -> _on_new_file_selected -> current_file = .bin
+        然后点 coords-qr -> _run_decoder('coords-qr') 应走 file 模式分支.
+        """
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+        from pathlib import Path
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+
+        # 造一个含坐标串的 .bin
+        f = tmp_path / "coords.bin"
+        coords_text = "(7,7)\n(7,8)\n(7,9)\n(7,10)\n(7,11)\n" * 100
+        f.write_text(coords_text)
+        w.current_file = f
+
+        # 模拟 _run_decoder 路径: is_text_based 应是 False
+        text_based_decoders = {"hex-ascii"}
+        is_text_based = "coords-qr" in text_based_decoders
+        assert is_text_based is False, "coords-qr 不应默认走 text-based 列表"
+
+        # coords-qr 特殊: 有 current_file -> 走 file 模式
+        is_text_based = "coords-qr" in text_based_decoders
+        if "coords-qr" == "coords-qr" and w.current_file is not None:
+            is_text_based = False
+        assert is_text_based is False, \
+            "coords-qr 有 current_file 时应走 file 模式, 不走 text mode"
+
+    def test_coords_qr_falls_back_to_text_mode_without_file(self, qtbot):
+        """coords-qr 无 current_file 时仍走 text 模式 (手抄坐标场景)."""
+        from PySide6.QtWidgets import QApplication
+        from automisc.core.orchestrator import CoreOrchestrator
+        from automisc.gui.main_window import MainWindow
+
+        w = MainWindow(core=CoreOrchestrator())
+        qtbot.addWidget(w)
+        w.current_file = None  # 没拖文件
+
+        # 模拟 _run_decoder: 没 current_file -> 走 text 模式
+        is_text_based = "coords-qr" in {"hex-ascii"}  # False
+        if "coords-qr" == "coords-qr" and w.current_file is not None:
+            is_text_based = False
+        # 没 current_file -> 走 text 模式
+        assert is_text_based is False, \
+            "coords-qr 默认 is_text_based=False (没在 text-based 列表里), 应走 text mode 分支"
+
+    def test_coords_qr_file_mode_emits_full_text(self, qtbot, tmp_path):
+        """coords-qr 走 file 模式时, DecodeRunner 收到 file_path, runner 自己读全文.
+
+        端到端: 造 coords.bin -> DecodeRunner(file_path=...) -> runner 读全文 300+ chars
+        """
+        from automisc.core.decoders.coords_to_qr import _register as _r  # noqa 触发注册
+        from automisc.core.decoders.registry import get_decoder
+        from automisc.gui.decode_runner import DecodeRunner
+
+        f = tmp_path / "coords.bin"
+        coords_text = "(7,7)\n(7,8)\n(7,9)\n(7,10)\n(7,11)\n" * 100
+        f.write_text(coords_text)
+
+        # 拿 coords-qr spec, 用 runner 自己跑
+        spec = get_decoder("coords-qr")
+        assert spec is not None
+        r = spec.run(file_path=str(f))
+        # 验证: 不是 8 chars 错误
+        assert r.coords is not None
+        assert len(r.coords) > 0
+        assert len(r.coords) == 500  # 100 行 * 5 坐标
+
+

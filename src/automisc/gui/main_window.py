@@ -822,11 +822,20 @@ class MainWindow(QMainWindow):
             return
 
         # v0.5-hex-ascii-fix + v0.5-coords-qr: text-based decoders 走 input 区
-        # - hex-ascii: 解 hex/binary/base64/base32 串
+        # - hex-ascii: 解 hex/binary/base64/base32 串 (永远走 text 模式)
         # - coords-qr: 解 "(r,c)" 坐标串 (per meihuai 手工解法自动化)
-        # 这些都用 input 区的 text, 不用 current_file (避免把图片当文本解)
-        text_based_decoders = {"hex-ascii", "coords-qr"}
+        #
+        # v0.5-coords-qr-file-mode (per Owner 15:23):
+        # coords-qr 有 current_file 时优先 file 模式 (e.g. 拖了 .bin 坐标文件),
+        # 走 text 模式会触发 'input_len: 8 chars (CSV text)' bug, 因为
+        # extract_base_candidate 抽不到 8 字符坐标, 兜底到 'CSV text' (file 工具把坐标串判成 CSV).
+        # 修: coords-qr 且 current_file 存在 -> 走 file 模式让 runner read_text(file_path).
+        text_based_decoders = {"hex-ascii"}
         is_text_based = decoder_name in text_based_decoders
+
+        # coords-qr 特殊: 有 current_file 时走 file 模式
+        if decoder_name == "coords-qr" and self.current_file is not None:
+            is_text_based = False  # 走 file 模式分支
 
         if is_text_based:
             # 从 input 区抽 candidate
@@ -896,7 +905,7 @@ class MainWindow(QMainWindow):
                 out_dir=out_dir,
             )
         else:
-            # 传统 file-based decoder (e.g. base64-image)
+            # 传统 file-based decoder (e.g. base64-image / coords-qr with current_file)
             if not self.current_file:
                 self.statusBar().showMessage("请先拖入或打开文件")
                 self.output_view.append_text("[!] no file selected\n")
@@ -905,8 +914,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 f"running decoder={decoder_name} on {self.current_file.name} (async)…"
             )
-            self.output_view.append_text(f"\n=== Decoder: {decoder_name} ===\n")
+            self.output_view.append_text(f"\n=== Decoder: {decoder_name} (file mode) ===\n")
             self.output_view.append_text(f"=== File:    {self.current_file}\n")
+            # v0.5-coords-qr-file-mode (per Owner 15:23):
+            # coords-qr 走 file 模式时, 提示 Owner 全文读 (35019 chars 之类)
+            # 区别于 text 模式 input_len: 8 chars
+            if decoder_name == "coords-qr":
+                try:
+                    full_text = self.current_file.read_text(errors="replace")
+                    self.output_view.append_text(
+                        f"  file_size: {self.current_file.stat().st_size} bytes\n"
+                        f"  text_len:  {len(full_text)} chars (全文读, per Owner 15:23 修复)\n"
+                    )
+                except Exception as e:  # noqa: BLE001
+                    self.output_view.append_text(f"  [!] read_text failed: {e}\n")
 
             self._decode_runner = DecodeRunner(
                 decoder_name=decoder_name,
