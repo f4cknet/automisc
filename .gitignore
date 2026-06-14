@@ -39,3 +39,8 @@ Challenge/**/audit.txt
 Challenge/**/foremost_out/
 Challenge/**/FOREMOST/
 Challenge/**/__extract/
+
+# v0.5-hex-router: strings 命中长 hex 自动 router 写 samedir
+Challenge/hex_router_*
+/tmp/automisc/
+/tmp/automisc_text_outputs/
