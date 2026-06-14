@@ -300,6 +300,10 @@ def build_parser() -> argparse.ArgumentParser:
             "--variant", default=None,
             help="变体参数 (bacon 用 '24'/'26', pigpen 用 'unicode'/'simple')"
         )
+        p_sub.add_argument(
+            "--word-sep", default=None,
+            help="摩尔斯单词间分隔符 (morse 用, 默认 ' '; 传 '' 拼成连续字符串, CTF 数字串场景)"
+        )
         p_sub.set_defaults(func=cmd_decode_dispatcher, decoder_name=spec.name)
 
     p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")

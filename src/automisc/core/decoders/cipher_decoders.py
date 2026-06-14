@@ -250,16 +250,22 @@ def run_pigpen(text=None, file_path=None, variant="unicode", **_):
 
 # === 摩尔斯 runner ===
 
-def run_morse(text=None, file_path=None, **_):
+def run_morse(text=None, file_path=None, word_sep=" ", **_):
+    """摩尔斯解码. word_sep=None/'' → 拼成连续字符串 (CTF 数字串场景)."""
     data = _read_input(text, file_path, "morse")
+    # None → 默认空格
+    sep = " " if word_sep is None else str(word_sep)
     try:
-        output = classical_ext.morse_decode(data)
+        output = classical_ext.morse_decode(data, word_sep=sep)
     except (ValueError, TypeError) as e:
         return DecodeResult(codec="morse", input=data, error=str(e))
+    hint = "word sep=/  char sep=空格  (CTF 包裹 {} 自动去除)"
+    if sep != " ":
+        hint += f"  --word-sep={sep!r} 拼成连续字符串"
     return DecodeResult(
         codec="morse", input=data,
         output_text=output,
-        hint="word sep=/  char sep=空格  (CTF 包裹 {} 自动去除)",
+        hint=hint,
     )
 
 

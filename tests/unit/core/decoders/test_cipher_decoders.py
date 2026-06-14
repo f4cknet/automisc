@@ -233,6 +233,44 @@ def test_morse_strips_braces():
     assert r.output_text == "SOS"
 
 
+def test_morse_word_sep_empty_string():
+    """v0.5-cipher-decoders-wordsep: --word-sep='' 拼成连续字符串 (CTF 数字串场景)."""
+    # Owner 19:35 真样本: 摩尔斯数字串 → hex
+    morse_input = (
+        "...../-.../-.-./----./..---/...../-..../....-/----./-.-./-.../-----"
+        "/.----/---../---../..-./...../..---/./-..../.----/--.../-../--.../-----"
+        "/----./..---/----./.----/----./.----/-.-."
+    )
+    r = run_morse(text=morse_input, word_sep="")
+    assert r.error is None
+    # 应解出 32 字符 hex 串
+    assert r.output_text == "5BC925649CB0188F52E617D70929191C"
+    assert len(r.output_text) == 32
+    # hint 应包含 word-sep 提示
+    assert "--word-sep" in r.hint or "拼成连续字符串" in r.hint
+
+
+def test_morse_word_sep_default_space():
+    """默认 word_sep=' ' 跟原行为一致 (HELLO WORLD)."""
+    r = run_morse(text=".... . .-.. .-.. --- / .-- --- .-. .-.. -..", word_sep=" ")
+    assert r.error is None
+    assert r.output_text == "HELLO WORLD"
+
+
+def test_morse_word_sep_custom():
+    """自定义 word_sep (e.g. '-' 用于 CTF 拼写)."""
+    r = run_morse(text=".... . .-.. .-.. --- / .-- --- .-. .-.. -..", word_sep="-")
+    assert r.error is None
+    assert r.output_text == "HELLO-WORLD"
+
+
+def test_morse_word_sep_none_uses_default():
+    """word_sep=None (CLI 未传) → 默认 ' '."""
+    r = run_morse(text="... --- ...", word_sep=None)
+    assert r.error is None
+    assert r.output_text == "SOS"
+
+
 # === xxencode ===
 
 def test_xxencode_hello():

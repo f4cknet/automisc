@@ -43,16 +43,24 @@ _MORSE_TO_CHAR = {
 }
 
 
-def morse_decode(s: str) -> str:
+def morse_decode(s: str, word_sep: str = " ") -> str:
     """Morse 解码.
 
     分隔符：单词间用 `/` 或 `  `（两个空格），字符间用 ` `（一个空格）。
     常见变体：`/` 不区分前后空格；`{` `}` 等 CTF 包裹字符去除。
 
+    Args:
+        s: Morse 字符串
+        word_sep: 单词间分隔符（默认 " "）
+            - " " (默认) — 标准输出 "HELLO WORLD"
+            - "" (空串) — 拼成连续字符串 "HELLOWORLD" (CTF 数字串场景)
+            - "-" / "_" — 自定义
+
     例:
-        "... --- ..." → SOS
+        "... --- ..." → "SOS"
         ".... . .-.. .-.. --- / .-- --- .-. .-.. -.."
-            → "HELLO WORLD"
+            → "HELLO WORLD"  (word_sep 默认 " ")
+        同上 word_sep="" → "HELLOWORLD"
     """
     if not s or not s.strip():
         raise ValueError("Morse input is empty")
@@ -77,7 +85,7 @@ def morse_decode(s: str) -> str:
                 raise ValueError(f"Morse: unknown token {tok!r}")
             chars.append(upper)
         out_words.append("".join(chars))
-    return " ".join(out_words)
+    return word_sep.join(out_words)
 
 
 # ============================================================
