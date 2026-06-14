@@ -1,0 +1,231 @@
+"""单测: decoder registry + DecodeRunner + GUI Tools 菜单 (v0.5-decoder-menu)
+
+覆盖:
+- registry 注册 / 查找 / 按 category 分组
+- DecodeRunner QThread 异步跑 + signal
+- main_window _build_tools_menu 动态生成
+- 端到端: KEY.exe 走 GUI 路径
+"""
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from automisc.core.decoders.base64_image import decode_file_to_image
+from automisc.core.decoders.registry import (
+    DecoderSpec,
+    REGISTRY,
+    get_decoder,
+    list_decoders,
+    list_decoders_by_category,
+    register_decoder,
+)
+
+
+# ---------- registry ----------
+class TestRegistry:
+    def test_registry_has_base64_image(self):
+        """base64-image 应已注册 (在 import base64_image 时触发)."""
+        names = [s.name for s in list_decoders()]
+        assert "base64-image" in names
+
+    def test_get_decoder(self):
+        spec = get_decoder("base64-image")
+        assert spec is not None
+        assert spec.name == "base64-image"
+        assert spec.display == "🔓 Base64 → 图片"
+        assert spec.category == "decode"
+        assert spec.cli_cmd == "decode base64-image"
+        assert spec.run is decode_file_to_image
+
+    def test_get_decoder_unknown(self):
+        assert get_decoder("nonexistent-decoder") is None
+
+    def test_list_by_category(self):
+        grouped = list_decoders_by_category()
+        assert "decode" in grouped
+        assert any(s.name == "base64-image" for s in grouped["decode"])
+
+    def test_register_custom_decoder(self):
+        """register_decoder 可以加自定义 decoder (per Owner 后续 3 候选)."""
+        # 1. 准备一个 dummy runner
+        def my_runner(file_path: str) -> object:
+            from dataclasses import dataclass
+
+            @dataclass
+            class R:
+                ok: bool = True
+                input: str = file_path
+
+            return R()
+
+        spec = DecoderSpec(
+            name="test-decoder",
+            display="🧪 Test",
+            category="test",
+            cli_cmd="decode test-decoder",
+            run=my_runner,
+            description="unit test stub",
+        )
+        register_decoder(spec)
+        try:
+            assert get_decoder("test-decoder") is spec
+            assert any(s.name == "test-decoder" for s in list_decoders())
+        finally:
+            # cleanup
+            REGISTRY.remove(spec)
+
+
+# ---------- CLI dispatcher ----------
+class TestCLIDispatcher:
+    """CLI `automisc decode <name>` 走 cmd_decode_dispatcher."""
+
+    def test_decode_base64_image_key_exe(self):
+        """KEY.exe 走 CLI decode base64-image."""
+        import subprocess
+
+        r = subprocess.run(
+            [
+                "python3", "-m", "automisc",
+                "decode", "base64-image",
+                "--file", "Challenge/KEY.exe",
+            ],
+            capture_output=True,
+            text=True,
+            env={"PYTHONPATH": "src", "PATH": "/usr/bin:/bin"},
+        )
+        assert r.returncode == 0
+        # 输出含 display 标题 + PNG magic
+        assert "Base64" in r.stdout
+        assert "PNG image" in r.stdout
+        assert "133 x 133" in r.stdout
+
+    def test_decode_help_lists_all_decoders(self):
+        """decode --help 应自动列出所有注册的 decoder."""
+        import subprocess
+
+        r = subprocess.run(
+            ["python3", "-m", "automisc", "decode", "--help"],
+            capture_output=True,
+            text=True,
+            env={"PYTHONPATH": "src", "PATH": "/usr/bin:/bin"},
+        )
+        # 至少含 base64-image
+        assert "base64-image" in r.stdout
+
+
+# ---------- DecodeRunner (QThread) ----------
+class TestDecodeRunner:
+    def test_decode_runner_base64_image(self, qtbot, sample_key_exe):
+        """DecodeRunner 跑 base64-image -> emit finished_with_result."""
+        from automisc.gui.decode_runner import DecodeRunner
+
+        results = {}
+        runner = DecodeRunner(decoder_name="base64-image", file_path=sample_key_exe)
+        runner.finished_with_result.connect(
+            lambda n, f, r: results.setdefault("result", r)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "result" in results, timeout=10_000)
+        runner.wait()
+
+        assert results["result"] is not None
+        assert "PNG image" in results["result"].detected_mime
+
+    def test_decode_runner_unknown_decoder(self, qtbot, tmp_path):
+        """未知 decoder name -> emit failed_with_error."""
+        from automisc.gui.decode_runner import DecodeRunner
+
+        f = tmp_path / "x.txt"
+        f.write_text("dummy")
+
+        results = {}
+        runner = DecodeRunner(decoder_name="nonexistent-decoder", file_path=str(f))
+        runner.failed_with_error.connect(
+            lambda n, err: results.setdefault("error", err)
+        )
+        runner.start()
+        qtbot.waitUntil(lambda: "error" in results, timeout=5_000)
+        runner.wait()
+        assert "unknown decoder" in results["error"]
+
+
+# ---------- GUI Tools 菜单 ----------
+class TestMainWindowToolsMenu:
+    def test_tools_menu_has_decode_submenu(self, qtbot):
+        """GUI Tools 菜单 -> Decode submenu -> 1 个 base64-image 项."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # 找 Tools 菜单
+        tools_menu = None
+        for action in window.menuBar().actions():
+            if action.text() == "&Tools":
+                tools_menu = action.menu()
+                break
+        assert tools_menu is not None, "Tools 菜单未找到"
+
+        # 找 Decode submenu
+        decode_submenu = None
+        for a in tools_menu.actions():
+            if a.text() == "&Decode":
+                decode_submenu = a.menu()
+                break
+        assert decode_submenu is not None, "Decode submenu 未找到"
+
+        # 找 base64-image 项
+        base64_action = None
+        for a in decode_submenu.actions():
+            if "Base64" in a.text() and "图片" in a.text():
+                base64_action = a
+                break
+        assert base64_action is not None, "Base64 → 图片 项未找到"
+        assert base64_action.toolTip() != ""  # 至少要 tooltip
+
+    def test_run_decoder_no_file(self, qtbot):
+        """无文件时 _run_decoder 报错."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.current_file = None
+
+        window._run_decoder("base64-image")
+        msg = window.statusBar().currentMessage()
+        assert "文件" in msg or "file" in msg.lower()
+
+    def test_run_decoder_e2e(self, qtbot, sample_key_exe):
+        """端到端: _run_decoder('base64-image') -> output 渲染 result."""
+        from automisc.gui.main_window import MainWindow
+
+        if not Path(sample_key_exe).exists():
+            pytest.skip("Challenge/KEY.exe not found")
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.current_file = Path(sample_key_exe)
+
+        window._run_decoder("base64-image")
+        qtbot.waitUntil(
+            lambda: window._decode_runner is None
+            or not window._decode_runner.isRunning(),
+            timeout=15_000,
+        )
+        if window._decode_runner:
+            window._decode_runner.wait()
+
+        out = window.output_view.toPlainText()
+        assert "Decoder: base64-image" in out
+        assert "decoder result" in out
+        assert "133 x 133" in out
+        assert "输出文件" in out
+
+
+# ---------- Fixtures ----------
+@pytest.fixture
+def sample_key_exe():
+    return str(Path("Challenge/KEY.exe"))

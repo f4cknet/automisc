@@ -84,6 +84,8 @@ def cmd_decode_base64_image(args: argparse.Namespace) -> int:
 
     决策树: data URL 头 -> 直接 decode; 无头 -> 加 image/* 头尝试;
             解出 tmp -> file 命令验证是 image; 否则报"转图片失败".
+
+    v0.5-decoder-menu: 通用 dispatcher (v0.5+ decoder 自动从 registry 注册).
     """
     from automisc.core.decoders.base64_image import (
         Base64ImageError,
@@ -108,6 +110,40 @@ def cmd_decode_base64_image(args: argparse.Namespace) -> int:
     print(f"detected_mime: {r.detected_mime}")
     print(f"source_hint:   {r.source_mime_hint or '(no data: header)'}")
     print(f"raw_size:      {r.raw_size}")
+    return 0
+
+
+def cmd_decode_dispatcher(args: argparse.Namespace) -> int:
+    """v0.5-decoder-menu: 通用 decoder dispatcher (按 decoder name 派发).
+
+    所有 v0.5+ decoder 通过 core.decoders.registry 注册, CLI 子命令自动生成.
+    """
+    from automisc.core.decoders.registry import get_decoder
+
+    spec = get_decoder(args.decoder_name)
+    if spec is None:
+        print(f"error: unknown decoder '{args.decoder_name}'", file=sys.stderr)
+        return 2
+
+    # 只传 decoder 知道的 kwargs (用 inspect 拿 signature, 排除未知字段)
+    import inspect
+    sig = inspect.signature(spec.run)
+    valid_kwargs = set(sig.parameters.keys())
+    raw_kwargs = {
+        k: v for k, v in vars(args).items()
+        if k in valid_kwargs
+    }
+
+    try:
+        result = spec.run(**raw_kwargs)
+    except Exception as e:  # noqa: BLE001
+        print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+
+    # 打印 result 字段 (简单 dataclass dump)
+    print(f"=== {spec.display} ===")
+    for k, v in vars(result).items():
+        print(f"{k}: {v}")
     return 0
 
 
@@ -220,19 +256,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui = sub.add_parser("gui", help="启动 PySide6 GUI 主窗口（macOS only）")
     p_gui.set_defaults(func=cmd_gui)
 
-    p_decode = sub.add_parser("decode", help="解码器（v0.5+ standalone）")
+    p_decode = sub.add_parser("decode", help="解码器（v0.5+ standalone, 自动从 registry 注册）")
     p_decode_sub = p_decode.add_subparsers(dest="decode_cmd")
-    p_decode_b64 = p_decode_sub.add_parser(
-        "base64-image", help="base64 -> 图片（自动识别 data: 头 + file 验证）"
-    )
-    p_decode_b64.add_argument("--file", required=True, help="含 base64 的文件路径")
-    p_decode_b64.add_argument(
-        "--out-dir", default=None, help="输出目录 (None = /tmp)"
-    )
-    p_decode_b64.add_argument(
-        "--keep", action="store_true", help="保留 output 文件（默认删）"
-    )
-    p_decode_b64.set_defaults(func=cmd_decode_base64_image)
+    # 触发 decoder 注册 (import 一次即生效)
+    from automisc.core.decoders import base64_image  # noqa: F401
+    from automisc.core.decoders.registry import list_decoders
+    for spec in list_decoders():
+        p_sub = p_decode_sub.add_parser(spec.name, help=spec.description)
+        p_sub.add_argument("--file", required=True, help="目标文件路径", dest="file_path")
+        # 通用 args: --out-dir, --keep
+        p_sub.add_argument(
+            "--out-dir", default=None, help="输出目录 (None = /tmp)"
+        )
+        p_sub.add_argument(
+            "--keep", action="store_true", help="保留 output 文件（默认删）"
+        )
+        p_sub.set_defaults(func=cmd_decode_dispatcher, decoder_name=spec.name)
 
     p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")
     p_chain.add_argument(
@@ -270,8 +309,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_gui(args)
     if args.cmd == "chain":
         return cmd_chain(args)
-    if args.cmd == "decode" and getattr(args, "decode_cmd", None) == "base64-image":
-        return cmd_decode_base64_image(args)
+    if args.cmd == "decode" and getattr(args, "decode_cmd", None):
+        return cmd_decode_dispatcher(args)
 
     parser.print_help()
     return 0

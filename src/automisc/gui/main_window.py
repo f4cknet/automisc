@@ -34,6 +34,7 @@ from automisc.core.router import FileRouter, RouteRecommendation
 
 from .auto_runner import AutoRunner
 from .chain_runner import ChainRunner
+from .decode_runner import DecodeRunner
 from .journal_panel import JournalPanel
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
@@ -58,6 +59,7 @@ class MainWindow(QMainWindow):
         self.current_file: Optional[Path] = None
         self._runner: Optional[ToolRunner] = None  # 单工具 async runner
         self._chain_runner: Optional[ChainRunner] = None  # chain async runner (v0.5)
+        self._decode_runner: Optional[DecodeRunner] = None  # decoder async runner (v0.5-decoder-menu)
         self._auto_runner: Optional[AutoRunner] = None  # 链式 auto-runner
         self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐
         self._auto_run_enabled: bool = True  # 默认开启 auto-run
@@ -376,6 +378,10 @@ class MainWindow(QMainWindow):
         )
         chain_menu.addAction(bf_action)
 
+        # Tools menu (v0.5-decoder-menu): 解码器/转换器/提取器 (CLI -> GUI 同步)
+        # 从 core.decoders.registry 动态生成菜单项
+        self._build_tools_menu(menubar)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
         about_action = QAction("&About", self)
@@ -552,3 +558,93 @@ class MainWindow(QMainWindow):
             f"[!] chain {chain_name} failed: {error_msg}\n"
         )
         self.statusBar().showMessage(f"chain {chain_name} error: {error_msg}")
+
+    # ---------- decoder menu (v0.5-decoder-menu, GUI 同步 CLI) ----------
+    def _build_tools_menu(self, menubar) -> None:
+        """从 core.decoders.registry 动态构建 Tools 菜单.
+
+        菜单按 category 分组 (decode / convert / extract).
+        每个 decoder 一个 QAction, 触发 _run_decoder(name).
+        """
+        from automisc.core.decoders.registry import list_decoders_by_category
+
+        tools_menu = menubar.addMenu("&Tools")
+        grouped = list_decoders_by_category()
+        for category, specs in grouped.items():
+            sub_menu = tools_menu.addMenu(f"&{category.title()}")
+            for spec in specs:
+                act = QAction(spec.display, self)
+                act.setToolTip(spec.description)
+                act.triggered.connect(
+                    lambda checked=False, name=spec.name: self._run_decoder(name)
+                )
+                sub_menu.addAction(act)
+        # 兜底: 如果 registry 是空, 加 "no decoders registered" 提示
+        if not grouped:
+            noop = QAction("(no decoders registered)", self)
+            noop.setEnabled(False)
+            tools_menu.addAction(noop)
+
+    def _run_decoder(self, decoder_name: str) -> None:
+        """异步跑 decoder (v0.5-decoder-menu).
+
+        跟 _run_chain/_run_tool 同样的并发保护:
+        - 不能同时跑多个 decoder
+        - 不能在 tool 跑着时跑 decoder
+        """
+        if not self.current_file:
+            self.statusBar().showMessage("请先拖入或打开文件")
+            self.output_view.append_text("[!] no file selected\n")
+            return
+
+        if self._decode_runner and self._decode_runner.isRunning():
+            self.statusBar().showMessage("前一个 decoder 还在跑，请稍等…")
+            return
+        if self._chain_runner and self._chain_runner.isRunning():
+            self.statusBar().showMessage("前一个 chain 还在跑，请稍等…")
+            return
+        if self._runner and self._runner.isRunning():
+            self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
+            return
+
+        self.statusBar().showMessage(
+            f"running decoder={decoder_name} on {self.current_file.name} (async)…"
+        )
+        self.output_view.append_text(f"\n=== Decoder: {decoder_name} ===\n")
+        self.output_view.append_text(f"=== File:    {self.current_file}\n")
+
+        self._decode_runner = DecodeRunner(
+            decoder_name=decoder_name,
+            file_path=str(self.current_file),
+        )
+        self._decode_runner.started_run.connect(self._on_decoder_started)
+        self._decode_runner.finished_with_result.connect(self._on_decoder_finished)
+        self._decode_runner.failed_with_error.connect(self._on_decoder_failed)
+        self._decode_runner.start()
+
+    def _on_decoder_started(self, decoder_name: str, file_path: str) -> None:
+        self.statusBar().showMessage(
+            f"running decoder={decoder_name} on {Path(file_path).name}…"
+        )
+
+    def _on_decoder_finished(
+        self, decoder_name: str, file_path: str, result
+    ) -> None:
+        """Decoder 跑成功 → 渲染 result 字段 (类似 chain summary)."""
+        self.output_view.append_text(f"\n--- decoder result ---")
+        for k, v in vars(result).items():
+            self.output_view.append_text(f"  {k}: {v}")
+        # 特殊: 如果 result 含 output_path, 高亮并附提示
+        output_path = getattr(result, "output_path", None)
+        if output_path:
+            self.output_view.append_text(
+                f"\n[输出文件] {output_path}\n"
+                f"  └─ 可在 Finder 打开, 或用其他工具 (zbarimg / open 等) 继续处理"
+            )
+        self.statusBar().showMessage(f"decoder {decoder_name} done")
+
+    def _on_decoder_failed(self, decoder_name: str, error_msg: str) -> None:
+        self.output_view.append_text(
+            f"[!] decoder {decoder_name} failed: {error_msg}\n"
+        )
+        self.statusBar().showMessage(f"decoder {decoder_name} error: {error_msg}")

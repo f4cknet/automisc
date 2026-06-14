@@ -223,6 +223,24 @@ def decode_file_to_image(
     )
 
 
+# ---------- v0.5-decoder-menu: 注册到 registry ----------
+def _register() -> None:
+    from automisc.core.decoders.registry import DecoderSpec, register_decoder
+    register_decoder(
+        DecoderSpec(
+            name="base64-image",
+            display="🔓 Base64 → 图片",
+            category="decode",
+            cli_cmd="decode base64-image",
+            run=decode_file_to_image,
+            description="base64 -> 图片（自动识别 data: 头 + file 验证）",
+        )
+    )
+
+
+_register()
+
+
 __all__ = [
     "Base64ImageError",
     "Base64ImageResult",
