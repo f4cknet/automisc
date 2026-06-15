@@ -118,3 +118,59 @@ def test_menu_dock_tree_children_have_correct_kind(qtbot):
     reg_names = {s.name for s in REGISTRY}
     for name, _ in decoder_clicks:
         assert name in reg_names, f"{name} not in REGISTRY"
+
+
+# === v0.5-zbar-rename (per Owner 22:17) ===
+
+def test_zbar_display_name_renamed_to_qr_parse():
+    """v0.5-zbar-rename: zbar 工具栏显示 '二维码解析'."""
+    from automisc.gui.menu_dock import ZBAR_DISPLAY_NAME
+    assert ZBAR_DISPLAY_NAME == "🔳 二维码解析"
+
+
+def test_zbar_renders_with_new_display_name_in_tree(qtbot):
+    """v0.5-zbar-rename: tree 渲染 zbar 时用新名 '🔳 二维码解析'."""
+    from automisc.gui.menu_dock import ToolMenuDock
+    from PySide6.QtCore import Qt
+    dock = ToolMenuDock()
+    qtbot.addWidget(dock)
+
+    # 找 Misc/Brainteaser 分类
+    for i in range(dock.tree.topLevelItemCount()):
+        cat = dock.tree.topLevelItem(i)
+        if "Brainteaser" not in cat.text(0):
+            continue
+        # 应该 1 个 zbar 子项, 显示为 "✓ 🔳 二维码解析" (✓ 是注册标记)
+        assert cat.childCount() == 1
+        text = cat.child(0).text(0)
+        assert "二维码解析" in text, f"zbar 没显示为'二维码解析': {text!r}"
+        # user role data 保持原 tool name (用于 callback dispatch)
+        tool_name = cat.child(0).data(0, Qt.UserRole)
+        assert tool_name == "zbar", f"zbar tool name 改掉了: {tool_name!r}"
+
+
+# === v0.5-more-converts: 进制转换分类下 7 个新工具 ===
+
+def test_convert_category_has_7_decoders_in_tree(qtbot):
+    """v0.5-more-converts: 进制转换分类下应有 7 个 (1 老 + 6 新)."""
+    from automisc.gui.menu_dock import ToolMenuDock
+    dock = ToolMenuDock()
+    qtbot.addWidget(dock)
+
+    for i in range(dock.tree.topLevelItemCount()):
+        cat = dock.tree.topLevelItem(i)
+        if "进制转换" not in cat.text(0):
+            continue
+        # 7 个子项
+        assert cat.childCount() == 7, (
+            f"进制转换分类应 7 个子项, got {cat.childCount()}"
+        )
+        # 名字应包含 6 个新工具
+        names = [cat.child(j).text(0) for j in range(cat.childCount())]
+        for expected_display in [
+            "Hex → ASCII", "Bin → ASCII", "Dec → Bin", "Bin → Dec",
+            "Dec → Hex", "Hex → Dec", "ASCII → Bin",
+        ]:
+            assert any(expected_display in n for n in names), (
+                f"进制转换分类缺 {expected_display!r}: {names}"
+            )

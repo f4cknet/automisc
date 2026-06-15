@@ -1,13 +1,28 @@
-"""Hex/Binary/Base64/Base32 → ASCII 转换器（v0.5-base-convert, v0.5-hex-ascii-fix）
+"""Hex/Binary/Base64/Base32 → ASCII 转换器（v0.5-base-convert, v0.5-hex-ascii-fix, v0.5-more-converts）
 
 **Owner 触发**（2026-06-14 Bug 修 2/3）：
 > "在工具栏没有16进制转ascii的工具"
 
 **职责**：把 4 种进制的串 → ASCII 字符串。GUI 工具栏入口 + CLI `automisc decode hex-ascii` 子命令。
 
-**算法**：
+**v0.5-more-converts (per Owner 22:17)**：
+> "在一级目录'进制转换'中增加常见的进制转换工具，比如16进制转ascii(已有），补充其他更多常见的进制转换，
+> 比如二进制转十进制、二进制转ascii(text)"
+
+**v0.5-more-converts 新增 6 个工具**（全部 text_only）:
+- **bin-ascii** : 2 进 → ASCII text (e.g. "0100100001100101" → "He")
+- **dec-bin**   : 10 进 → 2 进 (e.g. "65" → "1000001")
+- **bin-dec**   : 2 进 → 10 进 (e.g. "1000001" → "65")
+- **dec-hex**   : 10 进 → 16 进 (e.g. "255" → "ff")
+- **hex-dec**   : 16 进 → 10 进 (e.g. "ff" → "255")
+- **ascii-bin** : ASCII → 2 进 (e.g. "Hi" → "0100100001101001")
+
+**原有**:
+- **hex-ascii** (v0.5-base-convert / v0.5-hex-ascii-fix): 16 进 / 2 进 / base64 / base32 → ASCII (自动探测)
+
+**算法**:
 1. 读 input (字符串)
-2. 探测格式 (按规则：binary > hex > base64 > base32)
+2. 探测格式 (按规则: binary > hex > base64 > base32)
 3. decode → ASCII
 4. 输出 result dataclass (input / detected_format / output_text / errors)
 
@@ -168,24 +183,273 @@ def convert_text_to_ascii(text: str) -> BaseConvertResult:
         )
 
 
+# === v0.5-more-converts: 6 个新转换函数 (per Owner 22:17) ===
+
+def convert_bin_to_ascii(text: str) -> BaseConvertResult:
+    """2 进制串 → ASCII text.
+
+    例: "0100100001100101" → "He"
+    """
+    try:
+        s = _strip_text(text)
+        if not s:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        if not _BIN_RE.match(s):
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors=f"not binary (got chars other than 0/1, len={len(s)})",
+            )
+        if len(s) % 8 != 0:
+            return BaseConvertResult(
+                input=text, detected_format="binary", output_text="",
+                errors=f"binary length must be multiple of 8, got {len(s)}",
+            )
+        chars = [
+            chr(int(s[i : i + 8], 2))
+            for i in range(0, len(s), 8)
+        ]
+        return BaseConvertResult(
+            input=text, detected_format="binary",
+            output_text="".join(chars),
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"bin→ascii failed: {e}",
+        )
+
+
+def convert_dec_to_bin(text: str) -> BaseConvertResult:
+    """10 进制整数 → 2 进制串.
+
+    支持多个数字用空格/逗号分隔 (e.g. "65 66 67" → "1000001 1000010 1000011").
+
+    例: "65" → "1000001"
+         "255" → "11111111"
+    """
+    try:
+        s = text.strip()
+        if not s:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        parts = re.split(r"[\s,;]+", s)
+        out_parts = []
+        for p in parts:
+            if not p:
+                continue
+            n = int(p)  # 10 进制
+            if n < 0:
+                return BaseConvertResult(
+                    input=text, detected_format="decimal", output_text="",
+                    errors=f"negative integer not supported: {n}",
+                )
+            out_parts.append(bin(n)[2:])  # 去掉 "0b" 前缀
+        return BaseConvertResult(
+            input=text, detected_format="decimal",
+            output_text=" ".join(out_parts),
+        )
+    except ValueError as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"not decimal: {e}",
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"dec→bin failed: {e}",
+        )
+
+
+def convert_bin_to_dec(text: str) -> BaseConvertResult:
+    """2 进制串 → 10 进制整数.
+
+    支持多个二进制数用空格/逗号分隔 (e.g. "1000001 1000010" → "65 66").
+
+    例: "1000001" → "65"
+         "11111111" → "255"
+    """
+    try:
+        s = text.strip()
+        if not s:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        parts = re.split(r"[\s,;]+", s)
+        out_parts = []
+        for p in parts:
+            if not p:
+                continue
+            # 只接受 0/1
+            if not all(c in "01" for c in p):
+                return BaseConvertResult(
+                    input=text, detected_format="unknown", output_text="",
+                    errors=f"not binary: {p!r}",
+                )
+            out_parts.append(str(int(p, 2)))
+        return BaseConvertResult(
+            input=text, detected_format="binary",
+            output_text=" ".join(out_parts),
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"bin→dec failed: {e}",
+        )
+
+
+def convert_dec_to_hex(text: str) -> BaseConvertResult:
+    """10 进制整数 → 16 进制串 (lowercase, 无 0x 前缀).
+
+    支持多个数字用空格/逗号分隔.
+
+    例: "255" → "ff"
+         "3735928559" → "deadbeef"
+    """
+    try:
+        s = text.strip()
+        if not s:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        parts = re.split(r"[\s,;]+", s)
+        out_parts = []
+        for p in parts:
+            if not p:
+                continue
+            n = int(p)
+            if n < 0:
+                return BaseConvertResult(
+                    input=text, detected_format="decimal", output_text="",
+                    errors=f"negative integer not supported: {n}",
+                )
+            out_parts.append(hex(n)[2:])  # 去掉 "0x" 前缀
+        return BaseConvertResult(
+            input=text, detected_format="decimal",
+            output_text=" ".join(out_parts),
+        )
+    except ValueError as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"not decimal: {e}",
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"dec→hex failed: {e}",
+        )
+
+
+def convert_hex_to_dec(text: str) -> BaseConvertResult:
+    """16 进制串 → 10 进制整数.
+
+    自动剥 0x / 0X 前缀 (每个 token 单独剥). 支持多个 hex 用空格/逗号分隔.
+
+    例: "ff" → "255"
+         "DEADBEEF" → "3735928559"
+         "ff 0xdeadbeef" → "255 3735928559"
+    """
+    try:
+        s = text.strip()
+        if not s:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        # 注意: 不能用 _strip_text 因为它会把 "ff 0xdeadbeef" 剥成 "ff0xdeadbeef"
+        # 这里每个 token 单独剥 0x 前缀
+        parts = re.split(r"[\s,;]+", s)
+        out_parts = []
+        for p in parts:
+            if not p:
+                continue
+            # 剥每个 token 的 0x/0X/0b 前缀
+            if p.startswith(("0x", "0X", "\\x")):
+                p = p[2:]
+            elif p.startswith("0b"):
+                p = p[2:]
+            # 接受大写/小写
+            n = int(p, 16)
+            out_parts.append(str(n))
+        return BaseConvertResult(
+            input=text, detected_format="hex",
+            output_text=" ".join(out_parts),
+        )
+    except ValueError as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"not hex: {e}",
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"hex→dec failed: {e}",
+        )
+
+
+def convert_ascii_to_bin(text: str) -> BaseConvertResult:
+    """ASCII text → 2 进制串 (每字符 8 bits, 空格分隔).
+
+    例: "He" → "01001000 01100101"
+    """
+    try:
+        if not text:
+            return BaseConvertResult(
+                input=text, detected_format="unknown", output_text="",
+                errors="input is empty",
+            )
+        out_parts = [f"{ord(c):08b}" for c in text]
+        return BaseConvertResult(
+            input=text, detected_format="ascii",
+            output_text=" ".join(out_parts),
+        )
+    except Exception as e:
+        return BaseConvertResult(
+            input=text, detected_format="unknown", output_text="",
+            errors=f"ascii→bin failed: {e}",
+        )
+
+
 # ---------- v0.5-decoder-menu: 注册到 registry ----------
 def _register() -> None:
     from automisc.core.decoders.registry import DecoderSpec, register_decoder
 
-    def _runner(file_path: str | None = None, text: str | None = None, **_):
-        """v0.5-hex-ascii-fix: 接受 text 优先, 退回 file_path.
+    def _make_text_runner(codec_name: str, convert_fn):
+        """通用 text-based runner (file_path 模式兜底读 .txt 文件)."""
+        def _runner(file_path: str | None = None, text: str | None = None, **_):
+            if text is not None:
+                return convert_fn(text)
+            if file_path is None:
+                raise BaseConvertError(
+                    f"需要 --text '<{codec_name}串>' 或 --file <含{codec_name}的txt文件>"
+                )
+            from pathlib import Path
+            p = Path(file_path)
+            if not p.exists():
+                raise FileNotFoundError(f"input not found: {file_path}")
+            text = p.read_text(errors="replace")
+            if len(text) > MAX_INPUT_SIZE:
+                raise BaseConvertError(
+                    f"input too large: {len(text)} bytes (max {MAX_INPUT_SIZE})"
+                )
+            return convert_fn(text)
+        _runner.__name__ = f"run_{codec_name}"
+        return _runner
 
-        Args:
-            file_path: 文件路径 (用户写 hex 串到 .txt)
-            text: 直接传 hex 串 (CLI --text / GUI 内部)
-        """
+    def _hex_ascii_runner(file_path: str | None = None, text: str | None = None, **_):
+        """v0.5-hex-ascii-fix: hex-ascii 主入口 (原 _runner)."""
         if text is not None:
             return convert_text_to_ascii(text)
         if file_path is None:
             raise BaseConvertError(
                 "需要 --text '<hex串>' 或 --file <含hex的txt文件> (v0.5-hex-ascii-fix)"
             )
-        # file_path 模式: 读文件当 text
         from pathlib import Path
         p = Path(file_path)
         if not p.exists():
@@ -198,17 +462,48 @@ def _register() -> None:
             )
         return convert_text_to_ascii(text)
 
+    # === 原有 hex-ascii (v0.5-base-convert / v0.5-hex-ascii-fix) ===
     register_decoder(
         DecoderSpec(
             name="hex-ascii",
             display="🔢 Hex → ASCII",
             category="convert",
             cli_cmd="decode hex-ascii",
-            run=_runner,
+            run=_hex_ascii_runner,
             description="Hex / Binary / Base64 / Base32 → ASCII 转换 (自动探测格式; v0.5-hex-ascii-fix)",
             text_only=True,  # v0.5-cipher-decoders-textfix: text input 优先
         )
     )
+
+    # === v0.5-more-converts: 6 个新转换工具 (per Owner 22:17) ===
+    MORE_CONVERTS = [
+        # (name, display, runner_fn, description)
+        ("bin-ascii", "💻 Bin → ASCII", convert_bin_to_ascii,
+         "2 进制串 → ASCII text (每 8 bit = 1 char, 需 8 倍数长度)"),
+        ("dec-bin",   "🔟 Dec → Bin",   convert_dec_to_bin,
+         "10 进制整数 → 2 进制串 (支持空格/逗号分隔多个数字)"),
+        ("bin-dec",   "💻 Bin → Dec",   convert_bin_to_dec,
+         "2 进制串 → 10 进制整数 (支持空格/逗号分隔多个数)"),
+        ("dec-hex",   "🔟 Dec → Hex",   convert_dec_to_hex,
+         "10 进制整数 → 16 进制串 (lowercase, 无 0x 前缀)"),
+        ("hex-dec",   "🔢 Hex → Dec",   convert_hex_to_dec,
+         "16 进制串 → 10 进制整数 (自动剥 0x 前缀)"),
+        ("ascii-bin", "🔤 ASCII → Bin", convert_ascii_to_bin,
+         "ASCII text → 2 进制串 (每字符 8 bit, 空格分隔)"),
+    ]
+
+    for name, display, convert_fn, desc in MORE_CONVERTS:
+        register_decoder(
+            DecoderSpec(
+                name=name,
+                display=display,
+                category="convert",
+                cli_cmd=f"decode {name}",
+                run=_make_text_runner(name, convert_fn),
+                description=desc,
+                text_only=True,  # v0.5-cipher-decoders-textfix: 全 text input
+            )
+        )
 
 
 _register()
@@ -219,5 +514,11 @@ __all__ = [
     "BaseConvertResult",
     "MAX_INPUT_SIZE",
     "convert_text_to_ascii",
+    "convert_bin_to_ascii",
+    "convert_dec_to_bin",
+    "convert_bin_to_dec",
+    "convert_dec_to_hex",
+    "convert_hex_to_dec",
+    "convert_ascii_to_bin",
     "detect_and_decode",
 ]

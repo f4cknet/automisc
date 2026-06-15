@@ -55,6 +55,13 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     ],
     "🔢 进制转换 (v0.5+ Convert)": [
         "decoder:hex-ascii",  # bug fix 2026-06-14: 工具栏入口
+        # v0.5-more-converts (per Owner 22:17): 6 个新转换工具
+        "decoder:bin-ascii",  # 2 进 → ASCII
+        "decoder:dec-bin",    # 10 进 → 2 进
+        "decoder:bin-dec",    # 2 进 → 10 进
+        "decoder:dec-hex",    # 10 进 → 16 进
+        "decoder:hex-dec",    # 16 进 → 10 进
+        "decoder:ascii-bin",  # ASCII → 2 进
     ],
     "🔳 QR 工具 (v0.5+ QR Tools)": [
         "decoder:coords-qr",  # 2026-06-14 10:16: 坐标串 → QR PNG → zbar 识别
@@ -117,7 +124,19 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     # 特殊
     "decoder:base64-custom": "🔐 Base64 自定义表",
     "decoder:base64-stego": "🕵 Base64 隐写",
+    # v0.5-more-converts: 6 个新进制转换 (per Owner 22:17)
+    "decoder:bin-ascii": "💻 Bin → ASCII",
+    "decoder:dec-bin":   "🔟 Dec → Bin",
+    "decoder:bin-dec":   "💻 Bin → Dec",
+    "decoder:dec-hex":   "🔟 Dec → Hex",
+    "decoder:hex-dec":   "🔢 Hex → Dec",
+    "decoder:ascii-bin": "🔤 ASCII → Bin",
 }
+
+
+# v0.5-zbar-rename (per Owner 22:17): zbar 工具栏改名为"二维码解析"
+# 备注: zbar 实际功能是 QR / barcode 解析 (zxing/zbarimg 类似), CTF 圈叫"二维码"更通俗
+ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 
 
 # adapter 工具名集合 (per core.registry.list_tools())
@@ -230,6 +249,8 @@ class ToolMenuDock(QDockWidget):
         # 3) display names: 老字典 + cipher 从 registry 拿
         display_names = dict(ACTION_DISPLAY_NAMES)
         display_names.update(_get_cipher_display_names())
+        # v0.5-zbar-rename (per Owner 22:17): zbar 工具栏显示"二维码解析"
+        display_names["zbar"] = ZBAR_DISPLAY_NAME
 
         for category, tools in categories.items():
             cat_item = QTreeWidgetItem([category])

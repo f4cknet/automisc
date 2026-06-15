@@ -32,8 +32,9 @@ EXPECTED_TEXT_ONLY_DECODERS = [
     "base85", "base91", "base92", "base100", "base32768", "base65536",
     "rot5", "rot13", "rot18", "rot47",
     "base64-custom", "base64-stego",
-    # hex-ascii (per v0.5-hex-ascii-fix)
-    "hex-ascii",
+    # 7 convert (per v0.5-hex-ascii-fix + v0.5-more-converts)
+    "hex-ascii", "bin-ascii", "dec-bin", "bin-dec",
+    "dec-hex", "hex-dec", "ascii-bin",
     # 2 占位
     "placeholder-解密工具2", "placeholder-解密工具3",
 ]
