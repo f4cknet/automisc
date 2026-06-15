@@ -151,6 +151,43 @@ def test_zbar_renders_with_new_display_name_in_tree(qtbot):
 
 # === v0.5-more-converts: 进制转换分类下 7 个新工具 ===
 
+# === v0.5-cn-display (per Owner 22:39): 进制转换分类下 display 全部中文 ===
+
+def test_all_convert_decoders_have_chinese_display():
+    """v0.5-cn-display: 7 个 convert decoder 的 display 字段全中文 (含中文/数字/箭头, 不含 Bin/Dec/Hex/ASCII 等英文词)."""
+    from automisc.core.decoders.registry import get_decoder
+
+    # 英文敏感词 (出现任何一个就 fail)
+    forbidden = ["Bin", "Dec", "Hex", "ASCII"]
+    for name in [
+        "hex-ascii", "bin-ascii", "dec-bin", "bin-dec",
+        "dec-hex", "hex-dec", "ascii-bin",
+    ]:
+        spec = get_decoder(name)
+        assert spec is not None, f"{name} not registered"
+        for word in forbidden:
+            assert word not in spec.display, (
+                f"{name} display 含英文词 {word!r}: {spec.display!r}"
+            )
+
+
+def test_all_convert_decoders_descriptions_contain_chinese():
+    """v0.5-cn-display: 7 个 convert decoder description 也用中文 (含至少 1 个中文字符)."""
+    from automisc.core.decoders.registry import get_decoder
+
+    for name in [
+        "hex-ascii", "bin-ascii", "dec-bin", "bin-dec",
+        "dec-hex", "hex-dec", "ascii-bin",
+    ]:
+        spec = get_decoder(name)
+        assert spec is not None
+        # 至少含 1 个中文字符 (Unicode \u4e00-\u9fff)
+        has_chinese = any("\u4e00" <= c <= "\u9fff" for c in spec.description)
+        assert has_chinese, (
+            f"{name} description 缺中文: {spec.description!r}"
+        )
+
+
 def test_convert_category_has_7_decoders_in_tree(qtbot):
     """v0.5-more-converts: 进制转换分类下应有 7 个 (1 老 + 6 新)."""
     from automisc.gui.menu_dock import ToolMenuDock
@@ -165,11 +202,16 @@ def test_convert_category_has_7_decoders_in_tree(qtbot):
         assert cat.childCount() == 7, (
             f"进制转换分类应 7 个子项, got {cat.childCount()}"
         )
-        # 名字应包含 6 个新工具
+        # v0.5-cn-display (per Owner 22:39): 中文 display
         names = [cat.child(j).text(0) for j in range(cat.childCount())]
         for expected_display in [
-            "Hex → ASCII", "Bin → ASCII", "Dec → Bin", "Bin → Dec",
-            "Dec → Hex", "Hex → Dec", "ASCII → Bin",
+            "16 进制转文本",       # 原 hex-ascii
+            "2 进制转文本",        # bin-ascii
+            "10 进制转 2 进制",    # dec-bin
+            "2 进制转 10 进制",    # bin-dec
+            "10 进制转 16 进制",   # dec-hex
+            "16 进制转 10 进制",   # hex-dec
+            "文本转 2 进制",       # ascii-bin
         ]:
             assert any(expected_display in n for n in names), (
                 f"进制转换分类缺 {expected_display!r}: {names}"

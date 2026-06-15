@@ -101,7 +101,8 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "lsb_extract": "🎨 PNG LSB 智能提取",
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
     "decoder:base64-image": "🔓 Base64 → 图片",
-    "decoder:hex-ascii": "🔢 Hex → ASCII",
+    # v0.5-cn-display (per Owner 22:39): 中文 display
+    "decoder:hex-ascii": "🔢 16 进制转文本",
     "decoder:coords-qr": "🔳 坐标 → 二维码",  # v0.5-coords-qr
     # Base 系列（per v0.5-base-rot-decoders PR3）
     "decoder:base16": "🔢 Base16",
@@ -125,12 +126,13 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "decoder:base64-custom": "🔐 Base64 自定义表",
     "decoder:base64-stego": "🕵 Base64 隐写",
     # v0.5-more-converts: 6 个新进制转换 (per Owner 22:17)
-    "decoder:bin-ascii": "💻 Bin → ASCII",
-    "decoder:dec-bin":   "🔟 Dec → Bin",
-    "decoder:bin-dec":   "💻 Bin → Dec",
-    "decoder:dec-hex":   "🔟 Dec → Hex",
-    "decoder:hex-dec":   "🔢 Hex → Dec",
-    "decoder:ascii-bin": "🔤 ASCII → Bin",
+    # v0.5-cn-display (per Owner 22:39): 全部中文, 方便非 CS 背景理解
+    "decoder:bin-ascii": "💻 2 进制转文本",
+    "decoder:dec-bin":   "🔟 10 进制转 2 进制",
+    "decoder:bin-dec":   "💻 2 进制转 10 进制",
+    "decoder:dec-hex":   "🔟 10 进制转 16 进制",
+    "decoder:hex-dec":   "🔢 16 进制转 10 进制",
+    "decoder:ascii-bin": "🔤 文本转 2 进制",
 }
 
 

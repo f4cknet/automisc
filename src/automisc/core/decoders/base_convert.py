@@ -466,30 +466,31 @@ def _register() -> None:
     register_decoder(
         DecoderSpec(
             name="hex-ascii",
-            display="🔢 Hex → ASCII",
+            display="🔢 16 进制转文本",
             category="convert",
             cli_cmd="decode hex-ascii",
             run=_hex_ascii_runner,
-            description="Hex / Binary / Base64 / Base32 → ASCII 转换 (自动探测格式; v0.5-hex-ascii-fix)",
+            description="16 进制/2 进制/Base64/Base32 → 文本（自动识别格式; 把可疑串转成明文看）",
             text_only=True,  # v0.5-cipher-decoders-textfix: text input 优先
         )
     )
 
     # === v0.5-more-converts: 6 个新转换工具 (per Owner 22:17) ===
+    # v0.5-cn-display (per Owner 22:39): display 全部中文, 描述也用中文方便新人理解
     MORE_CONVERTS = [
         # (name, display, runner_fn, description)
-        ("bin-ascii", "💻 Bin → ASCII", convert_bin_to_ascii,
-         "2 进制串 → ASCII text (每 8 bit = 1 char, 需 8 倍数长度)"),
-        ("dec-bin",   "🔟 Dec → Bin",   convert_dec_to_bin,
-         "10 进制整数 → 2 进制串 (支持空格/逗号分隔多个数字)"),
-        ("bin-dec",   "💻 Bin → Dec",   convert_bin_to_dec,
-         "2 进制串 → 10 进制整数 (支持空格/逗号分隔多个数)"),
-        ("dec-hex",   "🔟 Dec → Hex",   convert_dec_to_hex,
-         "10 进制整数 → 16 进制串 (lowercase, 无 0x 前缀)"),
-        ("hex-dec",   "🔢 Hex → Dec",   convert_hex_to_dec,
-         "16 进制串 → 10 进制整数 (自动剥 0x 前缀)"),
-        ("ascii-bin", "🔤 ASCII → Bin", convert_ascii_to_bin,
-         "ASCII text → 2 进制串 (每字符 8 bit, 空格分隔)"),
+        ("bin-ascii", "💻 2 进制转文本", convert_bin_to_ascii,
+         "2 进制串 → 文本（每 8 位 = 1 个字符; 长度需 8 的倍数）"),
+        ("dec-bin",   "🔟 10 进制转 2 进制", convert_dec_to_bin,
+         "10 进制整数 → 2 进制（支持空格/逗号分隔多个数字, 如 '65 66 67'）"),
+        ("bin-dec",   "💻 2 进制转 10 进制", convert_bin_to_dec,
+         "2 进制串 → 10 进制（支持空格/逗号分隔多个数）"),
+        ("dec-hex",   "🔟 10 进制转 16 进制", convert_dec_to_hex,
+         "10 进制整数 → 16 进制（小写无 0x 前缀, 如 255 → ff）"),
+        ("hex-dec",   "🔢 16 进制转 10 进制", convert_hex_to_dec,
+         "16 进制串 → 10 进制（自动剥 0x 前缀, 如 0xdeadbeef → 3735928559）"),
+        ("ascii-bin", "🔤 文本转 2 进制", convert_ascii_to_bin,
+         "文本 → 2 进制（每字符 8 位, 空格分隔; 如 'He' → '01001000 01100101'）"),
     ]
 
     for name, display, convert_fn, desc in MORE_CONVERTS:
