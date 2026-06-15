@@ -71,6 +71,7 @@
 | v0.5-cipher-decoders-wordsep | morse --word-sep 参数, CTF 数字串拼成连续字符串 (v0.5-cipher-decoders §10) | ✅ done | (1 commit；+4 单测 657→669 passed；morse_decode 加 word_sep 参数 + CLI --word-sep + Owner 真样本 '5BC925649CB0188F52E617D70929191C') | [`upgrade/v0.5-cipher-decoders.md`](upgrade/v0.5-cipher-decoders.md) |
 | v0.5-more-converts + v0.5-zbar-rename | 6 个新进制转换 (bin-ascii / dec-bin / bin-dec / dec-hex / hex-dec / ascii-bin) + zbar 改名为"🔳 二维码解析" | ✅ done | (1 commit；+72 单测 669→741 passed；ZBAR_DISPLAY_NAME 常量 + hex-dec 修 _strip_text bug) | [`upgrade/v0.5-more-converts.md`](upgrade/v0.5-more-converts.md) |
 | v0.5-pcap-protocol-router | pcap 协议层路由：协议分类（TLS 加密 vs FTP/SMTP 明文）+ key 候选发现（.key/.pub/.pem）+ **不**自动解密 + 输出 Wireshark 手动命令模板；触发题：Challenge/greatescape.pcap | 🟡 design | (无 commit，待 Owner 拍板 §7 决策点后走铁律 2) | [`upgrade/v0.5-pcap-protocol-router.md`](upgrade/v0.5-pcap-protocol-router.md) |
+| v0.5-binwalk-extract | binwalk adapter 补 PEM/SSH/RSA 私钥关键字 + 自动 `binwalk -e` 提取到 samedir + SuspiciousPoint context 显示提取路径；推翻"binwalk macOS 兼容性问题"旧定论（bug 在 adapter 层不在 CLI）；同 greatescape.pcap 暴露姊妹 bug | 🟡 design | (无 commit，实施中) | [`upgrade/v0.5-binwalk-extract.md`](upgrade/v0.5-binwalk-extract.md) |
 
 ---
 
