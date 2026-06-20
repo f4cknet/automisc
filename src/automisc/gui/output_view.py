@@ -331,14 +331,14 @@ class InputOutputView(QWidget):
         text_out = f"\n[Hex → ASCII] detected={fmt}\n  input:  {candidate[:100]}{'...' if len(candidate) > 100 else ''}\n  output: {decoded}\n"
         cursor.insertText(text_out, fmt_obj)
 
-    def extract_base_candidate(self) -> str | None:
+    def extract_base_candidate(self, strict: bool = False) -> str | None:
         """从 input 区抽 candidate (selection 优先, 否则最后像 base 的行).
 
         v0.5-hex-ascii-fix: 抽出为公共方法, 让 main_window._run_decoder
         (菜单栏 hex-ascii) 和 InputOutputView.run_hex_to_ascii 共享同一逻辑.
 
         v0.5-brainfuck-candidate-fix (per Owner 2026-06-20 20:19 实战反馈):
-        - 之前 `looks_like_base` 只检查"全 [0-9a-zA-Z+/= \n\r\t] 字符" + 长度 ≥ 2
+        - 之前 `looks_like_base` 只检查"全 [0-9a-zA-Z+/= \\n\\r\\t] 字符" + 长度 ≥ 2
         - 太宽松: 把 GUI [drop] recommendation 行 "           5  xxd              hex dump"
           (纯数字 + 空格 + 短英文, 28 chars) 误判成 base candidate
         - owner 拖文件 + auto-run 跑完 + 点 brainfuck decoder → 抽到这行 → 跑空
@@ -346,14 +346,25 @@ class InputOutputView(QWidget):
                 短行 (< 8 chars) 直接排除 (base 至少 8 chars, GUI 推荐行常 10-30 chars)
                 数字开头行 (≥ 3 个连续数字开头) 排除 (GUI log 行特征)
 
+        v0.5-brainfuck-candidate-ux (per Owner 2026-06-20 20:27 实战反馈):
+        - owner 拖 .txt brainfuck 文件 → auto-run 跑完 → 点 brainfuck decoder
+        - input 区是 GUI log, 没真 BF 代码 → 兜底抽最后非空行 (e.g. "Unicode text, UTF-8")
+        - main_window 想 fallback 读 current_file, 但 candidate 非 None 不触发
+        - 加 strict=True: 没真 base 候选时返回 None (不兜底), 让 main_window 走 file fallback
+
+        Args:
+            strict: True = 没真 base 候选时返回 None (不兜底最后非空行)
+                    False (默认) = 没真 base 候选时返回最后非空行 (兜底, 老行为)
+
         Returns:
-            candidate string 或 None (空 input)
+            candidate string 或 None (空 input, 或 strict + 没真候选)
 
         Logic:
         1. 用户有 selection -> 用 selection
         2. 否则过每一行, 跳过 log 装饰 ([xxx] / === / --- / 空行), 找最后"看起来像
            base-encoded"的非空行
-        3. 都没找到 -> 用最后非空行 (兜底)
+        3. (strict=False 时) 都没找到 -> 用最后非空行 (兜底)
+        4. (strict=True 时) 都没找到 -> 返回 None
         """
         import re
         text = self.text_edit.toPlainText().strip()
@@ -391,10 +402,11 @@ class InputOutputView(QWidget):
             #   - 全是 hex 字符 (0-9 a-f A-F)
             #   - 全是 binary 字符 (0/1)
             # 否则就是普通英文 (e.g. "xxd hex dump" 纯字母空格) 不算
-            has_base64_char = bool(re.search(r"[+/=]", s))
+            has_base64_mid = bool(re.search(r"[+/]", s))
+            has_base64_pad = s.endswith("=")
             is_all_hex = bool(re.match(r"^[0-9a-fA-F]+$", s))
             is_all_binary = bool(re.match(r"^[01]+$", s))
-            if not (has_base64_char or is_all_hex or is_all_binary):
+            if not (has_base64_mid or has_base64_pad or is_all_hex or is_all_binary):
                 return False
             # 全字符是 base64/base32 字符集
             return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
@@ -403,8 +415,8 @@ class InputOutputView(QWidget):
         base_lines = [ln for ln in lines if looks_like_base(ln)]
         if base_lines:
             return base_lines[-1]
-        if lines:
-            return lines[-1]
+        if lines and not strict:
+            return lines[-1]  # 兜底 (老行为)
         return None
 
     def toPlainText(self) -> str:

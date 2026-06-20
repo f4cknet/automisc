@@ -229,3 +229,133 @@ def test_run_decoder_base64_image_no_file_still_warns(qtbot):
     assert "文件" in status_msg or "file" in status_msg.lower(), (
         f"base64-image 没 file 时应提示: {status_msg!r}"
     )
+
+
+# === file fallback (v0.5-brainfuck-candidate-ux) ===
+
+class TestFileFallbackForTextDecoders:
+    """per Owner 2026-06-20 20:27 实战反馈:
+    owner 拖文本文件 (.txt brainfuck 代码) → auto-run 跑完 → 点 brainfuck decoder.
+    input 区是 GUI 日志 (没真 BF 代码) → 抽 candidate 反复抽错.
+
+    修法 (per main_window._extract_input_candidate 加 file fallback):
+    - input 区抽不到 candidate → fallback 读 current_file 文本内容
+    - 仅文本后缀 + < 256KB + printable 字符 ≥ 85%
+    """
+
+    def test_file_fallback_reads_text_file(self, qtbot, tmp_path):
+        """文本文件 → fallback 读文件内容."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # 写测试文件 (BF 代码 + 中文标点)
+        bf_file = tmp_path / "brainfuck_code.txt"
+        bf_file.write_text("++++++++[>+++++++++++++<-]>.", encoding="utf-8")
+        window.current_file = bf_file
+
+        # input 区无候选 (空或只有 GUI log)
+        window.output_view.setPlainText("[some GUI log line]")
+
+        candidate = window._extract_input_candidate()
+        assert candidate == "++++++++[>+++++++++++++<-]>.", (
+            f"file fallback 应读 .txt 内容, got: {candidate!r}"
+        )
+
+    def test_file_fallback_skips_binary_extensions(self, qtbot, tmp_path):
+        """二进制扩展名不读 (避免乱码 + GUI 卡)."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        bin_file = tmp_path / "image.bin"
+        bin_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"fake png" * 100)
+        window.current_file = bin_file
+
+        # 二进制文件不 fallback
+        candidate = window._extract_input_candidate()
+        assert candidate is None, (
+            f"二进制文件不应 fallback, got: {candidate!r}"
+        )
+
+    def test_file_fallback_skips_large_files(self, qtbot, tmp_path):
+        """大文件不读 (> 256KB, 防 GUI 卡)."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        big_file = tmp_path / "huge.txt"
+        big_file.write_text("a" * (300 * 1024))  # 300KB
+        window.current_file = big_file
+
+        candidate = window._extract_input_candidate()
+        assert candidate is None, (
+            f"大文件 (> 256KB) 不应 fallback, got len: {len(candidate) if candidate else 0}"
+        )
+
+    def test_file_fallback_skips_non_printable_content(self, qtbot, tmp_path):
+        """含大量非 printable 字符 → 不算文本 → 不 fallback."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # .txt 后缀但内容是 binary (95% 非 printable)
+        fake_text = tmp_path / "fake.txt"
+        fake_text.write_bytes(bytes(range(0, 256)) * 4)  # 全 binary 字符
+        window.current_file = fake_text
+
+        candidate = window._extract_input_candidate()
+        assert candidate is None, (
+            f"非 printable 内容不应 fallback, got: {candidate!r}"
+        )
+
+    def test_input_area_candidate_takes_priority_over_file(self, qtbot, tmp_path):
+        """input 区有候选 → 优先用 input, 不 fallback 到 file."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # 文件内容不同
+        file_path = tmp_path / "other.txt"
+        file_path.write_text("file content", encoding="utf-8")
+        window.current_file = file_path
+
+        # input 区有真候选
+        window.output_view.setPlainText("aGVsbG8=")  # base64 for 'hello'
+        candidate = window._extract_input_candidate()
+        assert candidate == "aGVsbG8=", (
+            f"input 区有候选应优先, got: {candidate!r}"
+        )
+
+    def test_owner_scenario_brainfuck_txt(self, qtbot, tmp_path):
+        """owner 实战完整场景: 拖 .txt brainfuck 文件 → decoder fallback 读."""
+        from automisc.gui.main_window import MainWindow
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        # 模拟 owner 实战文件 (where_is_flag_part_two.txt 类似)
+        bf_file = tmp_path / "where_is_flag_part_two.txt"
+        bf_content = "++++++++[>+++++++++++++<-]>."  # 简单 BF 输出 'h'
+        bf_file.write_text(bf_content, encoding="utf-8")
+        window.current_file = bf_file
+
+        # 模拟 input 区是 GUI log (无 BF 代码)
+        window.output_view.setPlainText(
+            "[drop] file=/Users/.../where_is_flag_part_two.txt\n"
+            "        magic=unknown\n"
+            "[auto-run] 启动 find_suspicious_from_binary\n"
+            "=== file (auto OK) ===\n"
+            "Unicode text, UTF-8"
+        )
+
+        candidate = window._extract_input_candidate()
+        # 应该 fallback 读文件, 不抽 GUI log
+        assert candidate == bf_content, (
+            f"owner 实战场景: 应 fallback 读 .txt BF 代码, got: {candidate!r}"
+        )

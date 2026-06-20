@@ -263,6 +263,47 @@ class TestExtractBaseCandidateStricter:
         v.append_text("0100100001100101011011000110110001101111")
         assert v.extract_base_candidate() == "0100100001100101011011000110110001101111"
 
+    def test_magic_unknown_excluded(self, qtbot):
+        """per Owner 2026-06-20 20:27 实战: 'magic=unknown' 含 = 但不在行尾, 不算 base.
+
+        之前修法: 含 +/= 一票 → 误抽 'magic=unknown' (13 chars, 含 = 在中段).
+        修后修法: = 必须行尾才算 base padding (aGVsbG8=), 中段 = 仍不算.
+        """
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("[drop] file=/Users/.../foo.txt")
+        v.append_text("        size=2323 bytes")
+        v.append_text("        magic=unknown")  # ← 之前的 bug: 这行被抽走 (含 =)
+        v.append_text("        recommendations (4):")
+        v.append_text("aGVsbG8=")  # 真 base64 (行尾 = padding)
+        c = v.extract_base_candidate()
+        assert c == "aGVsbG8=", (
+            f"'magic=unknown' 不应被抽走 (= 不在行尾), 应选 'aGVsbG8=', got: {c!r}"
+        )
+
+    def test_equals_mid_string_not_base(self, qtbot):
+        """= 在中段不算 base (key=value, magic=unknown 等 GUI log 行)."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("magic=unknown")
+        v.append_text("key=value")
+        v.append_text("foo=bar=baz")  # 中段多个 =
+        # 这 3 行单独时, 应该都不算 base (除非有真 base 行)
+        # 兜底返回最后非空行, 但 candidate 字段不应被识别为 base
+        # 实际验证: 跟真 base 一起时, 不应选这些
+        v2 = InputOutputView()
+        qtbot.addWidget(v2)
+        v2.append_text("magic=unknown")
+        v2.append_text("aGVsbG8K")
+        # "aGVsbG8K" 不含 +/= 也不全 hex/binary, 不算 base → 兜底返回 "aGVsbG8K"
+        # 但 "magic=unknown" 含 = 但不在行尾, 不算 base → 不被抽走
+        c = v2.extract_base_candidate()
+        # 应返回 "aGVsbG8K" (兜底最后非空行), 不是 "magic=unknown"
+        if c is not None:
+            assert c != "magic=unknown", (
+                f"'magic=unknown' 不应被识别为 base, got: {c!r}"
+            )
+
 
 # ---------- run_hex_to_ascii (内部用, 顶 bar 已删) ----------
 class TestHexToAscii:

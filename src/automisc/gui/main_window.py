@@ -1123,8 +1123,50 @@ class MainWindow(QMainWindow):
 
         复用 InputOutputView 的相同逻辑, 保证顶 bar [Hex → ASCII] 按钮和
         菜单栏 [hex-ascii] 工具行为一致.
+
+        v0.5-brainfuck-candidate-ux (per Owner 2026-06-20 20:27 实战反馈):
+        owner 拖文本文件 (e.g. brainfuck .txt) → auto-run 跑完 → 点 brainfuck decoder.
+        之前: input 区是 GUI 日志 + [drop] 信息, 抽 candidate 反复抽错 (GUI log 行).
+        修法:
+        1. input 区抽 candidate 用 strict=True (没真 base 候选时返回 None)
+        2. None 时 fallback 读 current_file 文本内容 (owner 主动拖的 .txt 文件)
+           - 仅文本后缀 (.txt/.md/.json/.xml/.csv/.yaml/.yml/.log/.py/.c/.cpp/.js/.html)
+           - 仅 < 256KB 读 (大文件 read 进 GUI 会卡)
+           - ≥ 85% printable 字符 (避免 binary 假 .txt)
+        3. 都没找到 → 返回 None (提示用户手动 paste / selection)
         """
-        return self.output_view.extract_base_candidate()
+        # strict=True: 没真 base 候选时返回 None, 让 file fallback 接管
+        candidate = self.output_view.extract_base_candidate(strict=True)
+        if candidate:
+            return candidate
+        # v0.5-brainfuck-candidate-ux: file fallback — owner 拖文本文件想直接 decoder
+        if self.current_file and self.current_file.exists():
+            try:
+                if self.current_file.stat().st_size > 256 * 1024:  # > 256KB 不读 (防 GUI 卡)
+                    return None
+                # 仅文本后缀读
+                text_suffixes = {
+                    ".txt", ".md", ".json", ".xml", ".csv",
+                    ".yaml", ".yml", ".log", ".py", ".c", ".cpp",
+                    ".js", ".html", ".htm", ".ini", ".conf",
+                }
+                if self.current_file.suffix.lower() not in text_suffixes:
+                    return None
+                text = self.current_file.read_text(errors="replace")
+                # v0.5-brainfuck-candidate-ux: 二进制假 .txt 检查
+                # 注意: utf-8 errors="replace" 会把 \x80-\xff 替换成 \ufffd
+                # \ufffd 是 printable, ratio 被高估, 误判二进制为文本
+                # 修法: 用 latin-1 decode (每个 byte → U+0000-U+00FF, 无 replacement),
+                #       然后 byte 级 printable 检查 (\x20-\x7e + \t\n\r)
+                raw_bytes = self.current_file.read_bytes()[:1024]
+                sample = raw_bytes.decode("latin-1")
+                printable = sum(1 for c in sample if c.isprintable() or c in "\n\r\t")
+                if printable / max(len(sample), 1) < 0.85:
+                    return None
+                return text
+            except (OSError, UnicodeError):
+                return None
+        return None
 
     def _on_decoder_started(self, decoder_name: str, file_path: str) -> None:
         self.statusBar().showMessage(
