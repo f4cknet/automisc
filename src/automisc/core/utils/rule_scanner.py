@@ -35,13 +35,21 @@ from dataclasses import dataclass
 from typing import Final
 
 
-# 敏感关键词 (Q1 + Owner 后补, 与 encoding_detector 同步)
+# 敏感关键词 (per Owner 2026-06-20 18:03 + 18:05 + 19:39 拍板, 跨项目铁律)
+# 与 core/suspicious.py:KEYWORDS 严格同步 (单一 source of truth)
+# pass | password | key | flag | f1ag | p@ssw0rd | p@ssphrase | fl@g | s3cr3t | secret | ctf
 _SENSITIVE_KEYWORDS: Final[tuple[str, ...]] = (
+    "pass",
+    "password",
     "key",
     "flag",
+    "f1ag",
+    "p@ssw0rd",
+    "p@ssphrase",  # 实战累积 2026-06-20 19:39
+    "fl@g",        # 实战累积 2026-06-20 19:39
+    "s3cr3t",      # 实战累积 2026-06-20 19:39
     "secret",
     "ctf",
-    "password",
 )
 
 # base64 字符集
@@ -99,7 +107,11 @@ class TextMatch:
 
 # ---------- 单规则函数 (per line / per 整段) ----------
 def has_sensitive_keyword(text: str) -> bool:
-    """text 是否含 secret/key/flag/ctf/password (Q1 高度敏感)."""
+    """text 是否含 11 个高优先级可疑 keyword (pass/password/key/flag/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t/secret/ctf).
+
+    per Owner 2026-06-20 18:03 + 18:05 + 19:39 拍板 — 跨项目铁律.
+    与 core/suspicious.py:KEYWORDS 严格同步 (单一 source of truth).
+    """
     text_lower = text.lower()
     return any(kw in text_lower for kw in _SENSITIVE_KEYWORDS)
 

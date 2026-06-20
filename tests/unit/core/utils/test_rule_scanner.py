@@ -233,3 +233,63 @@ class TestStringsAdapterIntegration:
             )
         finally:
             Path(path).unlink(missing_ok=True)
+
+
+# ---------- Owner 19:39 keyword 白名单同步 (单一 source of truth) ----------
+
+class TestOwnerKeywordSync:
+    """per Owner 2026-06-20 18:03 + 18:05 + 19:39 拍板.
+
+    跨项目铁律:
+    - rule_scanner._SENSITIVE_KEYWORDS 跟 suspicious.KEYWORDS 必须严格同步
+    - 11 个 owner 高优先级 keyword: pass/password/key/flag/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t/secret/ctf
+    - 实战累积, owner 拍板再加
+    """
+
+    def test_11_keywords_all_present(self):
+        """11 个高优先级 keyword 必须全在 _SENSITIVE_KEYWORDS."""
+        from automisc.core.utils.rule_scanner import _SENSITIVE_KEYWORDS
+
+        required = {
+            "pass", "password", "key", "flag", "f1ag", "p@ssw0rd",
+            "p@ssphrase", "fl@g", "s3cr3t",
+            "secret", "ctf",
+        }
+        missing = required - set(_SENSITIVE_KEYWORDS)
+        assert not missing, f"_SENSITIVE_KEYWORDS 缺 keyword: {missing}"
+
+    def test_sync_with_suspicious_module(self):
+        """rule_scanner._SENSITIVE_KEYWORDS 跟 suspicious.KEYWORDS 必须一致.
+
+        单一 source of truth 铁律 — 任何 keyword 改动必须两边同步.
+        """
+        from automisc.core.suspicious import KEYWORDS as SUS_KEYWORDS
+        from automisc.core.utils.rule_scanner import _SENSITIVE_KEYWORDS
+
+        # rule_scanner 是 suspicious.KEYWORDS 的子集 (没有工具名 steghide/binwalk 等)
+        rule_kws = set(_SENSITIVE_KEYWORDS)
+        sus_kws = set(SUS_KEYWORDS)
+        # 11 个 owner 拍板的 keyword 必须两边都有
+        owner_keywords = {
+            "pass", "password", "key", "flag", "f1ag", "p@ssw0rd",
+            "p@ssphrase", "fl@g", "s3cr3t",
+            "secret", "ctf",
+        }
+        assert owner_keywords <= rule_kws, f"rule_scanner 缺: {owner_keywords - rule_kws}"
+        assert owner_keywords <= sus_kws, f"suspicious 缺: {owner_keywords - sus_kws}"
+
+    @pytest.mark.parametrize("text", [
+        "p@ssphrase=secret123",
+        "FL@G{hidden}",
+        "the s3cr3t code: xyz",
+        "P@SSPHRASE",
+        "FL@G",
+        "S3CR3T",
+    ])
+    def test_owner_v2_variants_hit_via_rule_scanner(self, text):
+        """新 3 个变种 keyword 走 rule_scanner 也必须命中.
+
+        修复老 bug: 上次只改了 suspicious.KEYWORDS, rule_scanner 漏 6 个 keyword
+        (pass/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t), 导致 has_sensitive_keyword 漏匹配.
+        """
+        assert has_sensitive_keyword(text), f"rule_scanner 漏命中: {text!r}"

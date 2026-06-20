@@ -64,8 +64,9 @@ SUSPICIOUS_PATTERNS: dict[str, re.Pattern] = {
 }
 
 # 关键字列表（大小写不敏感，子串匹配，不用正则）
-# per Owner 2026-06-20 18:03 + 18:05 拍板 (跨项目铁律):
+# per Owner 2026-06-20 18:03 + 18:05 + 19:39 拍板 (跨项目铁律):
 # pass | password | key | flag | f1ag | p@ssw0rd | secret | ctf
+# + p@ssphrase | fl@g | s3cr3t (实战累积, per Owner 2026-06-20 19:39)
 # 实战累积 — 遇到新的同类 keyword, owner 拍板后加
 KEYWORDS: list[str] = [
     # 高优先级可疑关键词（per Owner 铁律）
@@ -75,6 +76,9 @@ KEYWORDS: list[str] = [
     "flag",
     "f1ag",
     "p@ssw0rd",
+    "p@ssphrase",  # 实战累积 2026-06-20 19:39: pass 的常见变形
+    "fl@g",        # 实战累积 2026-06-20 19:39: flag 的常见变形
+    "s3cr3t",      # 实战累积 2026-06-20 19:39: secret 的 leetspeak 变形
     "secret",
     "ctf",
     # 工具名（per v0.5-相关历史决策 — 命中表示含该工具的处理痕迹）
@@ -94,7 +98,7 @@ SEVERITY_MAP: dict[str, tuple[int, str]] = {
     # per Owner 2026-06-20 18:03 + 18:05 拍板铁律: 高优先级可疑关键词命中 = severity 5
     # (与 rule_scanner.CATEGORY_SENSITIVE severity=5 保持一致)
     # 不触发 short-circuit — SHORT_CIRCUIT_SEVERITY=99 (per v0.5-journal-highlight-keywords Q12 拍板)
-    "keyword": (5, "高优先级可疑关键词命中 (pass/password/key/flag/f1ag/p@ssw0rd/secret/ctf), 检查上下文"),
+    "keyword": (5, "高优先级可疑关键词命中 (pass/password/key/flag/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t/secret/ctf), 检查上下文"),
     "base64_candidate": (3, "尝试 base64 解码"),
     "base32_candidate": (3, "尝试 base32 解码"),
     "hex_string": (3, "尝试 hex 解码（xxd -r）"),
