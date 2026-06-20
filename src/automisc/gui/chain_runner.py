@@ -41,11 +41,15 @@ def register_action(name: str, action: Action) -> None:
 
 
 def _ensure_action_registry() -> None:
-    """懒加载 v0.5 快捷 action 4 个."""
+    """懒加载 v0.5 快捷 action 6 个 (4 老 + 2 v0.5-stegseek 新)."""
     if _ACTION_REGISTRY:
         return
     from automisc.core.actions.lsb_extract import LSBExtractAction
     from automisc.core.actions.rar_chain import BruteforceRarAction
+    from automisc.core.actions.stegseek import (
+        StegseekCrackAction,
+        SteghideExtractAction,
+    )
     from automisc.core.actions.zip_chain import (
         BruteforceZipAction,
         FixPseudoEncryptionAction,
@@ -55,6 +59,12 @@ def _ensure_action_registry() -> None:
     register_action("fix_pseudo_zip", FixPseudoEncryptionAction())
     register_action("bruteforce_zip", BruteforceZipAction())
     register_action("bruteforce_rar", BruteforceRarAction())
+    # v0.5-philosophy-rethink: GUI 工具栏 stegseek 3 模式 (Owner 2026-06-20 13:48 拍板)
+    # - stegseek_crack: bruteforce with wordlist (Chain 菜单入口)
+    # - steghide_extract: user-provided password (Chain 菜单入口)
+    # - 空密码模式: 走 SteghideAdapter (auto_run + ToolMenuDock 共用, 不需 action)
+    register_action("stegseek_crack", StegseekCrackAction())
+    register_action("steghide_extract", SteghideExtractAction())
 
 
 class ChainRunner(QThread):
@@ -68,7 +78,12 @@ class ChainRunner(QThread):
         runner.start()
 
     链模式: chain_name in {"zip","zip-full","binwalk","foremost","lsb"}
-    action 模式: chain_name in {"lsb_extract","fix_pseudo_zip","bruteforce_zip","bruteforce_rar"}
+    action 模式: chain_name in {"lsb_extract","fix_pseudo_zip","bruteforce_zip","bruteforce_rar",
+                                "stegseek_crack","steghide_extract"}  # v0.5-steghide-GUI 新增
+
+    extra_context 用途 (v0.5-steghide-GUI):
+    - {"__wordlist__": path} → StegseekCrackAction 用
+    - {"__password__": pw} → SteghideExtractAction 用
     """
 
     finished_with_context = Signal(str, str, object)  # chain_name, file_path, context
@@ -80,12 +95,14 @@ class ChainRunner(QThread):
         chain_name: str,
         file_path: str,
         bruteforce_limit: Optional[int] = None,
+        extra_context: Optional[dict[str, Any]] = None,
         parent=None,
     ):
         super().__init__(parent)
         self.chain_name = chain_name
         self.file_path = file_path
         self.bruteforce_limit = bruteforce_limit
+        self.extra_context = extra_context or {}
         self._context: Optional[dict[str, Any]] = None
         self._error: Optional[str] = None
 
@@ -105,6 +122,10 @@ class ChainRunner(QThread):
             context: dict[str, Any] = {"file_path": self.file_path}
             if self.bruteforce_limit:
                 context["__bruteforce_limit__"] = self.bruteforce_limit
+            # v0.5-steghide-GUI: 合并 GUI 传入的 extra context
+            # (e.g. __wordlist__ for bruteforce, __password__ for user-pw extract)
+            if self.extra_context:
+                context.update(self.extra_context)
 
             # 模式 1: 5 链 (DAG)
             chain_builders = {
