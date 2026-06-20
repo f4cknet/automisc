@@ -82,6 +82,7 @@
 | v0.5-train-007-empty-zip-crash | **训练驱动第 7 篇**: Owner 2026-06-20 17:05 反馈 zip_classify.py **空 ZIP 崩溃** (UnboundLocalError on verdict_summary) + 算法层 2 个边界风险 (data descriptor / 非 store-deflate method). **修**: else 兜底分支 + severity 1. **defer**: data descriptor + 非 store/deflate (按 §5.2 等实战命中再升架构). | ✅ done | (无 commit, 待 Owner 签字 push) | [`upgrade/v0.5-train-007-empty-zip-crash.md`](upgrade/v0.5-train-007-empty-zip-crash.md) |
 | v0.5-train-008-lsb-text-write-file | **训练驱动第 8 篇**: Owner 2026-06-20 17:26 实测 `flag11.png` (LSB 隐写 17531B 垃圾 unicode) — `LSBExtractAction` text 分支只 print 不写文件, **漏 `output_path_for` 同目录写盘动作** (file 分支已对). 触发 `v0.5-LSB-router` UX 修复 (text 通道 main 也写文件). | ✅ done | (无 commit, 待 Owner 签字 push) | [`upgrade/v0.5-train-008-lsb-text-write-file.md`](upgrade/v0.5-train-008-lsb-text-write-file.md) |
 | v0.5-keyword-variants | 实战累积加 3 keyword: **p@ssphrase / fl@g / s3cr3t** + 修老 bug: `rule_scanner._SENSITIVE_KEYWORDS` 跟 `suspicious.KEYWORDS` 不同步 (补 6 个: pass/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t);keyword 白名单 8 → 11 (per Owner 2026-06-20 19:39) | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-keyword-variants.md`](upgrade/v0.5-keyword-variants.md) |
+| v0.5-sevenz-extract | **新建 `sevenz_extract` adapter** — 真正 `7z x` 解压 (zip/7z/rar/tar/vmdk/vhd/wim 等 30+ 格式) → GUI 工具栏 "Misc/Archive" 下加 "📦 7z 解压",跟 sevenz / unzip / john / zip_classify 同一级;不动现有 sevenz adapter (探测);per Owner 19:48 拍板 writeup 面具下的flag | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-extract.md`](upgrade/v0.5-sevenz-extract.md) |
 
 ---
 

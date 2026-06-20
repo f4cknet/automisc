@@ -5,7 +5,7 @@
 - Stego/Image (PR2) — zsteg / steghide
 - Forensics/Network (PR3) — tshark / tcpdump
 - Stego/Audio+Video (PR4) — ffmpeg_audio / ffprobe / ffmpeg_video / sox / steghide_audio
-- Misc/Archive (PR5) — sevenz / unzip / john
+- Misc/Archive (PR5) — sevenz / sevenz_extract / unzip / john / zip_classify
 - Forensics/Log (PR6) — grep / evtx_dump
 - Misc/Brainteaser (PR8) — zbar
 - Forensics/Memory (PR7) — vol
@@ -40,7 +40,7 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
         "sox",
         "steghide_audio",
     ],
-    "Misc/Archive (PR5)": ["sevenz", "unzip", "john"],
+    "Misc/Archive (PR5)": ["sevenz", "sevenz_extract", "unzip", "john", "zip_classify"],
     "Forensics/Log (PR6)": ["grep", "evtx_dump"],
     "Misc/Brainteaser (PR8)": ["zbar"],
     "Forensics/Memory (PR7)": ["vol"],
@@ -100,6 +100,7 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "bruteforce_zip": "🔨 Zip 暴力破解 (4-6 位)",
     "lsb_extract": "🎨 PNG LSB 智能提取",
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
+    "sevenz_extract": "📦 7z 解压",  # v0.5-sevenz-extract Owner 2026-06-20 19:48
     "decoder:base64-image": "🔓 Base64 → 图片",
     # v0.5-cn-display (per Owner 22:39): 中文 display
     "decoder:hex-ascii": "🔢 16 进制转文本",
@@ -143,12 +144,13 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 
 # adapter 工具名集合 (per core.registry.list_tools())
 # 其他以 "decoder:" 开头的是 decoder (走 _run_decoder)
+# v0.5-sevenz-extract (per Owner 2026-06-20 19:48): 加 sevenz_extract 7z 解压
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
     "zsteg", "stegseek",
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
-    "sevenz", "unzip", "john",
+    "sevenz", "sevenz_extract", "unzip", "john", "zip_classify",
     "grep", "evtx_dump",
     "zbar",
     "vol",

@@ -73,8 +73,8 @@ automisc/
 │       │   ├── image/            zsteg / steghide
 │       │   ├── audio/            sox / ffmpeg_audio / steghide_audio
 │       │   └── video/            ffmpeg_video / ffprobe
-│       └── misc/                 Misc 类
-│           ├── archive/          sevenz / unzip / john
+│           └── misc/                 Misc 类
+│           ├── archive/          sevenz / sevenz_extract / unzip / john / zip_classify
 │           └── brainteaser/      zbar (QR)
 │
 ├── tests/
@@ -137,7 +137,7 @@ automisc/
 | Stego/Image | `zsteg`, `steghide` |
 | Stego/Audio | `sox`, `ffmpeg_audio`, `steghide_audio` |
 | Stego/Video | `ffmpeg_video`, `ffprobe` |
-| Misc/Archive | `sevenz`, `unzip`, `john` |
+| Misc/Archive | `sevenz`, `sevenz_extract`, `unzip`, `john`, `zip_classify` |
 | Misc/Brainteaser | `zbar` (QR) |
 | Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
 
