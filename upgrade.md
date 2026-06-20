@@ -83,6 +83,7 @@
 | v0.5-train-008-lsb-text-write-file | **训练驱动第 8 篇**: Owner 2026-06-20 17:26 实测 `flag11.png` (LSB 隐写 17531B 垃圾 unicode) — `LSBExtractAction` text 分支只 print 不写文件, **漏 `output_path_for` 同目录写盘动作** (file 分支已对). 触发 `v0.5-LSB-router` UX 修复 (text 通道 main 也写文件). | ✅ done | (无 commit, 待 Owner 签字 push) | [`upgrade/v0.5-train-008-lsb-text-write-file.md`](upgrade/v0.5-train-008-lsb-text-write-file.md) |
 | v0.5-keyword-variants | 实战累积加 3 keyword: **p@ssphrase / fl@g / s3cr3t** + 修老 bug: `rule_scanner._SENSITIVE_KEYWORDS` 跟 `suspicious.KEYWORDS` 不同步 (补 6 个: pass/f1ag/p@ssw0rd/p@ssphrase/fl@g/s3cr3t);keyword 白名单 8 → 11 (per Owner 2026-06-20 19:39) | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-keyword-variants.md`](upgrade/v0.5-keyword-variants.md) |
 | v0.5-sevenz-extract | **新建 `sevenz_extract` adapter** — 真正 `7z x` 解压 (zip/7z/rar/tar/vmdk/vhd/wim 等 30+ 格式) → GUI 工具栏 "Misc/Archive" 下加 "📦 7z 解压",跟 sevenz / unzip / john / zip_classify 同一级;不动现有 sevenz adapter (探测);per Owner 19:48 拍板 writeup 面具下的flag | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-extract.md`](upgrade/v0.5-sevenz-extract.md) |
+| v0.5-sevenz-toolbar-cleanup | **GUI menu 清理**: sevenz (探测类) 从 `TOOL_CATEGORIES["Misc/Archive"]` + `ADAPTER_TOOLS` 移除,但 **保留 adapter** (auto_run / router / find_suspicious 还在用);新原则: "用于自动化探测的工具,可不显示在 GUI menu" (per Owner 20:03);跨项目 GUI menu 设计铁律 | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-toolbar-cleanup.md`](upgrade/v0.5-sevenz-toolbar-cleanup.md) |
 
 ---
 

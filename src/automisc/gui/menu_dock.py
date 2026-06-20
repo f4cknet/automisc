@@ -5,7 +5,7 @@
 - Stego/Image (PR2) — zsteg / steghide
 - Forensics/Network (PR3) — tshark / tcpdump
 - Stego/Audio+Video (PR4) — ffmpeg_audio / ffprobe / ffmpeg_video / sox / steghide_audio
-- Misc/Archive (PR5) — sevenz / sevenz_extract / unzip / john / zip_classify
+- Misc/Archive (PR5) — sevenz_extract / unzip / john / zip_classify (sevenz 是探测类, GUI 不显示, per Owner 20:03)
 - Forensics/Log (PR6) — grep / evtx_dump
 - Misc/Brainteaser (PR8) — zbar
 - Forensics/Memory (PR7) — vol
@@ -40,7 +40,7 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
         "sox",
         "steghide_audio",
     ],
-    "Misc/Archive (PR5)": ["sevenz", "sevenz_extract", "unzip", "john", "zip_classify"],
+    "Misc/Archive (PR5)": ["sevenz_extract", "unzip", "john", "zip_classify"],
     "Forensics/Log (PR6)": ["grep", "evtx_dump"],
     "Misc/Brainteaser (PR8)": ["zbar"],
     "Forensics/Memory (PR7)": ["vol"],
@@ -145,6 +145,8 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 # adapter 工具名集合 (per core.registry.list_tools())
 # 其他以 "decoder:" 开头的是 decoder (走 _run_decoder)
 # v0.5-sevenz-extract (per Owner 2026-06-20 19:48): 加 sevenz_extract 7z 解压
+# v0.5-sevenz-toolbar-cleanup (per Owner 2026-06-20 20:03): 探测类 (sevenz) 不显示在 GUI menu,
+#   但 adapter 仍注册 (auto_run / router / find_suspicious 用)
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
     "zsteg", "stegseek",

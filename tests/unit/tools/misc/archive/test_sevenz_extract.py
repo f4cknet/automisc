@@ -242,16 +242,26 @@ class TestSevenZipExtractIntegration:
     """验证 GUI 工具栏能识别 sevenz_extract (per menu_dock.py 集成)."""
 
     def test_sevenz_extract_in_misc_archive_category(self):
-        """menu_dock.TOOL_CATEGORIES["Misc/Archive (PR5)"] 必须含 sevenz_extract."""
-        from automisc.gui.menu_dock import TOOL_CATEGORIES, ADAPTER_TOOLS
+        """menu_dock.TOOL_CATEGORIES["Misc/Archive (PR5)"] 必须含 sevenz_extract.
+
+        per v0.5-sevenz-toolbar-cleanup (Owner 2026-06-20 20:03):
+        探测类 sevenz (list/test) 不显示在 GUI menu (auto_run 用), 但 adapter 仍注册.
+        所以 archive_tools 应含 sevenz_extract 但不含 sevenz.
+        """
+        from automisc.gui.menu_dock import TOOL_CATEGORIES
 
         archive_tools = TOOL_CATEGORIES.get("Misc/Archive (PR5)", [])
         assert "sevenz_extract" in archive_tools, (
             f"Misc/Archive 应含 sevenz_extract, got: {archive_tools}"
         )
-        # 跟 sevenz / unzip 同一级
-        assert "sevenz" in archive_tools
-        assert "unzip" in archive_tools
+        # sevenz 是探测类, per Owner 20:03 设计原则, 不显示在 GUI menu
+        assert "sevenz" not in archive_tools, (
+            f"sevenz 是探测类, 不应显示在 GUI menu (per Owner 20:03), got: {archive_tools}"
+        )
+        # 跟 unzip / john / zip_classify 同一级 (操作类)
+        assert "unzip" in archive_tools  # owner 暂保留, 也算操作类入口
+        assert "john" in archive_tools
+        assert "zip_classify" in archive_tools
 
     def test_sevenz_extract_in_adapter_tools_set(self):
         """ADAPTER_TOOLS 必须含 sevenz_extract (GUI 标记 ✓ 才会显示)."""

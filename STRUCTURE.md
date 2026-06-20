@@ -137,7 +137,7 @@ automisc/
 | Stego/Image | `zsteg`, `steghide` |
 | Stego/Audio | `sox`, `ffmpeg_audio`, `steghide_audio` |
 | Stego/Video | `ffmpeg_video`, `ffprobe` |
-| Misc/Archive | `sevenz`, `sevenz_extract`, `unzip`, `john`, `zip_classify` |
+| Misc/Archive | `sevenz_extract`, `unzip`, `john`, `zip_classify` (sevenz 探测类, GUI 不显示, per Owner 20:03) |
 | Misc/Brainteaser | `zbar` (QR) |
 | Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
 
