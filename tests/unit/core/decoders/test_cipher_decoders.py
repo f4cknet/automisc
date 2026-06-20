@@ -444,6 +444,80 @@ def test_brainfuck_unmatched_bracket():
     assert "unmatched" in r.error.lower() or "未匹配" in r.error
 
 
+# === BrainFuck unicode input (per Owner 2026-06-20 20:10 实战反馈) ===
+
+class TestBrainFuckUnicodeInput:
+    """per Owner 2026-06-20 20:10 实战反馈 (面具下的flag, where_is_flag_part_two.txt):
+    owner BF input 167 chars, 位置 35-38 含中文标点 (U+3001 等).
+    之前 `_read_input_bytes` 用 `text.encode("latin-1")` 直接抛 UnicodeEncodeError.
+    修法: `text.encode("latin-1", errors="replace")` 把超范围字符换 `?`,
+          BF 引擎清理非 BF 字符时 `?` 也被丢 (不影响输出).
+    """
+
+    def test_brainfuck_with_chinese_punctuation(self):
+        """BF 代码 + 中文标点注释 → 不抛 UnicodeEncodeError, 正确解码."""
+        # BF code: cell[0]=8, 循环 8 次 cell[1]+=13 → cell[1]=104=chr('h')
+        bf_code = "++++++++[>+++++++++++++<-]>."
+        # 混入中文标点 (位置 0/5/10/15 = U+3001, U+3002, U+FF0C, U+300A)
+        # 模拟 owner "BF 代码 + 中文标点注释" 场景
+        mixed = "、。" + bf_code[:5] + "《" + bf_code[5:10] + "，" + bf_code[10:] + "》"
+
+        r = run_brainfuck(text=mixed)
+        assert r.error is None, f"含中文标点的 BF 应该解码成功, got error: {r.error}"
+        assert r.output_text == "h", f"BF 输出应为 'h' (8×13=104=chr 'h'), got {r.output_text!r}"
+
+    def test_brainfuck_with_chinese_at_position_35_38(self):
+        """直接复现 owner bug 场景: 167 chars, 位置 35-38 是中文标点."""
+        # 构造 167 chars: 头部填充 + 中文标点 + BF 代码
+        bf_code = "++++++++[>+++++++++++++<-]>."  # "h"
+        # 位置 35-38 嵌入中文标点 (owner 真实位置)
+        prefix = "+" * 35 + "、。，《"  # 35 ASCII + 4 个中文标点 = position 35-38
+        mixed = prefix + bf_code
+
+        assert len(mixed) == 35 + 4 + len(bf_code)
+        # 关键: 位置 35-38 是 unicode 字符 (U+3001 等)
+        assert ord(mixed[35]) > 0xFF, f"位置 35 应是 unicode, got {mixed[35]!r} (U+{ord(mixed[35]):04X})"
+
+        r = run_brainfuck(text=mixed)
+        assert r.error is None, (
+            f"位置 35-38 是中文标点 → 之前抛 UnicodeEncodeError. "
+            f"修后应成功. got error: {r.error}"
+        )
+
+    def test_brainfuck_with_emoji(self):
+        """emoji (超 BMP) → errors='replace' 兜底, 不抛错."""
+        bf_code = "++++++++[>+++++++++++++<-]>."  # "h"
+        mixed = "🎉🎊🎈" + bf_code + "🔥💡✨"
+
+        r = run_brainfuck(text=mixed)
+        assert r.error is None, f"emoji 应该被 replace 不抛错, got: {r.error}"
+        assert r.output_text == "h"
+
+    def test_brainfuck_pure_ascii_unchanged(self):
+        """纯 ASCII BF 代码 → 行为不变 (errors='replace' 不触发)."""
+        bf_code = "++++++++[>+++++++++++++<-]>."  # "h"
+        r = run_brainfuck(text=bf_code)
+        assert r.error is None
+        assert r.output_text == "h"
+
+    def test_read_input_bytes_handles_unicode(self):
+        """直接测 `_read_input_bytes` 对 unicode text 不抛错."""
+        from automisc.core.decoders.cipher_decoders import _read_input_bytes
+
+        # 关键: latin-1 不能编码 unicode, 必须 errors="replace" 才不抛错
+        text_with_chinese = "+" * 30 + "中文标点、。，《》" + "+" * 30
+        # 不应抛 UnicodeEncodeError
+        try:
+            data = _read_input_bytes(text=text_with_chinese, file_path=None, codec_name="brainfuck")
+        except UnicodeEncodeError as e:
+            pytest.fail(f"_read_input_bytes 不应抛 UnicodeEncodeError: {e}")
+
+        # 验证: 返回的 bytes 中, 中文位置被替换成 '?' (latin-1 replace)
+        assert isinstance(data, bytes)
+        # bytes 长度应 = 原始 unicode 长度 (latin-1 replace 1:1 替换)
+        assert len(data) == len(text_with_chinese)
+
+
 # === BubbleBabble ===
 
 def test_bubblebabble_simple():

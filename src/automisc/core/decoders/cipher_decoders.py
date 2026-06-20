@@ -67,9 +67,19 @@ def _read_input(
 def _read_input_bytes(
     text: str | None, file_path: str | None, codec_name: str
 ) -> bytes:
-    """读取输入为 bytes（uudecode/xxdecode/quoted-printable/brainfuck/bubblebabble 用）."""
+    """读取输入为 bytes（uudecode/xxencode/quoted-printable/brainfuck/bubblebabble 用）.
+
+    per Owner 2026-06-20 20:10 实战反馈 (面具下的flag, where_is_flag_part_two.txt):
+    - text mode 之前用 `text.encode("latin-1")`, owner input 含中文标点 (位置 35-38)
+      → latin-1 codec 不能编码 U+0100+ → UnicodeEncodeError
+    - 修法: 加 `errors="replace"` 把超范围字符换 `?`
+      - BF / xxuuencode / bubblebabble 等 bytes-based decoder 都正确处理 (引擎清理非 BF 字符时 `?` 也丢)
+      - 不影响纯 ASCII input (errors="replace" 只在错误时触发)
+    """
     if text is not None:
-        return text.encode("latin-1")
+        # v0.5-brainfuck-chinese-fix: latin-1 不支持 unicode, 必须 errors="replace"
+        # owner input 是 BF 代码 + 中文标点注释, 位置 35-38 含 U+3001 (、) 等
+        return text.encode("latin-1", errors="replace")
     if file_path is not None:
         p = Path(file_path)
         if not p.exists():
