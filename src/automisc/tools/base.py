@@ -18,6 +18,56 @@ from pathlib import Path
 from automisc.core.result import ToolResult
 
 
+# 多编码 fallback 候选 (per Owner 2026-06-20 14:46 实测 GBK 中文乱码 bug)
+# 顺序: 优先 utf-8 (国际通用), 然后东亚编码 (CTF 中文常用), 最后 latin-1 (永远成功兜底)
+_DECODE_CANDIDATES = ("utf-8", "gbk", "gb18030", "big5", "shift_jis", "latin-1")
+
+
+def _decode_output_bytes(data: bytes) -> str:
+    """subprocess 输出 bytes 解码 — 多编码 fallback 选 0 U+FFFD 那个.
+
+    背景 (per Owner 2026-06-20 14:46 实测):
+    - macOS subprocess 默认 utf-8 解码, GBK 中文显示成 ⬛⬛⬛ (U+FFFD)
+    - commit d500d79 修: 加 errors='replace' → 不 crash 但中文还是 ⬛
+    - 本 commit 修: 多编码 fallback, 选 GBK 解出"看到这个图片就是压缩包的密码"
+
+    策略:
+    1. 试每个候选编码 (strict 模式) — 完美解码 = 0 U+FFFD, 立刻返回
+    2. strict 全失败 → 试 errors='replace', 选 U+FFFD 最少的
+    3. latin-1 永远成功 (map each byte to char), 兜底
+
+    Args:
+        data: subprocess stdout/stderr 原始 bytes
+
+    Returns:
+        解码后的 str (中文/英文混合都正确显示)
+    """
+    if not data:
+        return ""
+
+    # 阶段 1: strict 解码, 找 0 U+FFFD 的
+    for enc in _DECODE_CANDIDATES:
+        try:
+            text = data.decode(enc)  # strict 默认
+            return text  # 0 replacements (strict 不允许 replace)
+        except UnicodeDecodeError:
+            continue
+
+    # 阶段 2: 全失败 → errors='replace' 选 U+FFFD 最少
+    best_text = ""
+    best_replacement = float("inf")
+    for enc in _DECODE_CANDIDATES:
+        text = data.decode(enc, errors="replace")
+        replacement = text.count("\ufffd")
+        if replacement < best_replacement:
+            best_replacement = replacement
+            best_text = text
+            if replacement == 0:
+                break  # latin-1 永远 0, 这里兜底
+
+    return best_text
+
+
 class ToolAdapter(ABC):
     """工具 adapter 抽象基类。
 
@@ -63,6 +113,10 @@ class ToolAdapter(ABC):
 
         Returns:
             ``(exit_code, stdout, stderr, duration_ms)``
+
+        输出解码: 多编码 fallback (`_decode_output_bytes`), 默认 utf-8 + GBK/gb18030 兜底.
+        per Owner 14:46 实测: GBK 中文 (e.g. "看到这个图片就是压缩包的密码")
+        默认 utf-8 解码失败 → 全局 fallback 让中文正确显示, 不再 ⬛⬛⬛.
         """
         effective_timeout = timeout if timeout is not None else self.default_timeout
         start = time.monotonic()
@@ -77,20 +131,18 @@ class ToolAdapter(ABC):
             env["PATH"] = f"{homebrew_paths}:{current_path}"
 
         try:
+            # 不传 text=True → 拿 bytes, 手动 decode (避免默认 utf-8 strict 抛错)
             proc = subprocess.run(
                 cmd,
                 capture_output=True,
-                text=True,
-                # 修 UnicodeDecodeError: binary tool (foremost/unzip/sevenz) 输出非 UTF-8 字节时,
-                # 默认 errors='strict' 直接抛异常挂掉. 用 'replace' 把无效字节 → U+FFFD,
-                # 日志完整可见 (per Owner "宁可多给错给, 也不能少给" 铁律).
-                errors="replace",
                 timeout=effective_timeout,
                 env=env,
                 check=False,
             )
             duration_ms = int((time.monotonic() - start) * 1000)
-            return proc.returncode, proc.stdout, proc.stderr, duration_ms
+            stdout = _decode_output_bytes(proc.stdout)
+            stderr = _decode_output_bytes(proc.stderr)
+            return proc.returncode, stdout, stderr, duration_ms
         except subprocess.TimeoutExpired:
             duration_ms = int((time.monotonic() - start) * 1000)
             return (
@@ -114,6 +166,8 @@ class ToolAdapter(ABC):
 
         Returns:
             同 ``_run_subprocess``
+
+        输出解码: 同 _run_subprocess, 多编码 fallback.
         """
         effective_timeout = timeout if timeout is not None else self.default_timeout
         start = time.monotonic()
@@ -126,19 +180,19 @@ class ToolAdapter(ABC):
             env["PATH"] = f"{homebrew_paths}:{current_path}"
 
         try:
+            # 不传 text=True → bytes mode
             proc = subprocess.run(
                 cmd,
                 input=input_text,
                 capture_output=True,
-                text=True,
-                # 同 _run_subprocess: 修 binary tool 非 UTF-8 字节触发的 UnicodeDecodeError
-                errors="replace",
                 timeout=effective_timeout,
                 env=env,
                 check=False,
             )
             duration_ms = int((time.monotonic() - start) * 1000)
-            return proc.returncode, proc.stdout, proc.stderr, duration_ms
+            stdout = _decode_output_bytes(proc.stdout)
+            stderr = _decode_output_bytes(proc.stderr)
+            return proc.returncode, stdout, stderr, duration_ms
         except subprocess.TimeoutExpired:
             duration_ms = int((time.monotonic() - start) * 1000)
             return (
