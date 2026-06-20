@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import struct
 import zipfile
 from pathlib import Path
 
@@ -34,19 +35,180 @@ def normal_zip(tmp_path) -> Path:
     return p
 
 
+def _make_pseudo_zip_form(p: Path, form: str) -> Path:
+    """构造伪加密 zip (3 形态之一).
+
+    形态 (per v0.5-train-004-cdh-pseudo-detect):
+    - A: LFH bit0=1, CDH bit0=0 (仅 LFH 假加密)
+    - B: LFH bit0=0, CDH bit0=1 (仅 CDH 假加密) ← 真实样本 00000038.zip 命中
+    - C: LFH bit0=1, CDH bit0=1 (双假加密)
+    """
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(p, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr(f"flag_{form}.txt", f"flag_{form}_test_xyz\n")
+    data = bytearray(p.read_bytes())
+    for i in range(len(data) - 4):
+        if data[i : i + 4] == b"PK\x03\x04":  # LFH
+            if form in ("A", "C"):
+                data[i + 6] |= 0x1
+            elif form == "B":
+                data[i + 6] &= 0xFE  # 确保 LFH bit0=0
+        elif data[i : i + 4] == b"PK\x01\x02":  # CDH
+            if form in ("B", "C"):
+                data[i + 8] |= 0x1
+            elif form == "A":
+                data[i + 8] &= 0xFE  # 确保 CDH bit0=0
+    p.write_bytes(data)
+    return p
+
+
 @pytest.fixture
 def pseudo_zip(tmp_path) -> Path:
-    """真伪加密 zip: 加密位 set 但内容明文, 可通过 fix_pseudo 解压."""
+    """真伪加密 zip: 加密位 set 但内容明文, 可通过 fix_pseudo 解压.
+
+    兼容旧测试: 写 'flag{pseudo}.txt' (而不是 'flag_c.txt').
+    形态: LFH+CDH bit0=1 (形态 C, 旧测试预期此形态).
+    """
     p = tmp_path / "pseudo.zip"
     with zipfile.ZipFile(p, "w", zipfile.ZIP_STORED) as zf:
         zf.writestr("flag{pseudo}.txt", "flag{pseudo_zip_test_xyz}\n")
-    # 二进制修改 flag bit 0 = 1
     data = bytearray(p.read_bytes())
     for i in range(len(data) - 4):
         if data[i : i + 4] == b"PK\x03\x04":
             data[i + 6] |= 0x1
         elif data[i : i + 4] == b"PK\x01\x02":
             data[i + 8] |= 0x1
+    p.write_bytes(data)
+    return p
+
+
+@pytest.fixture
+def pseudo_zip_form_a(tmp_path) -> Path:
+    """形态 A: 仅 LFH bit0=1 (CDH 0)."""
+    return _make_pseudo_zip_form(tmp_path / "pseudo_a.zip", "A")
+
+
+@pytest.fixture
+def pseudo_zip_form_b(tmp_path) -> Path:
+    """形态 B: 仅 CDH bit0=1 (LFH 0) ← 真实样本 00000038.zip 命中."""
+    return _make_pseudo_zip_form(tmp_path / "pseudo_b.zip", "B")
+
+
+@pytest.fixture
+def pseudo_zip_form_c(tmp_path) -> Path:
+    """形态 C: LFH+CDH bit0 都 = 1 (双假加密)."""
+    return _make_pseudo_zip_form(tmp_path / "pseudo_c.zip", "C")
+
+
+@pytest.fixture
+def nested_pseudo_zip(tmp_path) -> Path:
+    """外层 zip 形态 B 假加密 + 内含嵌套 zip (store 透明).
+
+    模拟 v0.5-train-004 真实样本 00000038.zip 拓扑 (外层 CDH 假加密 + 嵌套 qwe.zip store).
+    修复后必须: ① 外层 entry 能解出 ② 嵌套 zip 内部 CRC 一致 (不被破坏)
+
+    实现: 先造嵌套 zip → 外层 zip write 嵌套文件 → 用 EOCD 倒推外层 CDH 区域,
+    只设外层 CDH bit0=1 (避免误设嵌套 CDH).
+    """
+    # 1) 造嵌套 zip
+    nested_p = tmp_path / "_nested_inner.zip"
+    with zipfile.ZipFile(nested_p, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr("nested_flag.txt", "nested_content_xyz\n")
+
+    # 2) 外层 zip: 1 entry (形态 B 假加密) + 内含 nested_p 数据
+    outer_p = tmp_path / "outer_pseudo.zip"
+    with zipfile.ZipFile(outer_p, "w", zipfile.ZIP_STORED) as zf:
+        zf.write(nested_p, arcname="inner.zip")
+    data = bytearray(outer_p.read_bytes())
+
+    # 3) 找最末尾 EOCD, 拿外层 CDH 区域
+    eocd_offset = -1
+    i = len(data) - 22
+    while i >= 0:
+        if data[i : i + 4] == b"PK\x05\x06":
+            eocd_offset = i
+            break
+        i -= 1
+    cdh_count = struct.unpack("<H", data[eocd_offset + 10 : eocd_offset + 12])[0]
+    cdh_size = struct.unpack("<I", data[eocd_offset + 12 : eocd_offset + 16])[0]
+    cdh_start = struct.unpack("<I", data[eocd_offset + 16 : eocd_offset + 20])[0]
+    cdh_end = cdh_start + cdh_size
+
+    # 4) 只设外层 CDH (在 [cdh_start, cdh_end) 范围内) bit0=1
+    for i in range(cdh_start, cdh_end - 46):
+        if data[i : i + 4] == b"PK\x01\x02":
+            data[i + 8] |= 0x1
+    outer_p.write_bytes(data)
+    return outer_p
+
+
+@pytest.fixture
+def mixed_zip(tmp_path) -> Path:
+    """混合 zip: 1 clear + 1 pseudo (形态 B) + 1 real (per v0.5-zip-pseudo-per-entry-classify).
+
+    验证 per-entry 分类算法 (per ctf-wiki 原理):
+    - clear.txt: LFH/CDH bit0=0, 完全明文 → 分类 clear
+    - pseudo.txt: LFH/CDH bit0=0, CDH bit0=1 (形态 B), data 末位不在 0-11 → 分类 pseudo
+    - real.txt: LFH/CDH bit0=0, CDH bit0=1 (形态 B), data 第 11 字节改成 0-11 → 分类 real
+
+    owner 决策 A+A:
+    - FixPseudoEncryptionAction 只清 pseudo 的 LFH/CDH bit 0 (1 处), 不动 real
+    """
+    # 1) 先用 zipfile 写 3 个 store entry (LFH/CDH bit0 都 0, data 末位都不在 0-11)
+    p = tmp_path / "mixed.zip"
+    with zipfile.ZipFile(p, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr("clear.txt", "clear_content_xyz\n")  # 18 bytes, [11]='t' 不在 0-11
+        zf.writestr("pseudo.txt", "pseudo_content_xyz\n")  # 19 bytes, [11]='n' 不在 0-11
+        zf.writestr("real.txt", "real_content_xyz_buffer\n")  # 24 bytes, [11]='z' 不在 0-11
+    data = bytearray(p.read_bytes())
+
+    # 2) 找外层 CDH 区域 (用 EOCD 倒推)
+    eocd_offset = -1
+    i = len(data) - 22
+    while i >= 0:
+        if data[i : i + 4] == b"PK\x05\x06":
+            eocd_offset = i
+            break
+        i -= 1
+    cdh_count = struct.unpack("<H", data[eocd_offset + 10 : eocd_offset + 12])[0]
+    cdh_size = struct.unpack("<I", data[eocd_offset + 12 : eocd_offset + 16])[0]
+    cdh_start = struct.unpack("<I", data[eocd_offset + 16 : eocd_offset + 20])[0]
+    cdh_end = cdh_start + cdh_size
+
+    # 3) 改 CDH bit0=1 for pseudo + real (按 fname 匹配, 顺序写入)
+    #    收集外层 CDH 区域的 (cdh_offset, fname) 对
+    cdh_entries = []
+    k = cdh_start
+    while k < cdh_end - 46:
+        if data[k : k + 4] == b"PK\x01\x02":
+            fnl = struct.unpack("<H", data[k + 28 : k + 30])[0]
+            exl = struct.unpack("<H", data[k + 30 : k + 32])[0]
+            cmt = struct.unpack("<H", data[k + 32 : k + 34])[0]
+            cdh_fname = data[k + 46 : k + 46 + fnl].decode("utf-8", errors="replace")
+            cdh_entries.append((k, cdh_fname))
+            k = k + 46 + fnl + exl + cmt
+        else:
+            k += 1
+
+    # zipfile.writestr 写入顺序: clear → pseudo → real (按 writestr 顺序)
+    for cdh_off, fname in cdh_entries:
+        if fname == "pseudo.txt":
+            data[cdh_off + 8] |= 0x1  # CDH bit0=1
+        elif fname == "real.txt":
+            data[cdh_off + 8] |= 0x1  # CDH bit0=1
+
+    # 4) 改 real.txt 的 data 第 11 字节 (offset 11) 到 0-11 范围 → 模拟 PKCS#5 末位
+    #    real.txt data 起点: 用 CDH 反查 LFH, 再 LFH + 30 + fnl + exl
+    for cdh_off, fname in cdh_entries:
+        if fname == "real.txt":
+            lfh_off = struct.unpack("<I", data[cdh_off + 42 : cdh_off + 46])[0]
+            fnl = struct.unpack("<H", data[lfh_off + 26 : lfh_off + 28])[0]
+            exl = struct.unpack("<H", data[lfh_off + 28 : lfh_off + 30])[0]
+            data_start = lfh_off + 30 + fnl + exl
+            # real.txt data 第 11 字节 = data_start + 11
+            data[data_start + 11] = 0x05  # 0-11 范围 → 模拟 PKCS#5 末位 → 判 real
+            break
+
     p.write_bytes(data)
     return p
 
@@ -317,6 +479,122 @@ class TestPseudoDetection:
     def test_nonexistent_returns_false(self, tmp_path):
         assert _is_pseudo_encrypted(tmp_path / "nonexistent.zip") is False
 
+    # v0.5-zip-pseudo-cdh-detect: 3 形态覆盖 (per train-004 §5)
+    def test_form_a_lfh_only(self, pseudo_zip_form_a):
+        """形态 A: LFH bit0=1, CDH bit0=0 → 旧代码能识别 (回归)."""
+        assert _is_pseudo_encrypted(pseudo_zip_form_a) is True
+
+    def test_form_b_cdh_only(self, pseudo_zip_form_b):
+        """形态 B: LFH bit0=0, CDH bit0=1 ← 旧代码漏识别, 新代码覆盖."""
+        assert _is_pseudo_encrypted(pseudo_zip_form_b) is True
+
+    def test_form_c_both(self, pseudo_zip_form_c):
+        """形态 C: LFH bit0=1, CDH bit0=1 (双假加密) ← 旧代码能识别 (回归)."""
+        assert _is_pseudo_encrypted(pseudo_zip_form_c) is True
+
+    def test_nested_pseudo_detected(self, nested_pseudo_zip):
+        """嵌套 zip (外层形态 B 假加密 + 内含 zip) → 外层应判 True."""
+        assert _is_pseudo_encrypted(nested_pseudo_zip) is True
+
+    def test_mixed_zip_has_pseudo(self, mixed_zip):
+        """混合 zip (1 clear + 1 pseudo + 1 real) → 含伪加密 → True."""
+        assert _is_pseudo_encrypted(mixed_zip) is True
+
+
+# v0.5-zip-pseudo-per-entry-classify: per-entry 分类算法
+class TestClassifyZipEntries:
+    """v0.5-train-005 反馈: per-entry 独立判断, 不 short-circuit (per ctf-wiki 原理)."""
+
+    def test_normal_zip_all_clear(self, normal_zip):
+        """正常 zip (无加密位) → 全部 clear, 0 pseudo, 0 real."""
+        from automisc.core.actions.zip_chain import _classify_zip_entries
+        classify = _classify_zip_entries(normal_zip)
+        assert len(classify["pseudo"]) == 0
+        assert len(classify["real"]) == 0
+        assert set(classify["clear"].keys()) == {"flag{normal}.txt", "readme.txt"}
+
+    def test_form_b_cdh_only_classified_as_pseudo(self, pseudo_zip_form_b):
+        """形态 B (CDH bit0=1, data 明文) → per-entry 分类为 pseudo (不修真加密)."""
+        from automisc.core.actions.zip_chain import _classify_zip_entries
+        classify = _classify_zip_entries(pseudo_zip_form_b)
+        assert "flag_B.txt" in classify["pseudo"]
+        assert "flag_B.txt" not in classify["real"]
+        assert "flag_B.txt" not in classify["clear"]
+
+    def test_mixed_zip_per_entry(self, mixed_zip):
+        """混合 zip: clear + pseudo + real 三种 entry 各 1 个."""
+        from automisc.core.actions.zip_chain import _classify_zip_entries
+        classify = _classify_zip_entries(mixed_zip)
+        # 1 clear (CDH bit0=0, 无加密位)
+        assert "clear.txt" in classify["clear"]
+        # 1 pseudo (CDH bit0=1, data 末位不在 0-11)
+        assert "pseudo.txt" in classify["pseudo"]
+        # 1 real (CDH bit0=1, data 第 11 字节改成 0-11 模拟 PKCS#5 末位)
+        assert "real.txt" in classify["real"]
+        # 三个互不重叠
+        all_entries = set(classify["pseudo"]) | set(classify["real"]) | set(classify["clear"])
+        assert all_entries == {"clear.txt", "pseudo.txt", "real.txt"}
+
+    def test_nested_zip_outer_classification(self, nested_pseudo_zip):
+        """嵌套 zip: 外层 entry 分类正确, 嵌套 entry 不混入外层分类.
+
+        外层 'inner.zip' (CDH bit0=1) → 伪加密 (per train-004)
+        嵌套 'nested_flag.txt' (嵌套 CDH bit0=0, 不在外层 CDH 区域) → 不被外层分类
+        """
+        from automisc.core.actions.zip_chain import _classify_zip_entries
+        classify = _classify_zip_entries(nested_pseudo_zip)
+        # 外层 inner.zip: 形态 B 假加密 (data 是嵌套 zip 184 字节, 第 11 字节不在 0-11)
+        assert "inner.zip" in classify["pseudo"]
+        # 嵌套 entry 不会被收进外层分类 (因为 CDH 区域只扫外层)
+        assert "nested_flag.txt" not in classify["pseudo"]
+        assert "nested_flag.txt" not in classify["real"]
+        assert "nested_flag.txt" not in classify["clear"]
+
+
+# v0.5-zip-pseudo-per-entry-classify: 修复只清伪加密, 不修真加密
+class TestFixMixedZip:
+    """v0.5-train-005 + owner 决策 A+A: 只清 pseudo, 不动 real."""
+
+    def test_fix_mixed_zip_only_clears_pseudo(self, mixed_zip):
+        """混合 zip 修复: 只清 pseudo (1 处), 不动 real."""
+        # 1) 修复前状态
+        with zipfile.ZipFile(mixed_zip) as zf:
+            pre_flags = {info.filename: info.flag_bits for info in zf.infolist()}
+        assert pre_flags["pseudo.txt"] & 0x1, "pseudo.txt CDH bit0 应为 1 (形态 B)"
+        assert pre_flags["real.txt"] & 0x1, "real.txt CDH bit0 应为 1"
+        assert not (pre_flags["clear.txt"] & 0x1), "clear.txt CDH bit0 应为 0"
+
+        # 2) 跑 fix_pseudo
+        result = FixPseudoEncryptionAction().run({"file_path": str(mixed_zip)})
+        assert result.success is True
+        # 1 处修复 (pseudo.txt 的 CDH bit0)
+        assert result.data["fixed_count"] == 1
+        # 报告 per-entry 分类
+        assert "pseudo.txt" in result.data["pseudo_entries"]
+        assert "real.txt" in result.data["real_entries"]
+        assert "clear.txt" in result.data["clear_entries"]
+
+        # 3) 修复后状态
+        with zipfile.ZipFile(mixed_zip) as zf:
+            post_flags = {info.filename: info.flag_bits for info in zf.infolist()}
+        # pseudo: bit0 清 0 (修复)
+        assert not (post_flags["pseudo.txt"] & 0x1), "pseudo.txt CDH bit0 应被清 0"
+        # real: bit0 保持 1 (不修, per-owner 决策 A)
+        assert post_flags["real.txt"] & 0x1, "real.txt CDH bit0 应保持 1 (不修真加密)"
+        # clear: bit0 保持 0 (本来就没设)
+        assert not (post_flags["clear.txt"] & 0x1), "clear.txt CDH bit0 应保持 0"
+
+        # 4) clear + pseudo 解出, real 解不出 (真加密, 无密码)
+        assert result.data["extracted_count"] >= 1
+        # bad_entries 应包含 real.txt (zipfile 报 encrypted/password required)
+        real_bad = [b for b in result.data["bad_entries"] if b[0] == "real.txt"]
+        # 注意: real.txt 的 data 第 11 字节被改成 0x05 (模拟 PKCS#5), 但 data 不是真加密算法输出
+        # zipfile 仍会读 entry 看 CDH bit0=1 → 要密码 → 报"is encrypted"或 CRC 错
+        # 这个测试只验证: real 没被修真加密位 (bit0 仍是 1), 不强制要求它能解压
+        backup = mixed_zip.with_suffix(mixed_zip.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
+
 
 # ---------- zip_chain: actions ----------
 class TestTryUnzip:
@@ -354,7 +632,64 @@ class TestFixPseudoEncryption:
     def test_fix_normal_zip_fails(self, normal_zip):
         result = FixPseudoEncryptionAction().run({"file_path": str(normal_zip)})
         assert result.success is False
-        assert "not pseudo" in result.message.lower()
+        # v0.5-zip-pseudo-per-entry-classify: 改用 "no pseudo-encrypted entry found"
+        assert "no pseudo-encrypted entry" in result.message.lower()
+
+    # v0.5-zip-pseudo-cdh-detect: 3 形态 fix_pseudo 都应能解压 (per train-004)
+    def test_fix_form_a(self, pseudo_zip_form_a):
+        """形态 A: fix_pseudo 清 LFH/CDH bit0 → 解压 OK."""
+        result = FixPseudoEncryptionAction().run({"file_path": str(pseudo_zip_form_a)})
+        assert result.success is True
+        with zipfile.ZipFile(pseudo_zip_form_a) as zf:
+            data = zf.read("flag_A.txt")
+            assert b"flag_A_test_xyz" in data
+        backup = pseudo_zip_form_a.with_suffix(pseudo_zip_form_a.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
+
+    def test_fix_form_b(self, pseudo_zip_form_b):
+        """形态 B: fix_pseudo 清 LFH/CDH bit0 → 解压 OK ← owner 真实样本命中形态."""
+        result = FixPseudoEncryptionAction().run({"file_path": str(pseudo_zip_form_b)})
+        assert result.success is True
+        with zipfile.ZipFile(pseudo_zip_form_b) as zf:
+            data = zf.read("flag_B.txt")
+            assert b"flag_B_test_xyz" in data
+        backup = pseudo_zip_form_b.with_suffix(pseudo_zip_form_b.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
+
+    def test_fix_form_c(self, pseudo_zip_form_c):
+        """形态 C: fix_pseudo 清 LFH/CDH bit0 → 解压 OK (回归)."""
+        result = FixPseudoEncryptionAction().run({"file_path": str(pseudo_zip_form_c)})
+        assert result.success is True
+        with zipfile.ZipFile(pseudo_zip_form_c) as zf:
+            data = zf.read("flag_C.txt")
+            assert b"flag_C_test_xyz" in data
+        backup = pseudo_zip_form_c.with_suffix(pseudo_zip_form_c.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
+
+    def test_fix_nested_zip_no_collateral_damage(self, nested_pseudo_zip):
+        """嵌套 zip: fix_pseudo 只修外层 LFH/CDH, 嵌套 zip 内部 CRC 一致.
+
+        关键 (per v0.5-train-004 §3.4): 旧修复代码用 magic 搜索 PK\\x03\\x04/PK\\x01\\x02
+        会破坏嵌套 zip 内部 LFH/CDH → 嵌套 zip CRC fail.
+        新代码用 EOCD 倒推 + CDH 反查 LFH offset, 只修外层 entry 的 LFH/CDH.
+        """
+        result = FixPseudoEncryptionAction().run({"file_path": str(nested_pseudo_zip)})
+        assert result.success is True
+        assert result.data["fixed_count"] >= 1
+        # 验证外层 entry 解压 OK
+        with zipfile.ZipFile(nested_pseudo_zip) as zf:
+            data = zf.read("inner.zip")
+            # 验证嵌套 zip 内部 CRC 一致 (即嵌套 zip 仍可正常解压)
+            import io
+            with zipfile.ZipFile(io.BytesIO(data)) as nested_zf:
+                nested_data = nested_zf.read("nested_flag.txt")
+                assert b"nested_content_xyz" in nested_data
+        backup = nested_pseudo_zip.with_suffix(nested_pseudo_zip.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
 
 
 # ---------- generate_passwords ----------
@@ -428,3 +763,98 @@ class TestZipChainDAG:
             elif data[i : i + 4] == b"PK\x01\x02":
                 data[i + 8] |= 0x1
         pseudo_zip.write_bytes(data)
+
+
+# ---------- v0.5-journal-highlight-keywords: stop_if 谓词 ----------
+class TestStopIfPredicate:
+    """v0.5-journal-highlight-keywords (per Owner 2026-06-16) 加的 stop_if 谓词机制."""
+
+    def test_stop_if_true_terminates_chain(self):
+        """stop_if 返回 True → chain 立即停, 即使 on_failure 指向下一步."""
+        from automisc.core.dag import DAG, DAGNode, Action, ActionResult
+
+        class StubAction(Action):
+            def __init__(self, name, return_data=None):
+                super().__init__()
+                self.name = name
+                self._return_data = return_data or {}
+
+            def run(self, context):
+                return ActionResult(
+                    success=False,
+                    data={**self._return_data, "stop_reason": "encrypted"},
+                    message=f"{self.name} failed",
+                )
+
+        def stop_on_encrypted(result):
+            return result.data and result.data.get("stop_reason") == "encrypted"
+
+        a = StubAction("a", {"encrypted": True})
+        b = StubAction("b")
+
+        node_a = DAGNode(a, stop_if=stop_on_encrypted)
+        node_b = DAGNode(b)
+        node_a.on_failure = node_b  # 即使失败, stop_if 应优先
+
+        dag = DAG(start_node=node_a)
+        ctx = dag.execute({"file_path": "x.zip"})
+
+        # 应只跑了 a, 没跑 b
+        steps = [step["node"] for step in ctx.get("__log__", [])]
+        assert "a" in steps
+        assert "b" not in steps
+        # log 应标记 stop_reason
+        assert any("stop_if" in step.get("stop_reason", "") for step in ctx["__log__"])
+
+    def test_stop_if_false_continues_normal_flow(self):
+        """stop_if 返回 False → 走 on_success / on_failure 正常转移."""
+        from automisc.core.dag import DAG, DAGNode, Action, ActionResult
+
+        class StubAction(Action):
+            def __init__(self, name, success):
+                super().__init__()
+                self.name = name
+                self._success = success
+
+            def run(self, context):
+                return ActionResult(success=self._success, data={}, message=f"{self.name}")
+
+        def never_stop(result):
+            return False
+
+        a = StubAction("a", success=False)
+        b = StubAction("b", success=True)
+
+        node_a = DAGNode(a, stop_if=never_stop)
+        node_b = DAGNode(b)
+        node_a.on_failure = node_b
+
+        dag = DAG(start_node=node_a)
+        ctx = dag.execute({})
+
+        steps = [step["node"] for step in ctx.get("__log__", [])]
+        assert "a" in steps
+        assert "b" in steps  # 正常走了 on_failure
+
+    def test_stop_if_none_default_unchanged(self):
+        """stop_if 不传 (None) → 行为跟 v0.1 一致."""
+        from automisc.core.dag import DAG, DAGNode, Action, ActionResult
+
+        class StubAction(Action):
+            def __init__(self, name, success):
+                super().__init__()
+                self.name = name
+                self._success = success
+
+            def run(self, context):
+                return ActionResult(success=self._success, data={}, message=self.name)
+
+        a = StubAction("a", success=True)
+        node_a = DAGNode(a)  # stop_if 默认 None
+        node_a.on_success = None
+        node_a.on_failure = None
+
+        dag = DAG(start_node=node_a)
+        ctx = dag.execute({})
+        # 不抛异常就行
+        assert "a" in [s["node"] for s in ctx.get("__log__", [])]
