@@ -20,6 +20,12 @@ from __future__ import annotations
 # 见 core.decoders.__init__.py: base64_image / base_convert / coords_to_qr
 from automisc.core import decoders as _decoders  # noqa: F401  # noqa: E402
 
+# v0.5-journal-highlight-keywords-Q7 (per Owner 2026-06-16 17:00):
+# GUI 启动时 setup_logging 已在 __main__.py 调过, 这里拿 logger.
+from automisc.core.logging_setup import get_logger  # noqa: E402
+
+log = get_logger(__name__)
+
 from pathlib import Path
 from typing import Optional
 
@@ -34,14 +40,19 @@ from PySide6.QtWidgets import (
 from automisc.core.chains import (
     build_zip_chain_dag,
     build_zip_chain_with_bruteforce,
-    find_embedded_archives,
+    # v0.5-philosophy-rethink 删 find_embedded_archives (per owner 决策 4):
+    # 之前 _maybe_trigger_zip_chain_from_binwalk 用, 现在函数删了
 )
 from automisc.core.dag import DAG
 from automisc.core.orchestrator import CoreOrchestrator
 from automisc.core.registry import list_tools
 from automisc.core.router import FileRouter, RouteRecommendation
 
-from .auto_runner import AutoRunner
+from .auto_runner import (
+    AutoRunner,
+    FindSuspiciousRunner,
+    pick_suspicious_pool,
+)
 from .chain_runner import ChainRunner
 from .decode_runner import DecodeRunner
 from .journal_panel import JournalPanel
@@ -69,8 +80,9 @@ class MainWindow(QMainWindow):
         self._runner: Optional[ToolRunner] = None  # 单工具 async runner
         self._chain_runner: Optional[ChainRunner] = None  # chain async runner (v0.5)
         self._decode_runner: Optional[DecodeRunner] = None  # decoder async runner (v0.5-decoder-menu)
-        self._auto_runner: Optional[AutoRunner] = None  # 链式 auto-runner
-        self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐
+        self._auto_runner: Optional[AutoRunner] = None  # legacy auto-runner (向后兼容, 当前未使用)
+        self._find_suspicious_runner: Optional[FindSuspiciousRunner] = None  # v0.5-philosophy-rethink 新 auto-runner
+        self._current_recommendations: list[RouteRecommendation] = []  # 当前文件的 router 推荐 (仅展示用)
         self._auto_run_enabled: bool = True  # 默认开启 auto-run
         # v0.5-tmp-text-mode: text-based decoder GUI 弹 QFileDialog 时记住用户选
         self.output_dir_for_text_decoder: str = str(Path.cwd())  # 默认 cwd
@@ -116,6 +128,10 @@ class MainWindow(QMainWindow):
         if not local_path:
             return
 
+        # v0.5-journal-highlight-keywords-Q7 (per Owner 2026-06-16 17:00):
+        # 拖入即打 log, 卡死时 tail -f 能看到这一步发生过.
+        log.info("dropEvent: file=%s", local_path)
+
         # v0.5-clear-on-new-file: 拖入新文件时先清空 output, 避免旧文件的信息残留
         self._on_new_file_selected(Path(local_path), source="drop")
 
@@ -124,17 +140,60 @@ class MainWindow(QMainWindow):
     # ---------- auto-run (v0.1.1 增强) ----------
     def _start_auto_run(self, recommendations: list[RouteRecommendation]) -> None:
         """启动 AutoRunner 串行跑推荐工具."""
+        log.info("_start_auto_run: ENTER")
         if self._auto_runner and self._auto_runner.isRunning():
+            log.info("_start_auto_run: skip, AutoRunner already running")
             return  # 已有在跑
-        self._auto_runner = AutoRunner(
-            self.core, recommendations, str(self.current_file), max_tools=5
+        log.info(
+            "_start_auto_run: file=%s, %d recommendations, max_tools=8",
+            self.current_file, len(recommendations),
         )
+        log.info("_start_auto_run: building AutoRunner instance")
+        self._auto_runner = AutoRunner(
+            self.core, recommendations, str(self.current_file), max_tools=8
+        )
+        log.info("_start_auto_run: connecting signals")
         self._auto_runner.tool_started.connect(self._on_auto_tool_started)
         self._auto_runner.tool_finished.connect(self._on_auto_tool_finished)
         self._auto_runner.chain_finished.connect(self._on_auto_chain_finished)
         self._auto_runner.chain_failed.connect(self._on_auto_chain_failed)
         self._auto_runner.short_circuited.connect(self._on_auto_short_circuited)
+        log.info("_start_auto_run: calling .start()")
         self._auto_runner.start()
+        log.info("_start_auto_run: .start() returned, QThread should be running")
+
+    # ---------- v0.5-philosophy-rethink: find_suspicious_from_<type> ----------
+    def _start_find_suspicious(self, file_path: Path) -> None:
+        """启动 FindSuspiciousRunner 跑 find_suspicious_from_<type> 工具池.
+
+        与 _start_auto_run 区别:
+        - 不接 recommendations, 改为按扩展名选 pool
+        - pool 工具池固定 (per FIND_SUSPICIOUS_*_TOOLS), 不取 top 5 score
+        - **不**触发任何 chain (auto_run 抢 flag 是 owner 决策 1 禁忌)
+        - Signal 接口与 AutoRunner 一致, 复用现有 handler
+
+        Args:
+            file_path: 当前文件路径 (已在 _on_new_file_selected 里检查存在性)
+        """
+        log.info("_start_find_suspicious: ENTER, file=%s", file_path)
+        if self._find_suspicious_runner and self._find_suspicious_runner.isRunning():
+            log.info("_start_find_suspicious: skip, runner already running")
+            return
+        self._find_suspicious_runner = FindSuspiciousRunner(self.core, str(file_path))
+        self._find_suspicious_runner.pool_selected.connect(self._on_find_pool_selected)
+        self._find_suspicious_runner.tool_started.connect(self._on_auto_tool_started)
+        self._find_suspicious_runner.tool_finished.connect(self._on_auto_tool_finished)
+        self._find_suspicious_runner.chain_finished.connect(self._on_auto_chain_finished)
+        self._find_suspicious_runner.chain_failed.connect(self._on_auto_chain_failed)
+        log.info("_start_find_suspicious: calling .start()")
+        self._find_suspicious_runner.start()
+        log.info("_start_find_suspicious: .start() returned")
+
+    def _on_find_pool_selected(self, pool_name: str, tools: list[str]) -> None:
+        """pool 选定后, 状态栏 + output 区打一行."""
+        self.statusBar().showMessage(
+            f"[auto-run] pool={pool_name}, {len(tools)} tools: {tools}"
+        )
 
     def _on_auto_tool_started(self, tool_name: str, index: int, total: int) -> None:
         self.statusBar().showMessage(
@@ -195,7 +254,13 @@ class MainWindow(QMainWindow):
                 )
 
     def _on_auto_chain_finished(self, summaries) -> None:
-        """整链跑完 → 输出总结 + 检测 binwalk 输出含 archive → 触发 zip_chain."""
+        """整链跑完 → 输出总结 + 检测 binwalk 输出含 archive → 触发 zip_chain.
+
+        v0.5-journal-highlight-keywords (per Owner 2026-06-16):
+        - 整链跑完时, 调 journal_panel.add_sensitive_keyword_hints()
+          把所有 SP 命中 secret/key/password/pass/flag/ctf 的片段写到 journal
+          (kind="密码线索候选", severity=0 信息级)
+        """
         total = len(summaries)
         ok = sum(1 for s in summaries if s.success)
         sps = sum(s.suspicious_count for s in summaries)
@@ -205,6 +270,42 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"auto-run done: {ok}/{total} OK · {sps} suspicious points"
         )
+
+        # v0.5-journal-highlight-keywords: 归集密码线索
+        try:
+            # 从 core.journal 拿刚跑完的工具的 SuspiciousPoint
+            results_for_hints = []
+            seen_tools: set[str] = set()
+            for summary in summaries:
+                if summary.tool_name in seen_tools:
+                    continue
+                seen_tools.add(summary.tool_name)
+                # 从 core.journal 取最后一次该工具的 ToolResult
+                entries = self.core.journal.filter_by_tool(summary.tool_name)
+                if entries:
+                    # 拿最近的 entry (但 journal 不存完整 ToolResult, 改用 SP list 重组)
+                    # 简化: 让 _run_tool 重新跑是不合理的, 直接从 journal 拿 SP list
+                    sps_for_tool = [e.suspicious_point for e in entries if hasattr(e, "suspicious_point") and e.suspicious_point]
+                    if sps_for_tool:
+                        from automisc.core.result import ToolResult
+                        results_for_hints.append(
+                            ToolResult(
+                                tool_name=summary.tool_name,
+                                exit_code=0,
+                                suspicious_points=sps_for_tool,
+                            )
+                        )
+            if results_for_hints:
+                n = self.journal_panel.add_sensitive_keyword_hints(
+                    results_for_hints, self.current_file
+                )
+                if n:
+                    self.output_view.append_text(
+                        f"\n[journal] 归集 {n} 条密码线索候选 (secret/key/password/pass/flag/ctf) → 见下方 journal\n"
+                    )
+        except Exception as e:  # noqa: BLE001
+            # 归集失败不影响主流程
+            pass
 
         # v0.5-DAG: 检查 binwalk 输出里是否含 embedded archive → 触发 zip_chain
         if self._current_recommendations:
@@ -217,133 +318,14 @@ class MainWindow(QMainWindow):
                 binwalk_entries = self.core.journal.filter_by_tool("binwalk")
                 if binwalk_entries:
                     last_binwalk = binwalk_entries[-1]
-                    # journal 不存 stdout, 改用 ad-hoc 拿
-                    self._maybe_trigger_zip_chain_from_binwalk()
+                    # v0.5-philosophy-rethink 删 _maybe_trigger_zip_chain_from_binwalk 调用
+                    # (per owner 决策: auto_run 不该触发链/雕文件, 做题人自己判断下一步)
+                    # binwalk SP 已写 journal, 做题人可看 journal 决定是否点工具栏 fix_pseudo_zip
 
-    def _maybe_trigger_zip_chain_from_binwalk(self) -> None:
-        """跑一次 binwalk 拿 stdout, 检测 archive, 触发 zip_chain."""
-        if not self.current_file:
-            return
-        try:
-            result = self.core.run_tool("binwalk", str(self.current_file))
-        except Exception:  # noqa: BLE001
-            return
-
-        if not result.stdout:
-            return
-
-        archives = find_embedded_archives(result.stdout)
-        if not archives:
-            return
-
-        # binwalk 报有 archive → 提取 + 触发 zip_chain
-        self.output_view.append_text(
-            f"\n[DAG trigger] binwalk 检测到 {len(archives)} 个 embedded archive:\n"
-        )
-        for arch in archives[:5]:
-            self.output_view.append_text(f"  {arch}\n")
-
-        # 跑提取 (v0.5-output-samedir: extract_dir = input 同目录)
-        from automisc.core.utils.output_path import extract_dir_for
-        extract_dir = extract_dir_for(self.current_file, purpose="extract")
-        extract_dir.mkdir(parents=True, exist_ok=True)
-        binwalk_result = result  # 已跑过
-        if "extracted_files" in result.suspicious_points[0].__dict__ if result.suspicious_points else False:
-            pass  # binwalk 没暴露 extracted files via sps; 用 tool 直接抽取
-
-        # 跑 binwalk_extract
-        from automisc.core.actions.binwalk_extract import BinwalkExtractAction
-
-        binwalk_extract = BinwalkExtractAction()
-        extract_result = binwalk_extract.run(
-            {"file_path": str(self.current_file), "extract_dir": str(extract_dir)}
-        )
-        if not extract_result.success:
-            self.output_view.append_text(
-                f"[!] binwalk extract failed: {extract_result.message}\n"
-            )
-            return
-
-        extracted_files = extract_result.data.get("extracted_files", [])
-        zip_files = [
-            f for f in extracted_files
-            if f.lower().endswith((".zip",))
-        ]
-        if not zip_files:
-            self.output_view.append_text(
-                f"[!] no .zip file among {len(extracted_files)} extracted files\n"
-            )
-            return
-
-        # 对每个 zip 跑 chain
-        for zip_path in zip_files[:3]:  # 限制 3 个
-            self.output_view.append_text(
-                f"\n[DAG] running zip-full chain on {Path(zip_path).name} (含 bruteforce)...\n"
-            )
-            # v0.5-GUI-fix: 用 zip-full (含 bruteforce) 而非 zip (无 bruteforce)
-            # 之前用 build_zip_chain_dag 遇到真加密 zip 永远 fail
-            dag: DAG = build_zip_chain_with_bruteforce()
-            ctx = dag.execute({"file_path": zip_path})
-            log = ctx.get("__log__", [])
-            for step in log:
-                self.output_view.append_text(
-                    f"  [{step['step']}] {step['node']}: {step['message']}\n"
-                )
-            # v0.5-chain-success-journal-fix (per Owner 15:37):
-            # auto-run 路径 inline 调 dag.execute, **不**走 ChainRunner, 所以
-            # _on_chain_finished + _push_chain_step_to_journal 不会被触发
-            # 手动调 helper 推 journal (bruteforce 成功 / 解压成功 / foremost 提取)
-            for step in log:
-                if not step.get("success"):
-                    continue
-                step_data = ctx.get(f"__step_{step['step']}_{step['node']}__", {})
-                if step_data:
-                    self._push_chain_step_to_journal(
-                        chain_name="zip-full",
-                        file_path=zip_path,
-                        step_name=step["node"],
-                        step_data=step_data,
-                        step_message=step.get("message", ""),
-                    )
-
-            # 渲染 flag_candidate (如果 lsb chain 抽到) - 但 zip chain 没这字段
-            last_result = ctx.get("__last_result__")
-            if last_result and last_result.data:
-                extracted_to = last_result.data.get("extracted_to")
-                if extracted_to:
-                    self.output_view.append_text(
-                        f"  → 解出到: {extracted_to}\n"
-                    )
-                    # 检查解出的目录里有没有 flag{}
-                    extracted_path = Path(extracted_to)
-                    if extracted_path.is_dir():
-                        for f in extracted_path.rglob("*"):
-                            if f.is_file():
-                                try:
-                                    content = f.read_text(errors="replace")
-                                    if "flag{" in content or "CTF{" in content:
-                                        self.output_view.append_flag_candidate(
-                                            content.strip()[:200],
-                                            channel=f"zip_chain/{f.name}",
-                                        )
-                                        # v0.5-chain-success-journal-fix (per Owner 15:37):
-                                        # 推到 journal add_suspicious (sev=5, kind=zip_chain_flag)
-                                        from automisc.core.suspicious import SuspiciousPoint
-                                        sp = SuspiciousPoint(
-                                            id="",
-                                            tool_name=f"chain/zip-full/{f.name}",
-                                            file_path=zip_path,
-                                            category="zip_chain_flag",
-                                            offset=None,
-                                            matched_pattern=content.strip()[:120],
-                                            severity=5,
-                                            suggested_action="zip chain 解出文件含 flag{} / CTF{}",
-                                        )
-                                        self.journal_panel.add_suspicious(
-                                            f"chain/zip-full", Path(zip_path), sp
-                                        )
-                                except Exception:
-                                    pass
+    # v0.5-philosophy-rethink 删 _maybe_trigger_zip_chain_from_binwalk (per owner 决策 4):
+    # auto_run 跑 binwalk → 自动跑 binwalk -e 提取 → 自动触发 zip chain = 抢 flag
+    # 新设计: binwalk SP 写 journal 即可, 做题人自己看 journal 决定下一步
+    # (点工具栏 fix_pseudo_zip 按钮 / 或 CLI: automisc chain --chain zip 手工触发)
 
     def _on_auto_chain_failed(self, tool_name: str, error_msg: str) -> None:
         self.output_view.append_text(
@@ -454,7 +436,13 @@ class MainWindow(QMainWindow):
         5. auto-run 开启则启动 AutoRunner
         """
         # 1. 停所有 runner
-        for runner in (self._auto_runner, self._runner, self._chain_runner, self._decode_runner):
+        for runner in (
+            self._find_suspicious_runner,
+            self._auto_runner,
+            self._runner,
+            self._chain_runner,
+            self._decode_runner,
+        ):
             if runner and runner.isRunning():
                 try:
                     runner.stop()
@@ -495,12 +483,24 @@ class MainWindow(QMainWindow):
                 f"        router error: {e}\n"
             )
 
-        # 4. auto-run 开启则启动 AutoRunner
-        if self._auto_run_enabled and self._current_recommendations:
+        # 4. auto-run 开启则启动 (per v0.5-philosophy-rethink, 2026-06-20)
+        if self._auto_run_enabled and self.current_file:
+            # v0.5-philosophy-rethink (per Owner 2026-06-20 11:49 + 12:02 拍板 C 哲学):
+            # 之前 auto-run 对 .zip 自动触发 zip 链 (build_zip_chain_dag) — 违背新哲学 "auto_run 不抢 flag"
+            # 之前 auto-run 对 .rar / .7z 留接口, 跟 .zip 走 archive_chain_map — 同上违背
+            # 新设计: auto_run 改名 find_suspicious_from_<type>, 按扩展名选工具池
+            # - picture (.png/.jpg/.jpeg/.bmp/.gif): zsteg/exiftool/binwalk/strings/file
+            # - traffic (.pcap/.pcapng): pcap_protocol_router/tshark/strings/file
+            # - archive (.zip/.7z/.rar/.tar/.gz): sevenz/unzip/file/strings
+            # - binary (.exe/.dll/.elf/.bin + 默认兜底): file/strings/binwalk/exiftool
+            # 4 池都**不**含 foremost / binwalk_extract / steghide_extract / john / fix_pseudo / bruteforce
+            # (这些"雕/修/爆"操作留给 GUI 工具栏 / CLI 链手工触发, per owner C 哲学)
+            pool_name, tools = pick_suspicious_pool(str(self.current_file))
             self.output_view.append_text(
-                f"\n[auto-run] 启动串行跑 top 5 推荐工具...\n"
+                f"\n[auto-run] 启动 find_suspicious_from_{pool_name}, 跑 {len(tools)} 个工具: {tools}\n"
+                f"  (纯探测, 不雕不修不爆; 做题人看 journal 决定下一步)\n"
             )
-            self._start_auto_run(self._current_recommendations)
+            self._start_find_suspicious(self.current_file)
         elif not self._auto_run_enabled:
             self.output_view.append_text(
                 f"\n[auto-run disabled] 点左侧菜单手动选工具跑\n"

@@ -1,6 +1,7 @@
-"""e2e: binwalk 检测到 embedded zip → DAG 自动跑 zip_chain.
+"""e2e: zip 链 + 嵌套 zip 提取 (v0.5-zip-pseudo-per-entry-classify).
 
 依赖: tests/fixtures/sample_archive_pseudo_real.zip (177 bytes, 伪加密 zip)
+v0.5-philosophy-rethink: 删 TestBinwalkTriggerE2E (auto_run 不再触发链)
 """
 from __future__ import annotations
 
@@ -82,35 +83,3 @@ class TestZipChainE2E:
         if backup.exists():
             backup.unlink()
 
-
-class TestBinwalkTriggerE2E:
-    def test_drop_file_with_embedded_zip_triggers_chain(
-        self, qtbot, pseudo_zip, tmp_path
-    ):
-        """构造一个 bin 文件含 pseudo_zip 在 offset 0, 拖入 → 触发 zip chain."""
-        # 构造复合文件: pseudo_zip 数据 + padding
-        composite = tmp_path / "composite.bin"
-        composite.write_bytes(pseudo_zip.read_bytes() + b"\x00" * 1000)
-
-        w = MainWindow(core=CoreOrchestrator())
-        w._auto_run_enabled = False  # 手动触发
-        qtbot.addWidget(w)
-
-        from PySide6.QtCore import QMimeData, QPoint, QUrl
-        from PySide6.QtGui import QDropEvent
-
-        mime = QMimeData()
-        mime.setUrls([QUrl.fromLocalFile(str(composite))])
-        event = QDropEvent(
-            QPoint(0, 0), Qt.CopyAction, mime, Qt.LeftButton, Qt.NoModifier
-        )
-        w.dropEvent(event)
-
-        # 手动触发 zip chain
-        w._maybe_trigger_zip_chain_from_binwalk()
-
-        # output 应有 [DAG trigger] 标记
-        text = w.output_view.toPlainText()
-        # 如果 binwalk 实际找到 archive (取决于 binwalk 行为)
-        # 至少 "trigger" 或 "no .zip" 之一出现
-        assert "DAG" in text or "binwalk" in text

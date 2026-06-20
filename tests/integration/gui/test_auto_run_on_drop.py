@@ -30,7 +30,7 @@ def sample_text() -> Path:
 
 class TestAutoRunOnDrop:
     def test_drop_triggers_auto_run(self, qtbot, sample_text):
-        """拖入文件 → auto-run 启动 → chain_finished 跑完所有推荐工具."""
+        """拖入文件 → auto-run 启动 → chain_finished 跑完所有 pool 工具."""
         w = MainWindow(core=CoreOrchestrator())
         qtbot.addWidget(w)
 
@@ -48,8 +48,8 @@ class TestAutoRunOnDrop:
         # 等 chain_finished 信号 (避免 race: isRunning()=False 时 slot 还没排到事件循环)
         signal_received = {"flag": False}
         # 拿到 _auto_runner 后接信号
-        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
-        w._auto_runner.chain_finished.connect(
+        qtbot.waitUntil(lambda: w._find_suspicious_runner is not None, timeout=2000)
+        w._find_suspicious_runner.chain_finished.connect(
             lambda *args: signal_received.__setitem__("flag", True)
         )
         qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
@@ -65,7 +65,7 @@ class TestAutoRunOnDrop:
         assert "flag{smoke_test_pr9_xyz}" in text
 
     def test_drop_png_recommends_image_tools(self, qtbot, sample_png):
-        """拖入 PNG → auto-run 应该跑 zsteg/steghide (image stego 优先)."""
+        """拖入 PNG → auto-run 应该跑 picture pool (zsteg/exiftool/binwalk/strings/file)."""
         w = MainWindow(core=CoreOrchestrator())
         qtbot.addWidget(w)
 
@@ -81,8 +81,8 @@ class TestAutoRunOnDrop:
         w.dropEvent(event)
 
         signal_received = {"flag": False}
-        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
-        w._auto_runner.chain_finished.connect(
+        qtbot.waitUntil(lambda: w._find_suspicious_runner is not None, timeout=2000)
+        w._find_suspicious_runner.chain_finished.connect(
             lambda *args: signal_received.__setitem__("flag", True)
         )
         qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
@@ -111,7 +111,7 @@ class TestAutoRunOnDrop:
 
         # 不应启动 auto_runner
         time.sleep(0.5)  # 等一会儿确保不会启动
-        assert w._auto_runner is None
+        assert w._find_suspicious_runner is None
         text = w.output_view.toPlainText()
         assert "auto-run disabled" in text
 
@@ -132,8 +132,8 @@ class TestAutoRunOnDrop:
         w.dropEvent(event)
 
         signal_received = {"flag": False}
-        qtbot.waitUntil(lambda: w._auto_runner is not None, timeout=2000)
-        w._auto_runner.chain_finished.connect(
+        qtbot.waitUntil(lambda: w._find_suspicious_runner is not None, timeout=2000)
+        w._find_suspicious_runner.chain_finished.connect(
             lambda *args: signal_received.__setitem__("flag", True)
         )
         qtbot.waitUntil(lambda: signal_received["flag"], timeout=10000)
