@@ -95,3 +95,149 @@ def test_steghide_adapter_metadata():
     a = SteghideAdapter()
     assert a.description
     assert a.default_timeout > 0
+
+
+# ---------- v0.5-philosophy-rethink: stegseek 平替 (macOS 友好) ----------
+
+# 这些测试只在装了 stegseek 时跑 (per v0.5 设计, macOS 装 stegseek 后会激活)
+require_stegseek = pytest.mark.skipif(
+    shutil.which("stegseek") is None,
+    reason="stegseek not installed (v0.5+ 推荐安装)",
+)
+
+
+@require_stegseek
+def test_steghide_uses_stegseek_when_available(tmp_path, monkeypatch):
+    """v0.5: stegseek 在 PATH 时 adapter 优先用 stegseek (macOS 现代 fork, JPEG 支持).
+
+    验证方式: mock shutil.which 强制返回 stegseek 路径, 然后验证 run() 走 _run_stegseek.
+    """
+    from automisc.tools.steganography.image import steghide as steghide_mod
+
+    # 强制 stegseek "可用"
+    fake_stegseek = "/fake/path/to/stegseek"
+    monkeypatch.setattr(steghide_mod.shutil, "which", lambda x: fake_stegseek if x == "stegseek" else None)
+
+    a = SteghideAdapter()
+    # mock _run_stegseek 看是否被调
+    called = {"yes": False}
+
+    def fake_run_stegseek(file_path):
+        called["yes"] = True
+        from automisc.core.result import ToolResult
+        return ToolResult(
+            tool_name=a.name, exit_code=0, stdout="", stderr="", duration_ms=0,
+        )
+
+    monkeypatch.setattr(a, "_run_stegseek", fake_run_stegseek)
+
+    a.run("/tmp/fake.jpg")
+    assert called["yes"], "stegseek 在 PATH 时必须走 _run_stegseek 路径"
+
+
+def test_steghide_falls_back_to_steghide_when_no_stegseek(monkeypatch):
+    """v0.5: stegseek 不在 PATH 时 adapter fallback 到 steghide (Linux/Windows)."""
+    from automisc.tools.steganography.image import steghide as steghide_mod
+
+    # 强制 stegseek "不可用"
+    def fake_which(name):
+        if name == "stegseek":
+            return None
+        # 其他 (steghide 等) 走真实 which
+        import shutil as real_shutil
+        return real_shutil.which(name)
+
+    monkeypatch.setattr(steghide_mod.shutil, "which", fake_which)
+
+    a = SteghideAdapter()
+    called = {"yes": False}
+
+    def fake_fallback(file_path):
+        called["yes"] = True
+        from automisc.core.result import ToolResult
+        return ToolResult(
+            tool_name=a.name, exit_code=0, stdout="", stderr="", duration_ms=0,
+        )
+
+    monkeypatch.setattr(a, "_run_steghide_fallback", fake_fallback)
+    a.run("/tmp/fake.jpg")
+    assert called["yes"], "stegseek 不在 PATH 时必须走 _run_steghide_fallback"
+
+
+@require_stegseek
+def test_steghide_extracts_empty_password_steg(tmp_path):
+    """v0.5: stegseek 抓到空密码 → 写 steghide_extracted SP (severity=5).
+
+    模拟: stegseek --crack 输出 "Found passphrase" + "Original filename" + 提取内容.
+    """
+    import re
+    from automisc.core.result import ToolResult
+    from automisc.core.suspicious import SuspiciousPoint
+
+    # 准备 mock 输出 + 提取内容
+    fake_stdout = ""
+    fake_stderr = (
+        'StegSeek 0.6\n\n'
+        '[i] Found passphrase: ""\n'
+        '[i] Original filename: "ko.txt".\n'
+        '[i] Extracting to "/tmp/fake_out.bin".\n'
+    )
+    fake_content = b"compressed password: secret123\n"
+
+    a = SteghideAdapter()
+
+    # mock subprocess 返回值 + 写 temp 内容到 out_path
+    import tempfile, os
+    from pathlib import Path
+
+    out_path = None
+    def fake_run_subprocess(cmd, *args, **kwargs):
+        nonlocal out_path
+        # 找 cmd 里的 out_path (最后一个位置参数)
+        out_path = cmd[-1]
+        Path(out_path).write_bytes(fake_content)
+        return (0, fake_stdout, fake_stderr, 100)
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(a, "_run_subprocess", fake_run_subprocess)
+
+        result = a.run("/tmp/fake.jpg")
+    finally:
+        monkeypatch.undo()
+        if out_path and Path(out_path).exists():
+            Path(out_path).unlink()
+
+    # 验证 SP
+    extracted_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_extracted"]
+    assert len(extracted_sp) == 1
+    sp = extracted_sp[0]
+    assert sp.severity == 5
+    assert "Found passphrase" not in sp.matched_pattern  # 不暴露内部命令
+    assert "secret123" in sp.matched_pattern or "secret123" in sp.suggested_action
+    # 验证密码 + 文件名 + 内容
+    assert re.search(r'密码', sp.matched_pattern)
+    assert "ko.txt" in sp.matched_pattern
+
+
+@require_stegseek
+def test_steghide_no_match_clean_bmp_no_sp(monkeypatch):
+    """v0.5: stegseek "Could not find a valid passphrase" → 不写 SP (避免 clean 文件误报).
+
+    原因: stegseek 在 clean 文件和"需要大 wordlist"文件上报告同样的错误 (二义性).
+    写 steghide_embedded SP 会让所有 clean 文件被误报 — 用户烦.
+    """
+    a = SteghideAdapter()
+
+    def fake_run_subprocess(cmd, *args, **kwargs):
+        # 模拟 stegseek 在干净 BMP 上的输出
+        return (1, "", "[!] error: Could not find a valid passphrase.\n", 50)
+
+    monkeypatch.setattr(a, "_run_subprocess", fake_run_subprocess)
+    result = a.run("/tmp/fake_clean.bmp")
+
+    # 关键断言: 干净文件 + 二义性错误 → 0 SP
+    embedded_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_embedded"]
+    assert len(embedded_sp) == 0, (
+        f"clean 文件不该有 steghide_embedded SP (避免误报): {result.suspicious_points}"
+    )
