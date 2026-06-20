@@ -50,41 +50,47 @@ class ForemostAdapter(ToolAdapter):
             "-t", "all",  # 全部类型
             "-i", file_path,
             "-o", str(outdir),
-            "-q",  # 安静模式（少噪声）
+            # 修 foremost ZIP 提取 bug: foremoset 1.5.7 macOS homebrew 在 -q (quiet) 模式下
+            # 会漏掉 ZIP 提取 (实测 -t all -i X -o Y -q → 1 file, -t all -i X -o Y → 2 files).
+            # 删 -q 让 foremost 走 verbose 模式, 内部 ZIP 中央目录解析正常.
+            # Owner 实测 (2026-06-20 13:11): 命令行 `foremost 123456cry.jpg` (无 flag) 成功分离 zip+jpg.
         ]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []
-        # 扫描 foremost 输出目录，找出分离出的文件
+        # 修 foremost 输出路径 bug: 实际输出结构是 outdir/<type>/<file>
+        # (e.g. outdir/jpg/00000000.jpg, outdir/zip/00000038.zip), 没有 outdir/FOREMOST/ 子目录.
+        # 用 rglob 递归扫 outdir, 排除 audit.txt (不是分离文件).
         if outdir.exists():
-            extract_dir = outdir / "FOREMOST"
-            if extract_dir.exists():
-                extracted_files = sorted(extract_dir.iterdir())
-                if extracted_files:
-                    # 汇总一条 summary 可疑点
-                    file_list = "\n".join(
-                        f"  {f.name} ({f.stat().st_size} bytes)"
-                        for f in extracted_files[:20]
+            extracted_files = sorted(
+                p for p in outdir.rglob("*")
+                if p.is_file() and p.name != "audit.txt"
+            )
+            if extracted_files:
+                # 汇总一条 summary 可疑点
+                file_list = "\n".join(
+                    f"  {p.relative_to(outdir)} ({p.stat().st_size} bytes)"
+                    for p in extracted_files[:20]
+                )
+                if len(extracted_files) > 20:
+                    file_list += f"\n  ... and {len(extracted_files) - 20} more"
+                suspicious.append(
+                    SuspiciousPoint(
+                        id="",
+                        tool_name=self.name,
+                        file_path=file_path,
+                        category="extracted_files",
+                        offset=None,
+                        matched_pattern=(
+                            f"foremost 分离出 {len(extracted_files)} 个文件 "
+                            f"-> {outdir}\n{file_list}"
+                        ),
+                        severity=4,
+                        suggested_action=(
+                            f"查看分离文件清单（{outdir}）"
+                        ),
                     )
-                    if len(extracted_files) > 20:
-                        file_list += f"\n  ... and {len(extracted_files) - 20} more"
-                    suspicious.append(
-                        SuspiciousPoint(
-                            id="",
-                            tool_name=self.name,
-                            file_path=file_path,
-                            category="extracted_files",
-                            offset=None,
-                            matched_pattern=(
-                                f"foremost 分离出 {len(extracted_files)} 个文件 "
-                                f"-> {extract_dir}\n{file_list}"
-                            ),
-                            severity=4,
-                            suggested_action=(
-                                f"查看分离文件清单（{extract_dir}）"
-                            ),
-                        )
-                    )
+                )
 
         return ToolResult(
             tool_name=self.name,
