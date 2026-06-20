@@ -63,13 +63,21 @@ SUSPICIOUS_PATTERNS: dict[str, re.Pattern] = {
     ),
 }
 
-# 关键字列表（大小写不敏感）
+# 关键字列表（大小写不敏感，子串匹配，不用正则）
+# per Owner 2026-06-20 18:03 + 18:05 拍板 (跨项目铁律):
+# pass | password | key | flag | f1ag | p@ssw0rd | secret | ctf
+# 实战累积 — 遇到新的同类 keyword, owner 拍板后加
 KEYWORDS: list[str] = [
+    # 高优先级可疑关键词（per Owner 铁律）
+    "pass",
     "password",
+    "key",
+    "flag",
+    "f1ag",
+    "p@ssw0rd",
     "secret",
-    "hidden",
-    "encrypt",
-    "cipher",
+    "ctf",
+    # 工具名（per v0.5-相关历史决策 — 命中表示含该工具的处理痕迹）
     "steghide",
     "stegseek",
     "outguess",
@@ -83,7 +91,10 @@ KEYWORDS: list[str] = [
 # category → (severity, suggested_action) 映射
 SEVERITY_MAP: dict[str, tuple[int, str]] = {
     "flag": (5, "直接拿 flag 提交"),
-    "keyword": (1, "结合上下文判断是否敏感"),
+    # per Owner 2026-06-20 18:03 + 18:05 拍板铁律: 高优先级可疑关键词命中 = severity 5
+    # (与 rule_scanner.CATEGORY_SENSITIVE severity=5 保持一致)
+    # 不触发 short-circuit — SHORT_CIRCUIT_SEVERITY=99 (per v0.5-journal-highlight-keywords Q12 拍板)
+    "keyword": (5, "高优先级可疑关键词命中 (pass/password/key/flag/f1ag/p@ssw0rd/secret/ctf), 检查上下文"),
     "base64_candidate": (3, "尝试 base64 解码"),
     "base32_candidate": (3, "尝试 base32 解码"),
     "hex_string": (3, "尝试 hex 解码（xxd -r）"),
@@ -91,9 +102,25 @@ SEVERITY_MAP: dict[str, tuple[int, str]] = {
 
 
 def _keyword_pattern() -> re.Pattern:
-    """构造关键字正则（case-insensitive）。"""
-    escaped = [re.escape(k) for k in KEYWORDS]
-    return re.compile(r"\b(?:" + "|".join(escaped) + r")\b", re.IGNORECASE)
+    """构造关键字正则（case-insensitive + 子串匹配，不用 \\b 边界 + 长 keyword 优先）.
+
+    per Owner 2026-06-20 18:03 + 18:05 拍板铁律:
+    - 子串匹配 (不是 \\\\b word boundary) — `this_is_not_password` / `passphrase` /
+      `p@ssphrase` / `PASSWORD` / `PassWord` 全部命中
+    - case-insensitive (IGNORECASE) — F1AG / PASS / Password 全部命中
+    - 不用正则做整段匹配 — 用 keyword 子串定位
+    - **长度降序** — `password` (8) 排在 `pass` (4) 之前,
+      否则正则 alternatives 按顺序匹配会先吃 `pass`,
+      `password=hunter2` 命中 `pass` 而不是 `password`
+
+    修前 bug (per Owner 18:03 实测):
+    - 旧实现 `\\\\b(?:` + kws + `)\\\\b` → `this_is_not_password` 里的 `password`
+      前面是 `_`，word boundary 不匹配，SP 漏生成，journal 不收
+    - 修后: 直接 `(?:` + kws + `)` → 子串命中，severity 5 SP 进 journal
+    """
+    # 长度降序 — `password` (8) 在 `pass` (4) 前, `p@ssw0rd` (8) 在 `pass` 前
+    escaped = sorted((re.escape(k) for k in KEYWORDS), key=len, reverse=True)
+    return re.compile("(?:" + "|".join(escaped) + ")", re.IGNORECASE)
 
 
 def scan_output_for_suspicious(

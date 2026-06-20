@@ -31,7 +31,8 @@ class JournalPanel(QDockWidget):
     COL_COUNT = 6
 
     def __init__(self, parent=None) -> None:
-        super().__init__("Journal (可疑点累积)", parent)
+        # per Owner 2026-06-20 18:03 拍板: 标题改为 "可疑点列表"
+        super().__init__("可疑点列表", parent)
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(self.COL_COUNT)
