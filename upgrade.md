@@ -85,6 +85,7 @@
 | v0.5-sevenz-extract | **新建 `sevenz_extract` adapter** — 真正 `7z x` 解压 (zip/7z/rar/tar/vmdk/vhd/wim 等 30+ 格式) → GUI 工具栏 "Misc/Archive" 下加 "📦 7z 解压",跟 sevenz / unzip / john / zip_classify 同一级;不动现有 sevenz adapter (探测);per Owner 19:48 拍板 writeup 面具下的flag | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-extract.md`](upgrade/v0.5-sevenz-extract.md) |
 | v0.5-sevenz-toolbar-cleanup | **GUI menu 清理**: sevenz (探测类) 从 `TOOL_CATEGORIES["Misc/Archive"]` + `ADAPTER_TOOLS` 移除,但 **保留 adapter** (auto_run / router / find_suspicious 还在用);新原则: "用于自动化探测的工具,可不显示在 GUI menu" (per Owner 20:03);跨项目 GUI menu 设计铁律 | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-toolbar-cleanup.md`](upgrade/v0.5-sevenz-toolbar-cleanup.md) |
 | v0.5-decoder-arch-doc | **文档化架构**: `STRUCTURE.md` 新增 §3.5 "GUI 工具来源 (tools/ vs decoders/)" — 解 cipher 解密工具为啥在 `core/decoders/` 不在 `tools/` (adapter 调外部 CLI vs decoder 纯计算); `AGENTS.md` §0 加指针 (per Owner 20:40 拍板);**0 代码改动** | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-decoder-arch-doc.md`](upgrade/v0.5-decoder-arch-doc.md) |
+| v0.5-decoder-friendly-candidate | **extract_base_candidate 加 decoder-friendly 特例**: raw brainfuck / raw Ook! 代码 paste 到 input 区 算候选 (per Owner 21:17 实战 — GUI 之前报"input 区为空");不动 base64/hex/binary/caesar 现有判定 | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-decoder-friendly-candidate.md`](upgrade/v0.5-decoder-friendly-candidate.md) |
 
 ---
 

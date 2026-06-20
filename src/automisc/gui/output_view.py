@@ -397,6 +397,16 @@ class InputOutputView(QWidget):
             # 长度 < 8 太短不算 (base 至少 8 chars, 排除短纯英文/短纯数字)
             if len(s) < 8:
                 return False
+            # v0.5-decoder-friendly-candidate (per Owner 2026-06-20 21:17):
+            # raw brainfuck / Ook! 代码不算 base, 但用户主动 paste 想解, 算 decoder-friendly 候选
+            # brainfuck: 含 BF 8 指令字符之一 (+ - < > [ ] . ,) 且长度 ≥ 12
+            # Ook!: 含 "Ook." / "Ook!" / "Ook?" 任一 token 且长度 ≥ 20
+            if len(s) >= 12 and re.search(r"[+\-<>[\].,]", s):
+                # 全字符必须是 BF 字符集 + 数字 + 空格 (避免普通英文含 + 的误判)
+                if re.match(r"^[0-9a-zA-Z+\-.<>[\] \n\r\t]+$", s):
+                    return True
+            if re.search(r"Ook[.!?]", s) and len(s) >= 20:
+                return True
             # 真正 base/hex/binary 候选, 满足以下之一:
             #   - 含 base64 特征字符 +/=
             #   - 全是 hex 字符 (0-9 a-f A-F)
