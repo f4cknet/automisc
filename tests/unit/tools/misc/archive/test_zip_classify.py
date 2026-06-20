@@ -175,8 +175,11 @@ class TestVerdictClassification:
         assert "Fix Zip 伪加密" in sp.suggested_action
         assert "暴力破解" in sp.suggested_action
 
-    def test_clear_auto_extract(self, tmp_path: Path):
-        """clear entry 自动解压到 <stem>_clear_unzipped/ (per Owner verdict_silent)."""
+    def test_clear_does_not_auto_extract(self, tmp_path: Path):
+        """per Owner 14:31: auto_run **不**自动解压 clear entry (哲学: 纯探测).
+
+        留 GUI 工具栏 / 链菜单 手工触发解压.
+        """
         zf_path = tmp_path / "test.zip"
         with zipfile.ZipFile(zf_path, "w") as zf:
             zf.writestr("readme.txt", "no encryption")
@@ -184,15 +187,11 @@ class TestVerdictClassification:
         a = ZipClassifyAdapter()
         result = a.run(str(zf_path))
 
-        # metadata 应含 clear_extract_dir
-        assert result.metadata["clear_extract_dir"] is not None
-        extract_dir = Path(result.metadata["clear_extract_dir"])
-        assert extract_dir.exists()
-        # 提取的文件应存在
-        assert len(result.metadata["clear_extracted_files"]) == 1
-        extracted = Path(result.metadata["clear_extracted_files"][0])
-        assert extracted.exists()
-        assert extracted.read_text() == "no encryption"
+        # metadata 不再有 clear_extract_dir / clear_extracted_files
+        assert "clear_extract_dir" not in result.metadata
+        assert "clear_extracted_files" not in result.metadata
+        # 没有 <stem>_clear_unzipped 目录被创建
+        assert not (zf_path.parent / f"{zf_path.stem}_clear_unzipped").exists()
 
     def test_invalid_zip_no_sp(self, tmp_path: Path):
         """非 ZIP 文件 → 不写 SP, exit_code != 0."""
@@ -305,10 +304,9 @@ def test_owner_sample_zip_classify():
     # 伪加密 entry 名字
     assert "asd/good-已合并.jpg" in result.metadata["pseudo_entries"]
 
-    # clear 自动解压
-    assert result.metadata["clear_extract_dir"] is not None
-    assert len(result.metadata["clear_extracted_files"]) == 1
-    assert "qwe.zip" in result.metadata["clear_extracted_files"][0]
+    # per Owner 14:31: 不自动解压 clear, 只给 verdict
+    assert "clear_extract_dir" not in result.metadata
+    assert "clear_extracted_files" not in result.metadata
 
     # suggested_action 指向 GUI Fix
     assert "Fix Zip 伪加密" in sp.suggested_action

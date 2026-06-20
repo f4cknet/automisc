@@ -1,23 +1,19 @@
 """zip_classify adapter (v0.5-zip-verdict-pool)
 
-ZIP 拖入后, 给做题人**明确判断**:
+ZIP 拖入后, 给做题人**明确判断** (per Owner 2026-06-20 14:13 拍板):
 - 伪加密 (可修复) → GUI Fix Zip 伪加密
 - 真加密 (需密码) → GUI Zip 暴力破解
 - 混合 → 两条都建议
 - 全部 clear → 工具栏 unzip 直接解压
 
-**为什么需要这个** (per Owner 2026-06-20 14:13 实测):
-"123456cry__foremost/zip/00000038.zip 拖进工具没有提示伪加密.
- 按道理 zip 拖进来应该给一个结论, 是伪加密还是真加密, 只有正确的判断,
- 做题人下一步才知道去暴力破解还是走伪加密修复"
-
-之前的 FIND_SUSPICIOUS_ARCHIVE_TOOLS 池是 [sevenz / unzip -l / file / strings],
-只列文件不判断加密状态. 现在加 zip_classify → per-entry 分类 + verdict.
+**Owner 14:31 拍板**: auto_run **不**自动解压 clear entry.
+- 哲学: auto_run 纯探测 (per v0.5-philosophy-rethink owner 决策 1)
+- clear 自动解压虽然不是"雕",但仍是"操作" — 留给 GUI 工具栏 / 链菜单
+- 用户看 verdict 决定下一步 (Fix / bruteforce / 直接 unzip 工具栏)
 
 **功能**:
 1. 用 `core.actions.zip_chain._classify_zip_entries` per-entry 分类 (复用 ed5a00c 实现)
-2. 自动解压 clear entry (无密码) 到 `<stem>_clear_unzipped/` 目录 (per Owner verdict_silent 拍板)
-   - clear 不算雕 (没加密), 不违背 v0.5-philosophy-rethink owner 决策 1
+2. **不**自动解压 clear entry (per Owner 14:31)
 3. 写 1 条 verdict SP (severity 5) + suggested_action 指明 GUI 下一步
 
 **SP schema**:
@@ -27,9 +23,9 @@ ZIP 拖入后, 给做题人**明确判断**:
 - suggested_action: 明确 "GUI Fix Zip 伪加密" / "GUI Zip 暴力破解" 等
 
 **Owner 实测 00000038.zip** (本 commit 验证):
-- 1 pseudo (asd/good-已合并.jpg) + 0 real + 2 clear (asd/, asd/qwe.zip)
-- verdict: "混合: 1 伪加密 + 0 真加密 + 2 clear"
-- action: "伪加密可修复 (GUI Fix Zip 伪加密) | clear 已自动 unzip 到 <stem>_clear_unzipped/"
+- 1 pseudo (asd/good-已合并.jpg) + 0 real + 2 clear (asd/ + asd/qwe.zip)
+- verdict: "纯伪加密: 1 entries 可修复 (无密码)" (severity 5)
+- action: "GUI Fix Zip 伪加密 (全 entry 修复后解压)"
 """
 from __future__ import annotations
 
@@ -103,29 +99,11 @@ class ZipClassifyAdapter(ToolAdapter):
         n_real = len(real_entries)
         n_clear = len(clear_entries)
 
-        # 3. 自动解压 clear entry (per Owner verdict_silent 拍板)
-        #    clear 不算雕 (没加密), 不违背 v0.5-philosophy-rethink
-        clear_extract_dir = zip_path.parent / f"{zip_path.stem}_clear_unzipped"
+        # 3. **不**自动解压 clear entry (per Owner 14:31 拍板)
+        #    clear 算"操作", 留给 GUI 工具栏 / 链菜单 手工触发
+        #    auto_run 保持纯探测哲学 (v0.5-philosophy-rethink owner 决策 1)
+        clear_extract_dir = None
         clear_extracted_files: list[str] = []
-        if n_clear > 0:
-            try:
-                clear_extract_dir.mkdir(exist_ok=True)
-                with zipfile.ZipFile(zip_path) as zf:
-                    for entry_name in clear_entries:
-                        # 跳过目录 entry
-                        if entry_name.endswith("/"):
-                            continue
-                        try:
-                            zf.extract(entry_name, clear_extract_dir)
-                            clear_extracted_files.append(
-                                str(clear_extract_dir / entry_name)
-                            )
-                        except Exception as e:
-                            # 单个 entry 失败不阻断 (e.g. 权限)
-                            pass
-            except Exception:
-                # unzip 整体失败也不阻断 verdict
-                pass
 
         # 4. 构造 verdict
         if n_pseudo > 0 and n_real > 0:
@@ -145,12 +123,8 @@ class ZipClassifyAdapter(ToolAdapter):
             severity = 4
         elif n_clear > 0:
             verdict_summary = f"无加密: {n_clear} clear entries"
-            action = "工具栏 unzip 直接解压"
+            action = "工具栏 unzip 直接解压 (auto_run 不自动解压 clear, 留给工具栏)"
             severity = 2
-        else:
-            verdict_summary = "空 ZIP 或 0 entries"
-            action = "无需操作"
-            severity = 1
 
         # 5. per-entry 详情
         detail_lines = []
@@ -168,20 +142,9 @@ class ZipClassifyAdapter(ToolAdapter):
                 detail_lines.append(f"  - {name} (offset={offset}, size={size})")
         detail_text = "\n".join(detail_lines) if detail_lines else "(无 entry)"
 
-        # 6. clear 自动解压结果
+        # 6. (per Owner 14:31 拍板: auto_run **不**自动解压 clear entry)
+        #    clear_extract_text 永远为空字符串 (留接口给未来扩展)
         clear_extract_text = ""
-        if clear_extracted_files:
-            clear_extract_text = (
-                f"\n\n[自动解压 clear entry 到] {clear_extract_dir}\n"
-                f"  - 已提取 {len(clear_extracted_files)} 个文件"
-            )
-            if len(clear_extracted_files) <= 10:
-                for f in clear_extracted_files:
-                    clear_extract_text += f"\n  - {f}"
-            else:
-                for f in clear_extracted_files[:5]:
-                    clear_extract_text += f"\n  - {f}"
-                clear_extract_text += f"\n  ... (还有 {len(clear_extracted_files) - 5} 个)"
 
         # 7. 写 verdict SP
         verdict_sp = SuspiciousPoint(
@@ -193,13 +156,12 @@ class ZipClassifyAdapter(ToolAdapter):
             matched_pattern=(
                 f"{verdict_summary}\n\n"
                 f"per-entry 详情:\n{detail_text}"
-                f"{clear_extract_text}"
             ),
             severity=severity,
             suggested_action=action,
         )
 
-        # 8. 拼 metadata 让 GUI 知道 clear 自动解压路径
+        # 8. 拼 metadata (per Owner 14:31: 不再有 clear_extract_dir / clear_extracted_files)
         metadata = {
             "pseudo_count": n_pseudo,
             "real_count": n_real,
@@ -207,8 +169,6 @@ class ZipClassifyAdapter(ToolAdapter):
             "pseudo_entries": {k: list(v) for k, v in pseudo_entries.items()},
             "real_entries": {k: list(v) for k, v in real_entries.items()},
             "clear_entries": {k: list(v) for k, v in clear_entries.items()},
-            "clear_extract_dir": str(clear_extract_dir) if clear_extracted_files else None,
-            "clear_extracted_files": clear_extracted_files,
             "verdict_summary": verdict_summary,
         }
 
