@@ -379,6 +379,19 @@ class InputOutputView(QWidget):
                 return sel
 
         # 2. 找最后像 base 的行 (加固, per Owner 20:19 实战反馈)
+
+        # v0.5-decoder-friendly-candidate-join (per Owner 2026-06-20 21:22):
+        # BF/Ook! 多行 paste 时, 整段 = decoder-friendly 候选 (而不是单行).
+        # 检测: 全部字符都在 BF 字符集 (+ - < > [ ] . ,) + 空格 (没字母/数字),
+        # 且长度 ≥ 12, 或含 Ook! token 且长度 ≥ 20.
+        # 之前用 [0-9a-zA-Z+\-.<>[\] \n\r\t]+ 太宽, '[stderr] noop' 含 [ 被误判.
+        def _is_decoder_friendly_text(s: str) -> bool:
+            if len(s) >= 12 and re.fullmatch(r"[+\-<>[\]., \t]+", s):
+                return True
+            if re.search(r"Ook[.!?]", s) and len(s) >= 20:
+                return True
+            return False
+
         def looks_like_base(s: str) -> bool:
             if not s:
                 return False
@@ -399,12 +412,10 @@ class InputOutputView(QWidget):
                 return False
             # v0.5-decoder-friendly-candidate (per Owner 2026-06-20 21:17):
             # raw brainfuck / Ook! 代码不算 base, 但用户主动 paste 想解, 算 decoder-friendly 候选
-            # brainfuck: 含 BF 8 指令字符之一 (+ - < > [ ] . ,) 且长度 ≥ 12
+            # brainfuck: 全部字符在 BF 字符集 (+ - < > [ ] . ,) + 空格 + tab 且长度 ≥ 12
             # Ook!: 含 "Ook." / "Ook!" / "Ook?" 任一 token 且长度 ≥ 20
-            if len(s) >= 12 and re.search(r"[+\-<>[\].,]", s):
-                # 全字符必须是 BF 字符集 + 数字 + 空格 (避免普通英文含 + 的误判)
-                if re.match(r"^[0-9a-zA-Z+\-.<>[\] \n\r\t]+$", s):
-                    return True
+            if len(s) >= 12 and re.fullmatch(r"[+\-<>[\]., \t]+", s):
+                return True
             if re.search(r"Ook[.!?]", s) and len(s) >= 20:
                 return True
             # 真正 base/hex/binary 候选, 满足以下之一:
@@ -422,6 +433,15 @@ class InputOutputView(QWidget):
             return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
 
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        # v0.5-decoder-friendly-candidate-join (per Owner 2026-06-20 21:22 实战):
+        # 当整段是 decoder-friendly (BF / Ook!) 时, 优先返回所有非空行 join 而非最后一行.
+        # 因为 BF/Ook! 代码多行 paste 时括号必须跨行匹配, 只选最后一行会 unmatched.
+        # owner paste NUL 文件 (290 chars / 4 行) → 之前选最后一行 (74 chars) → unmatched ']'
+        #                修后选整段 290 chars → brainfuck_eval → 'flag{N7F5_AD5'
+        # 关键: 这个检查必须在 base_lines 检查之前, 否则 looks_like_base 会把 BF/Ook! 行
+        # 加进 base_lines → 走 "return base_lines[-1]" 分支跳过整段 join.
+        if any(_is_decoder_friendly_text(ln) for ln in lines):
+            return "\n".join(lines)
         base_lines = [ln for ln in lines if looks_like_base(ln)]
         if base_lines:
             return base_lines[-1]

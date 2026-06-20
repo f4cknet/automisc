@@ -372,28 +372,79 @@ class TestDecoderFriendlyCandidate:
         v.append_text("48656c6c6f")
         assert v.extract_base_candidate() == "48656c6c6f"
 
-    def test_owner_full_paste_scenario(self, qtbot):
-        """owner 21:17 实战完整 paste 场景: 多行 BF 代码 → 算 decoder-friendly 候选."""
-        v = InputOutputView()
-        qtbot.addWidget(v)
-        # owner 实际 paste 的 4 行 BF 代码
-        bf_lines = [
-            "+++++ +++++ [->++ +++++ +++<] >++.+ +++++ .<+++ [->-- -<]>- -.+++ +++.<",
-            "",
-            "++++[ ->+++ +<]>+ +++.< +++++ +[->- ----- <]>-- ----- --.<+ +++[- >----",
-            "",
-            "<]>-- ----- .<+++ [->++ +<]>+ +++++ .<+++ +[->- ---<] >-.<+ +++++ [->++",
-            "",
-            "++++< ]>+++ +++.< +++++ [->-- ---<] >---- -.+++ .<+++ [->-- -<]>- ----- .<",
-        ]
-        for line in bf_lines:
-            v.append_text(line)
-        c = v.extract_base_candidate()
-        # 应该返回最后一个非空行 (>= 12 chars, 含 BF 字符)
-        assert c is not None, "owner 实战多行 BF paste 应被识别为候选"
-        assert c == bf_lines[6], f"应返回最后非空 BF 行, got: {c!r}"
+def test_owner_full_paste_scenario(qtbot):
+    """owner 21:17 实战完整 paste 场景: 多行 BF 代码 → 算 decoder-friendly 候选.
+
+    per v0.5-decoder-friendly-candidate-join:
+    多行 BF 代码应返回整段 (所有非空行 join), 不是最后一行.
+    因为 BF 括号必须跨行匹配, 只选最后一行会 unmatched ']'.
+    """
+    from automisc.core.encoders.classical_ext import brainfuck_eval
+    v = InputOutputView()
+    qtbot.addWidget(v)
+    # owner 实际 paste 的 4 段 BF 代码
+    bf_lines = [
+        "+++++ +++++ [->++ +++++ +++<] >++.+ +++++ .<+++ [->-- -<]>- -.+++ +++.<",
+        "",
+        "++++[ ->+++ +<]>+ +++.< +++++ +[->- ----- <]>-- ----- --.<+ +++[- >----",
+        "",
+        "<]>-- ----- .<+++ [->++ +<]>+ +++++ .<+++ +[->- ---<] >-.<+ +++++ [->++",
+        "",
+        "++++< ]>+++ +++.< +++++ [->-- ---<] >---- -.+++ .<+++ [->-- -<]>- ----- .<",
+    ]
+    for line in bf_lines:
+        v.append_text(line)
+    c = v.extract_base_candidate()
+    assert c is not None, "owner 实战多行 BF paste 应被识别为候选"
+    try:
+        result = brainfuck_eval(c)
+    except ValueError as e:
+        pytest.fail(f"返回的 candidate 应能被 brainfuck_eval 完整执行, got error: {e}")
+    assert result == b"flag{N7F5_AD5", (
+        f"owner 实战完整 4 段 BF 应解出 flag{{N7F5_AD5, got: {result!r}"
+    )
 
 
+def test_owner_full_paste_returns_joined_not_last_line(qtbot):
+    """owner 21:22 实战: 多行 BF paste 必须返回整段 join, 不是最后一行 (74 chars).
+
+    之前 commit c5cf3d4 修后 (decoder-friendly 特例) 抽到了 candidate,
+    但只返回最后一行 (74 chars) → brainfuck_eval 报 'unmatched ] at pos 5'.
+    本次修法: 当整段是 decoder-friendly 时, 返回整段 (290 chars join).
+    """
+    v = InputOutputView()
+    qtbot.addWidget(v)
+    bf_lines = [
+        "+++++ +++++ [->++ +++++ +++<] >++.+ +++++ .<+++ [->-- -<]>- -.+++ +++.<",
+        "",
+        "++++[ ->+++ +<]>+ +++.< +++++ +[->- ----- <]>-- ----- --.<+ +++[- >----",
+        "",
+        "<]>-- ----- .<+++ [->++ +<]>+ +++++ .<+++ +[->- ---<] >-.<+ +++++ [->++",
+        "",
+        "++++< ]>+++ +++.< +++++ [->-- ---<] >---- -.+++ .<+++ [->-- -<]>- ----- .<",
+    ]
+    for line in bf_lines:
+        v.append_text(line)
+    c = v.extract_base_candidate()
+    assert c is not None
+    # 关键断言: 不是只返回最后一行 (74 chars)
+    assert c != bf_lines[6], (
+        f"应返回整段 join (290 chars), 不是最后一行 (74 chars), got last line: {c!r}"
+    )
+    assert len(c) > 100, f"应返回整段 (> 100 chars), got len: {len(c)}"
+    assert "+++++ +++++ [->++" in c, "应包含第 1 段"
+    assert "[->++ +++++ +++<]" in c, "应包含第 1 段的 [..]"
+    assert "<]>-- ----- .<+++ [->++" in c, "应包含第 3 段"
+
+
+def test_single_line_bf_still_works(qtbot):
+    """单行 BF 代码 (无换行) → 仍正确返回 (整段 = 单行)."""
+    v = InputOutputView()
+    qtbot.addWidget(v)
+    bf = "++++++++[>+++++++++++++<-]>."
+    v.append_text(bf)
+    c = v.extract_base_candidate()
+    assert c == bf, f"单行 BF 应原样返回, got: {c!r}"
 # ---------- run_hex_to_ascii (内部用, 顶 bar 已删) ----------
 class TestHexToAscii:
     def test_internal_method_still_works(self, qtbot):
