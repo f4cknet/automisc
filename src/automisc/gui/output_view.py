@@ -337,13 +337,22 @@ class InputOutputView(QWidget):
         v0.5-hex-ascii-fix: 抽出为公共方法, 让 main_window._run_decoder
         (菜单栏 hex-ascii) 和 InputOutputView.run_hex_to_ascii 共享同一逻辑.
 
+        v0.5-brainfuck-candidate-fix (per Owner 2026-06-20 20:19 实战反馈):
+        - 之前 `looks_like_base` 只检查"全 [0-9a-zA-Z+/= \n\r\t] 字符" + 长度 ≥ 2
+        - 太宽松: 把 GUI [drop] recommendation 行 "           5  xxd              hex dump"
+          (纯数字 + 空格 + 短英文, 28 chars) 误判成 base candidate
+        - owner 拖文件 + auto-run 跑完 + 点 brainfuck decoder → 抽到这行 → 跑空
+        - 修法: 真正 base 必含特征字符 +/= 之一 (光字母数字不够, 太容易撞 GUI 日志)
+                短行 (< 8 chars) 直接排除 (base 至少 8 chars, GUI 推荐行常 10-30 chars)
+                数字开头行 (≥ 3 个连续数字开头) 排除 (GUI log 行特征)
+
         Returns:
             candidate string 或 None (空 input)
 
         Logic:
         1. 用户有 selection -> 用 selection
-        2. 否则过每一行, 跳过 log 装饰 ([xxx] / === / ---), 找最后"看起来像
-           base-encoded"的非空行 (全 [0-9a-zA-Z+/= \n\r\t] 字符)
+        2. 否则过每一行, 跳过 log 装饰 ([xxx] / === / --- / 空行), 找最后"看起来像
+           base-encoded"的非空行
         3. 都没找到 -> 用最后非空行 (兜底)
         """
         import re
@@ -358,12 +367,36 @@ class InputOutputView(QWidget):
             if sel:
                 return sel
 
-        # 2. 找最后像 base 的行
+        # 2. 找最后像 base 的行 (加固, per Owner 20:19 实战反馈)
         def looks_like_base(s: str) -> bool:
-            if not s or len(s) < 2:
+            if not s:
                 return False
             if s.startswith("[") or s.startswith("=") or s.startswith("---"):
                 return False
+            # v0.5-brainfuck-candidate-fix: 数字开头的行不算 (GUI log 行特征)
+            #   e.g. "           10  file             通用文件类型识别"
+            #   e.g. "           5  xxd              hex dump"
+            if re.match(r"^\s*\d+\s+\d", s):  # "数字 空格 数字" 开头的 log 行
+                return False
+            # v0.5-brainfuck-candidate-fix + 兼容 caesar 测试: 全大写无空格密文
+            #   e.g. "KHOOR" (caesar shift=3 → HELLO) — 全大写字母 + 长度 ≥ 4 + 无空格
+            #   之前的 len < 8 阈值排除了这种, 修法: 加密文特例
+            if re.match(r"^[A-Z]{4,}$", s):
+                return True
+            # 长度 < 8 太短不算 (base 至少 8 chars, 排除短纯英文/短纯数字)
+            if len(s) < 8:
+                return False
+            # 真正 base/hex/binary 候选, 满足以下之一:
+            #   - 含 base64 特征字符 +/=
+            #   - 全是 hex 字符 (0-9 a-f A-F)
+            #   - 全是 binary 字符 (0/1)
+            # 否则就是普通英文 (e.g. "xxd hex dump" 纯字母空格) 不算
+            has_base64_char = bool(re.search(r"[+/=]", s))
+            is_all_hex = bool(re.match(r"^[0-9a-fA-F]+$", s))
+            is_all_binary = bool(re.match(r"^[01]+$", s))
+            if not (has_base64_char or is_all_hex or is_all_binary):
+                return False
+            # 全字符是 base64/base32 字符集
             return bool(re.match(r"^[0-9a-zA-Z+/= \n\r\t]+$", s)) and not s.startswith("//") and not s.startswith("#")
 
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]

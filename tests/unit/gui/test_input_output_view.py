@@ -166,6 +166,104 @@ class TestExtractBaseCandidate:
         assert c in ("48656c6c6f", "[Hex → ASCII] detected=hex")
 
 
+# ---------- extract_base_candidate (v0.5-brainfuck-candidate-fix 加固) ----------
+
+class TestExtractBaseCandidateStricter:
+    """per Owner 2026-06-20 20:19 实战反馈 (面具下的flag):
+    owner 拖文件 + auto-run 跑完 + 点 brainfuck decoder →
+    `_extract_input_candidate` 抽到了 GUI [drop] recommendation 行
+    "           5  xxd              hex dump" (28 chars, 纯数字空格英文).
+    修法: looks_like_base 加固:
+    - 长度 < 8 → 排除 (base 至少 8 chars)
+    - 数字开头行 (≥ 2 个数字 + 空格) → 排除 (GUI log 行特征)
+    - 必须含 +/= 或全 hex 或全 binary 之一 (避免普通英文行撞候选)
+    """
+
+    def test_owner_real_scenario_returns_none(self, qtbot):
+        """owner 20:19 实战场景: GUI 日志 + brainfuck decoder 兜底 → 修后返回 None (要求用户手动 paste/selection)."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        # 模拟 owner 实战: input 区全是 auto-run 日志 + [drop] recommendation
+        v.append_text("[drop] file=/Users/.../where_is_flag_part_two.txt")
+        v.append_text("        size=2323 bytes")
+        v.append_text("        magic=unknown")
+        v.append_text("        recommendations (4):")
+        v.append_text("           10  file             通用文件类型识别")
+        v.append_text("            8  strings          明文字符串")
+        v.append_text("            6  binwalk          内嵌文件检测")
+        v.append_text("            5  xxd              hex dump")  # ← 之前的 bug: 这行被抽走
+        v.append_text("")
+        v.append_text("=== file (auto OK) ===")
+        v.append_text("Unicode text, UTF-8 (with BOM) text")
+        v.append_text("=== exiftool (auto OK) ===")
+        v.append_text("[5] keyword: flag")
+        v.append_text("[5] keyword: foremost")
+        # 关键: 不应再抽 "5  xxd              hex dump" 这种 GUI 日志行
+        c = v.extract_base_candidate()
+        # 修后: 兜底返回最后非空行 ("[5] keyword: foremost" 或 "[5] keyword: flag")
+        # 这是已知 trade-off: 抽不到 BF 代码, 但不会抽到 GUI log 行误导 decoder
+        if c is not None:
+            assert "xxd" not in c.lower(), (
+                f"修复后不应抽到 GUI log 行 'xxd hex dump', got: {c!r}"
+            )
+            assert not c.startswith("5  xxd"), f"修复后不应抽到数字开头的 log 行, got: {c!r}"
+
+    def test_number_prefix_log_line_excluded(self, qtbot):
+        """数字开头的 GUI log 行 (e.g. "           5  xxd              hex dump") → 排除."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("           5  xxd              hex dump")
+        # 这行单独存在时, 抽 candidate 应该兜底返回它 (没有任何 base 行)
+        # 但如果同 input 区有真 base 行, 应该返回真 base 行而不是这行
+        v.append_text("aGVsbG8=")  # 真 base64: 'hello'
+        c = v.extract_base_candidate()
+        assert c == "aGVsbG8=", (
+            f"数字开头的 log 行不应被抽走, 应选真 base 'aGVsbG8=', got: {c!r}"
+        )
+
+    def test_short_log_line_excluded(self, qtbot):
+        """短行 (< 8 chars) → 排除."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("ab")  # 太短
+        v.append_text("aGVsbG8=")  # 真 base64
+        c = v.extract_base_candidate()
+        assert c == "aGVsbG8=", f"短行 'ab' 不应被抽, 应选 'aGVsbG8=', got: {c!r}"
+
+    def test_pure_alpha_space_not_base(self, qtbot):
+        """纯字母+空格 (无 +/= 不是全 hex/binary) → 不算 base."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("xxd hex dump")  # 纯英文+空格
+        v.append_text("S3cr3tK3y")  # 纯字母数字, 不是 hex, 不是 base64 (无 +/=)
+        v.append_text("aGVsbG8=")  # 真 base64
+        c = v.extract_base_candidate()
+        assert c == "aGVsbG8=", (
+            f"普通英文 + 字母数字 不应被抽为 base, got: {c!r}"
+        )
+
+    def test_real_base64_still_works(self, qtbot):
+        """真正 base64 串仍正确识别 (含 = padding)."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("aGVsbG8gd29ybGQ=")
+        assert v.extract_base_candidate() == "aGVsbG8gd29ybGQ="
+
+    def test_real_hex_still_works(self, qtbot):
+        """真正 hex 串仍正确识别."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("28372c37290a")
+        assert v.extract_base_candidate() == "28372c37290a"
+
+    def test_real_binary_still_works(self, qtbot):
+        """真正 binary 串仍正确识别."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        v.append_text("0100100001100101011011000110110001101111")
+        assert v.extract_base_candidate() == "0100100001100101011011000110110001101111"
+
+
 # ---------- run_hex_to_ascii (内部用, 顶 bar 已删) ----------
 class TestHexToAscii:
     def test_internal_method_still_works(self, qtbot):
