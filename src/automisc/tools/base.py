@@ -81,6 +81,10 @@ class ToolAdapter(ABC):
                 cmd,
                 capture_output=True,
                 text=True,
+                # 修 UnicodeDecodeError: binary tool (foremost/unzip/sevenz) 输出非 UTF-8 字节时,
+                # 默认 errors='strict' 直接抛异常挂掉. 用 'replace' 把无效字节 → U+FFFD,
+                # 日志完整可见 (per Owner "宁可多给错给, 也不能少给" 铁律).
+                errors="replace",
                 timeout=effective_timeout,
                 env=env,
                 check=False,
@@ -127,6 +131,8 @@ class ToolAdapter(ABC):
                 input=input_text,
                 capture_output=True,
                 text=True,
+                # 同 _run_subprocess: 修 binary tool 非 UTF-8 字节触发的 UnicodeDecodeError
+                errors="replace",
                 timeout=effective_timeout,
                 env=env,
                 check=False,
