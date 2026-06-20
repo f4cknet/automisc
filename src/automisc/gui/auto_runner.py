@@ -71,11 +71,12 @@ FIND_SUSPICIOUS_TRAFFIC_TOOLS = [
     "file",
 ]
 FIND_SUSPICIOUS_ARCHIVE_TOOLS = [
-    "sevenz",  # 7z l 列表 (不实际解压)
-    "unzip",   # unzip -l 列表 (不实际解压)
+    "sevenz",        # 7z l 列表 (不实际解压)
+    "unzip",         # unzip -l 列表 (不实际解压)
+    "zip_classify",  # ZIP per-entry 伪/真/clear 分类 + 自动解压 clear (v0.5-zip-verdict-pool)
     "file",
     "strings",
-]
+]  
 FIND_SUSPICIOUS_BINARY_TOOLS = [
     "file",
     "strings",
