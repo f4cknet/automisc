@@ -71,6 +71,7 @@ KEYWORDS: list[str] = [
     "encrypt",
     "cipher",
     "steghide",
+    "stegseek",
     "outguess",
     "stegdetect",
     "jsteg",

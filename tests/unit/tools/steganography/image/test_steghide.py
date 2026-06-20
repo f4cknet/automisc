@@ -20,9 +20,9 @@ def require_steghide():
 
 
 def test_steghide_adapter_is_registered():
-    a = get_tool("steghide")
+    a = get_tool("stegseek")
     assert isinstance(a, SteghideAdapter)
-    assert a.name == "steghide"
+    assert a.name == "stegseek"
     assert a.category == "steganography_image"
 
 

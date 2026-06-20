@@ -49,7 +49,7 @@ class TestFileRouter:
         assert r.detected_extension == ".png"
         assert r.detected_magic == "PNG image"
         assert any(rec.tool_name == "zsteg" for rec in r.recommendations)
-        assert any(rec.tool_name == "steghide" for rec in r.recommendations)
+        assert any(rec.tool_name == "stegseek" for rec in r.recommendations)
 
     def test_route_pcap(self, tmp_path):
         pcap = tmp_path / "test.pcap"

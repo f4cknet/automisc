@@ -58,7 +58,7 @@ SHORT_CIRCUIT_SEVERITY = 99
 # - binwalk adapter 默认探测模式 (跑 `binwalk <file>` 不带 -e), 写 SP 到 journal — OK
 FIND_SUSPICIOUS_PICTURE_TOOLS = [
     "zsteg",        # PNG LSB 隐写探测 (JPEG/BMP/GIF 会 fail, 不影响)
-    "steghide",     # JPEG/BMP 隐写 info (无密码, 纯探测; PNG/GIF 不支持会 fail)
+    "stegseek",     # JPEG/BMP 隐写 info (无密码, 纯探测; PNG/GIF 不支持会 fail, v0.5 平替 steghide)
     "exiftool",     # EXIF metadata
     "binwalk",      # 探测 (不 -e)
     "strings",      # rule_scanner 可疑字符串

@@ -78,7 +78,7 @@ class TestPickSuspiciousPool:
         "auto_run 不抢 flag" (extract 留给 GUI 工具栏 / CLI 手工触发).
         """
         _, tools = pick_suspicious_pool("/tmp/x.jpg")
-        assert "steghide" in tools, (
+        assert "stegseek" in tools, (
             f"picture pool 必须含 steghide (per Owner 实测): {tools}"
         )
 

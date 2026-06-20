@@ -10,7 +10,7 @@ EXPECTED_TOOLS = {
     # PR1: 共享基础工具
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
     # PR2: Stego/Image
-    "zsteg", "steghide",
+    "zsteg", "stegseek",
 }
 
 
@@ -38,7 +38,7 @@ def test_pr1_adapters_have_shared_category():
 
 def test_pr2_adapters_have_steganography_image_category():
     """PR2 2 个 adapter 的 category 是 'steganography_image'。"""
-    for name in ("zsteg", "steghide"):
+    for name in ("zsteg", "stegseek"):
         a = get_tool(name)
         assert a.category == "steganography_image", f"{name}.category={a.category}"
 
@@ -62,7 +62,7 @@ def test_orchestrator_can_run_pr2_on_png(tmp_png_file):
     core = CoreOrchestrator()
     file_path = str(tmp_png_file)
 
-    for name in ("zsteg", "steghide"):
+    for name in ("zsteg", "stegseek"):
         result = core.run_tool(name, file_path)
         # zsteg 在 PNG 上应成功（exit 0）；steghide 在 PNG 上 macOS 默认报不支持（exit 1）—— 都接受
         assert result.exit_code in (0, 1), (

@@ -409,8 +409,8 @@ class MainWindow(QMainWindow):
         # 1) 自动检测 (空 wordlist) — 走 StegseekCrackAction + 空 wordlist
         # 2) 暴力破解 (带 wordlist) — QFileDialog 收 wordlist → StegseekCrackAction
         # 3) 指定密码提取 — QInputDialog 收 password → SteghideExtractAction (stegseek 优先)
-        # (左侧 ToolMenuDock 的 steghide 入口仍叫 "steghide" — adapter 内部已平替为 stegseek,
-        #  但 adapter name 保持兼容 pool/test 引用, 改 menu label 即可)
+        # (左侧 ToolMenuDock 入口现已改为 "stegseek" (平替 steghide, per Owner 2026-06-20 13:57)
+        #  adapter name 已统一为 "stegseek", pool/router/menu_dock 也都改了)
         stegseek_menu = chain_menu.addMenu("Stegseek")
         auto_act = QAction("自动检测 (空 wordlist)", self)
         auto_act.triggered.connect(self._run_steghide_auto)

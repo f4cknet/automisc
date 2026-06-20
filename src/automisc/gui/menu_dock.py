@@ -31,7 +31,7 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 # v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
-    "Stego/Image (PR2)": ["zsteg", "steghide"],
+    "Stego/Image (PR2)": ["zsteg", "stegseek"],
     "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
         "ffmpeg_audio",
@@ -145,7 +145,7 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 # 其他以 "decoder:" 开头的是 decoder (走 _run_decoder)
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
-    "zsteg", "steghide",
+    "zsteg", "stegseek",
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
     "sevenz", "unzip", "john",

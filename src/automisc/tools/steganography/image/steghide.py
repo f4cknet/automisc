@@ -75,7 +75,7 @@ class SteghideAdapter(ToolAdapter):
     adapter 名字仍叫 `steghide` (registry / pool 不变), 但调 `stegseek` 二进制.
     """
 
-    name = "steghide"
+    name = "stegseek"
     category = "steganography_image"
     description = (
         "JPEG/BMP/WAV/AU 隐写检测 — macOS 优先用 stegseek (现代 fork, JPEG 支持), "

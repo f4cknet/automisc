@@ -91,7 +91,7 @@ class TestAutoRunOnDrop:
         # 推荐 zsteg/steghide 跑过（无 fixture，zsteg 可能 exit_code != 0 但 tool 应跑过）
         text = w.output_view.toPlainText()
         # 至少看到 zsteg 或 steghide 在 output 区出现
-        assert "zsteg" in text or "steghide" in text
+        assert "zsteg" in text or "stegseek" in text
 
     def test_auto_run_disabled_skips_chain(self, qtbot, sample_text):
         """auto-run 关闭 → drop 不启动 AutoRunner."""
