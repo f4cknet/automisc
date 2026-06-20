@@ -49,6 +49,13 @@ automisc/
 │   │   │   └── lsb_extract.py        LSB 智能路由 (v0.5-LSB-router 核心)
 │   │   ├── encoding_detector.py  text 分类 (Q1: 敏感词 + base64/binary/hex)
 │   │   ├── encoders/             自编写编码 (base/classical/custom + base64_stego + base_custom, 非工具池)
+│   │   ├── decoders/             纯计算 decoder (不调外部 CLI, 跟 tools/ adapter 对偶)
+│   │   │   ├── cipher_decoders.py    12 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BrainFuck/BubbleBabble) → GUI "解密工具1"
+│   │   │   ├── base_rot_decoders.py  18 base/rot (base16/32/.../65536 + rot5/13/18/47) → GUI "🔐 Base/ROT 解码"
+│   │   │   ├── base_convert.py       8 进制转换 (bin-ascii / dec-bin / ...) → GUI "🔢 进制转换"
+│   │   │   ├── base64_image.py       base64 → 图片 → GUI "🔓 Base64 → 图片"
+│   │   │   ├── coords_to_qr.py       坐标串 → QR PNG → GUI "🔳 坐标 → 二维码"
+│   │   │   └── registry.py           DecoderSpec + list_decoders_by_group/category
 │   │   ├── exceptions.py         异常体系 (AutomiscError + 6 子类)
 │   │   ├── journal.py            操作日志 (JSONL flush + filter/export)
 │   │   ├── registry.py           工具注册表 (@register_tool 装饰器)
@@ -124,6 +131,59 @@ automisc/
 | `core/decoders/cipher_decoders.py` | 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble) + 2 占位 → 解密工具1/2/3 | `run_caesar`, `run_bacon`, ..., `run_bubblebabble`, `run_placeholder` |
 | `gui/main_window.py` | QMainWindow + 5 菜单 + 拖文件 | `MainWindow` |
 | `gui/chain_runner.py` | 链 QThread (v0.5) | `ChainRunner` |
+
+---
+
+## 3.5 GUI 工具来源说明 — tools/ vs decoders/ (per Owner 20:40 拍板)
+
+> **背景**: Owner 看到 GUI 菜单有 "解密工具1" 分类 (凯撒/培根/栅栏/.../BrainFuck/BubbleBabble 等 11 cipher),
+> 但 `src/automisc/tools/` 下没对应目录, 误以为后端缺实现.
+>
+> **真相**: GUI 工具栏有 **两种来源**, 不是所有 GUI 工具都在 `tools/`.
+
+### 架构对比
+
+| 维度 | `src/automisc/tools/` (adapter) | `src/automisc/core/decoders/` (decoder) |
+|---|---|---|
+| **本质** | subprocess 调外部 CLI | 纯 Python 计算 |
+| **每工具对应** | 一个 macOS 安装的 binary (e.g. `/usr/local/bin/7z`) | 一个纯函数 (e.g. `base64.b64decode()`) |
+| **基类** | `ToolAdapter` (per `tools/base.py`) | 无基类, 直接注册 `DecoderSpec` |
+| **注册装饰器** | `@register_tool` (per `core/registry.py`) | `register_decoder()` (per `core/decoders/registry.py`) |
+| **返回类型** | `ToolResult` (含 stdout/stderr/duration/exit_code) | `DecodeResult` (含 output_text/output_bytes/error) |
+| **GUI 渲染** | `menu_dock.TOOL_CATEGORIES` 静态映射 | `menu_dock._get_cipher_categories_from_registry()` 动态聚合 |
+| **数量** | 18 adapter (file/strings/binwalk/.../sevenz_extract) | 28 decoder (12 cipher + 18 base/rot + 8 进制 + base64-image + coords-qr) |
+| **典型例子** | sevenz → `/usr/local/bin/7z l` | caesar → `chr((ord(c) - shift) % 26)` |
+
+### GUI 菜单分类 ↔ 后端位置速查
+
+| GUI 菜单分类 | 后端位置 | 类型 |
+|---|---|---|
+| **共享基础工具** (file/strings/binwalk/...) | `tools/shared/` | adapter |
+| **Stego/Image** (zsteg/stegseek) | `tools/steganography/image/` | adapter |
+| **Forensics/Network** (tshark/tcpdump) | `tools/forensics/network/` | adapter |
+| **Stego/Audio+Video** (ffmpeg/sox) | `tools/steganography/{audio,video}/` | adapter |
+| **Misc/Archive** (sevenz/unzip/john/zip_classify) | `tools/misc/archive/` | adapter |
+| **Forensics/Log** (grep/evtx_dump) | `tools/forensics/log/` | adapter |
+| **Misc/Brainteaser** (zbar) | `tools/misc/brainteaser/` | adapter |
+| **快捷工具** (fix_pseudo_zip/bruteforce_zip/...) | `core/actions/` | DAG Action |
+| **🔓 Base64 → 图片** | `core/decoders/base64_image.py` | decoder |
+| **🔢 进制转换** (8 个) | `core/decoders/base_convert.py` | decoder |
+| **🔳 坐标 → 二维码** | `core/decoders/coords_to_qr.py` | decoder |
+| **🔐 Base/ROT 解码** (18 个) | `core/decoders/base_rot_decoders.py` | decoder |
+| **🔤 解密工具1** (12 cipher) | `core/decoders/cipher_decoders.py` | decoder |
+| **📦 解密工具2/3** (占位 TBD) | `core/decoders/cipher_decoders.py` (placeholder) | decoder |
+
+### 何时用 adapter vs decoder?
+
+- **adapter** (tools/) — 需要调外部 binary (e.g. 解压 .vmdk 用 7z / 雕文件用 binwalk / 看图片用 exiftool)
+- **decoder** (decoders/) — 纯计算就够 (e.g. base64 解码 / 凯撒 shift / BF 解释器)
+
+**反例**: 把 cipher 写到 `tools/cipher/caesar.py` 写个 adapter 类, run() 只 return 计算结果 → 空壳, 违反分层. 正确位置是 `core/decoders/cipher_decoders.py:run_caesar`.
+
+### 修改 GUI 工具栏显示
+
+- **加 adapter** → `tools/<subpackage>/<name>.py` + `tools/<subpackage>/__init__.py` import + `tools/__init__.py` 双注册 + `menu_dock.TOOL_CATEGORIES` 加一行 + `ADAPTER_TOOLS` set 加 (per 双注册铁律)
+- **加 decoder** → `core/decoders/<name>.py` 定义 `DecoderSpec` 并 `register_decoder()` → GUI 自动从 registry 渲染 (无需改 menu_dock)
 
 ---
 

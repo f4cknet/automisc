@@ -11,7 +11,9 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 3. `upgrade.md`（当前迭代入口）+ `upgrade/<id>.md`（当前任务详细）
 4. （可选）`fix.md` + `prd.md`（🟡 frozen 历史 reference）
 
-> **关键自检**：每次写代码前内部回答"对应 `upgrade.md` 哪行迭代？对应 `STRUCTURE.md` 哪节？"，答不出停手。
+> **关键自检**: 每次写代码前内部回答 "对应 `upgrade.md` 哪行迭代？对应 `STRUCTURE.md` 哪节？", 答不出停手.
+>
+> **GUI 工具栏来源**: 见 `STRUCTURE.md §3.5` — GUI 工具有两种后端来源: `tools/` adapter (调外部 CLI) vs `core/decoders/` decoder (纯计算). Owner 找 cipher 解密工具找不到 `tools/cipher/` 时, 先查 §3.5.
 
 ## 1. 5 铁律（不可绕过）
 
