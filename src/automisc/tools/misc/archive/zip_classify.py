@@ -125,6 +125,11 @@ class ZipClassifyAdapter(ToolAdapter):
             verdict_summary = f"无加密: {n_clear} clear entries"
             action = "工具栏 unzip 直接解压 (auto_run 不自动解压 clear, 留给工具栏)"
             severity = 2
+        else:
+            # 空 ZIP (合法 zip 但 0 entry) — 兜底防 UnboundLocalError (per v0.5-train-007)
+            verdict_summary = "空 ZIP: 0 entry (合法 ZIP 但无内容)"
+            action = "无需操作 (ZIP 不含任何 entry)"
+            severity = 1
 
         # 5. per-entry 详情
         detail_lines = []

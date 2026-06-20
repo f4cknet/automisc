@@ -205,6 +205,45 @@ class TestVerdictClassification:
         assert result.suspicious_points == []
         assert "not a valid zip" in result.stderr.lower()
 
+    def test_empty_zip_no_unbound_local_error(self, tmp_path: Path):
+        """v0.5-train-007 修复: 空 ZIP (合法 ZIP 但 0 entry) → 不应 UnboundLocalError.
+
+        修复前 (per Owner 2026-06-20 17:05 反馈):
+        - 4 个 if/elif 分支都基于 n_pseudo/n_real/n_clear > 0 判定
+        - 空 ZIP 时 3 个计数都是 0 → 全部分支跳过 → verdict_summary/action/severity 未绑定
+        - 后续 f-string 引用 → UnboundLocalError
+
+        修复后:
+        - 加 else 兜底分支: "空 ZIP" verdict + severity 1
+        - exit_code 0 (合法 ZIP, 只是没内容)
+        """
+        zf_path = tmp_path / "empty.zip"
+        with zipfile.ZipFile(zf_path, "w") as zf:
+            pass  # 不写任何 entry
+
+        a = ZipClassifyAdapter()
+        result = a.run(str(zf_path))
+
+        # 不崩溃
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        assert len(result.suspicious_points) == 1
+
+        sp = result.suspicious_points[0]
+        assert sp.category == "zip_encryption_verdict"
+        assert sp.severity == 1
+        assert "空 ZIP" in sp.matched_pattern
+        assert "无需操作" in sp.suggested_action
+
+        # per-entry metadata 全 0
+        assert result.metadata["pseudo_count"] == 0
+        assert result.metadata["real_count"] == 0
+        assert result.metadata["clear_count"] == 0
+        assert result.metadata["pseudo_entries"] == {}
+        assert result.metadata["real_entries"] == {}
+        assert result.metadata["clear_entries"] == {}
+        assert result.metadata["verdict_summary"] == "空 ZIP: 0 entry (合法 ZIP 但无内容)"
+
     def test_missing_file_no_sp(self, tmp_path: Path):
         """文件不存在 → 不写 SP, exit_code != 0."""
         a = ZipClassifyAdapter()
@@ -272,6 +311,11 @@ class TestVerdictClassification:
 # ---------- 集成: 真实 owner 实战样本 ----------
 
 OWNER_SAMPLE = "/Users/minzhizhou/Downloads/123456cry__foremost/zip/00000038.zip"
+# v0.5-train-006: byte[11] 启发式误判样本 — 修复前判 pseudo, 修复后必须判 real
+OWNER_BYTE11_BUG_SAMPLE = (
+    "/Users/minzhizhou/Desktop/ctf/misc/automisc/tests/fixtures/challenges/"
+    "00000000_zip-pseudo-byte11-bug.zip"
+)
 
 
 @pytest.mark.skipif(
@@ -310,3 +354,192 @@ def test_owner_sample_zip_classify():
 
     # suggested_action 指向 GUI Fix
     assert "Fix Zip 伪加密" in sp.suggested_action
+
+
+# ---------- v0.5-train-006 回归测试: byte[11] 启发式误判 ----------
+
+@pytest.mark.skipif(
+    not os.path.exists(OWNER_BYTE11_BUG_SAMPLE),
+    reason=f"v0.5-train-006 fixture 不存在: {OWNER_BYTE11_BUG_SAMPLE}",
+)
+def test_byte11_bug_real_classification():
+    """v0.5-train-006 修复回归测试.
+
+    Owner 反馈样本 00000000.zip (per v0.5-train-006):
+    - LFH bit 0 = 1, CDH bit 0 = 1 (双加密位)
+    - comp_size = 29, data[11] = 0x6a (NOT in range(12))
+    - 旧启发式 (`data[11] in range(12)`): 误判 pseudo → 误导用户跑 ZipCenOp r
+    - 修复后: 真加密 (直接 inflate 失败 + 12-skip inflate 失败 + ZipCenOp r 后 unzip 仍失败)
+
+    期望 (修复后):
+    - 1 real (4number.txt) + 0 pseudo + 0 clear
+    - verdict = "纯真加密: 1 entries 需密码" (severity 4)
+    - suggested_action 指向 GUI Zip 暴力破解 (不是 Fix Zip 伪加密)
+    """
+    from automisc.core.actions.zip_chain import _classify_zip_entries
+
+    # 1) 直接调分类函数验证
+    classify = _classify_zip_entries(Path(OWNER_BYTE11_BUG_SAMPLE))
+    assert classify["pseudo"] == {}, (
+        f"修复后 4number.txt 必须判 real, 不应判 pseudo (旧 byte[11] 启发式 bug): {classify}"
+    )
+    assert "4number.txt" in classify["real"], (
+        f"4number.txt 必须归类到 real (per Owner 反馈+zip_cenop r 后 unzip 仍失败): {classify}"
+    )
+
+    # 2) 验证 byte[11] = 0x6a (旧启发式会误判的字节)
+    data = Path(OWNER_BYTE11_BUG_SAMPLE).read_bytes()
+    import struct
+    lfh_offset = data.find(b"PK\x03\x04")
+    fname_len = struct.unpack("<H", data[lfh_offset + 26 : lfh_offset + 28])[0]
+    extra_len = struct.unpack("<H", data[lfh_offset + 28 : lfh_offset + 30])[0]
+    data_start = lfh_offset + 30 + fname_len + extra_len
+    byte_11 = data[data_start + 11]
+    assert byte_11 > 11, (
+        f"此 fixture 设计 byte[11] > 11 (旧 byte[11] in range(12) 启发式会判 pseudo), "
+        f"实际 byte[11]=0x{byte_11:02x}={byte_11}"
+    )
+
+    # 3) 通过 adapter 验证 verdict SP 方向正确
+    a = ZipClassifyAdapter()
+    result = a.run(OWNER_BYTE11_BUG_SAMPLE)
+
+    verdict_sp = [
+        sp for sp in result.suspicious_points if sp.category == "zip_encryption_verdict"
+    ]
+    assert len(verdict_sp) == 1
+    sp = verdict_sp[0]
+
+    # 真加密 → severity 4 (per zip_classify.py 决策表)
+    assert sp.severity == 4, (
+        f"修复后必须判真加密 (severity 4), 不是伪加密 (severity 5): {sp}"
+    )
+    assert "纯真加密" in sp.matched_pattern
+    assert "暴力破解" in sp.suggested_action, (
+        f"修复后 suggested_action 必须指向 bruteforce, 不是 Fix Zip 伪加密: "
+        f"{sp.suggested_action}"
+    )
+    assert "Fix Zip 伪加密" not in sp.suggested_action, (
+        f"修复后**不**应再指向 Fix Zip 伪加密 (会误导用户): {sp.suggested_action}"
+    )
+
+    # 4) per-entry metadata
+    assert result.metadata["pseudo_count"] == 0
+    assert result.metadata["real_count"] == 1
+    assert result.metadata["clear_count"] == 0
+    assert "4number.txt" in result.metadata["real_entries"]
+
+
+def test_synthetic_real_encrypted_classified_as_real(tmp_path: Path):
+    """合成测试: 模拟「真加密 deflate 数据」(CRC 故意不匹配), 验证判 real.
+
+    不依赖真实密码, 直接构造: comp_size > 12, data 是无法 inflate 的随机字节 (模拟 PKCS#5 密文),
+    且 CRC 不匹配. 修复后必须判 real.
+    """
+    import os
+    import struct
+    import zlib
+
+    zf_path = tmp_path / "synthetic_real.zip"
+    content = b"secret 4-number flag content"  # 30 bytes
+
+    # 写 stored zip (压缩方法 0)
+    with zipfile.ZipFile(zf_path, "w") as zf:
+        zf.writestr("flag.txt", content)
+
+    # Patch: LFH bit 0 + CDH bit 0 都设 1 (模拟双加密位)
+    data = bytearray(zf_path.read_bytes())
+
+    # 找到所有 PK\x03\x04 (LFH)
+    offset = 0
+    while offset < len(data) - 4:
+        if data[offset : offset + 4] == b"PK\x03\x04":
+            flag_bits = struct.unpack_from("<H", data, offset + 6)[0]
+            flag_bits |= 0x1
+            struct.pack_into("<H", data, offset + 6, flag_bits)
+            comp_size = struct.unpack_from("<I", data, offset + 18)[0]
+            fname_len = struct.unpack_from("<H", data, offset + 26)[0]
+            extra_len = struct.unpack_from("<H", data, offset + 28)[0]
+            # 改 comp_size > 12 + 篡改 data 起始 12 字节为不可解压的密文
+            if comp_size >= 12:
+                # 12-byte PKCS#5 header (模拟密文: 全部 0xff, 不可解压)
+                for i in range(12):
+                    data[offset + 30 + fname_len + extra_len + i] = 0xFF
+            offset += 30 + fname_len + extra_len + comp_size
+        else:
+            break
+
+    # 找所有 PK\x01\x02 (CDH) 设 bit 0
+    offset = 0
+    while offset < len(data) - 4:
+        if data[offset : offset + 4] == b"PK\x01\x02":
+            flag_bits = struct.unpack_from("<H", data, offset + 8)[0]
+            flag_bits |= 0x1
+            struct.pack_into("<H", data, offset + 8, flag_bits)
+            offset += 46  # CDH 最小
+        else:
+            offset += 1
+
+    zf_path.write_bytes(bytes(data))
+
+    # 验证分类
+    from automisc.core.actions.zip_chain import _classify_zip_entries
+
+    classify = _classify_zip_entries(zf_path)
+    assert "flag.txt" in classify["real"], (
+        f"合成真加密样本应判 real, 实际: {classify}"
+    )
+    assert "flag.txt" not in classify["pseudo"], (
+        f"合成真加密样本**不**应判 pseudo: {classify}"
+    )
+
+
+def test_synthetic_pseudo_deflate_classified_as_pseudo(tmp_path: Path):
+    """合成测试: deflate 明文 + flag bit 0 设 1 (典型 CTF 伪加密), 验证判 pseudo."""
+    import struct
+    import zipfile
+
+    zf_path = tmp_path / "synthetic_pseudo_deflate.zip"
+    content = b"plaintext flag content for pseudo encryption test" * 3  # 长一些便于 deflate
+
+    # 写 deflate zip (压缩方法 8)
+    with zipfile.ZipFile(zf_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("flag.txt", content)
+
+    # Patch: LFH bit 0 设 1, 不动 CDH (CDH 已自动设 1? — 不一定, 看 zipfile 实现)
+    # 实际上 zipfile 写 deflate zip 时 LFH flag bit 0 = 0; patch 设 1
+    data = bytearray(zf_path.read_bytes())
+    offset = 0
+    while offset < len(data) - 4:
+        if data[offset : offset + 4] == b"PK\x03\x04":
+            flag_bits = struct.unpack_from("<H", data, offset + 6)[0]
+            flag_bits |= 0x1
+            struct.pack_into("<H", data, offset + 6, flag_bits)
+            comp_size = struct.unpack_from("<I", data, offset + 18)[0]
+            fname_len = struct.unpack_from("<H", data, offset + 26)[0]
+            extra_len = struct.unpack_from("<H", data, offset + 28)[0]
+            offset += 30 + fname_len + extra_len + comp_size
+        else:
+            break
+
+    # 同样 patch CDH bit 0
+    offset = 0
+    while offset < len(data) - 4:
+        if data[offset : offset + 4] == b"PK\x01\x02":
+            flag_bits = struct.unpack_from("<H", data, offset + 8)[0]
+            flag_bits |= 0x1
+            struct.pack_into("<H", data, offset + 8, flag_bits)
+            offset += 46
+        else:
+            offset += 1
+
+    zf_path.write_bytes(bytes(data))
+
+    # 验证分类
+    from automisc.core.actions.zip_chain import _classify_zip_entries
+
+    classify = _classify_zip_entries(zf_path)
+    assert "flag.txt" in classify["pseudo"], (
+        f"合成 deflate 伪加密应判 pseudo, 实际: {classify}"
+    )
+    assert "flag.txt" not in classify["real"]

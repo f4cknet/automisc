@@ -28,7 +28,7 @@ from automisc.core.dag import Action, ActionResult
 
 
 def _classify_zip_entries(zip_path: Path) -> dict:
-    """逐 entry 分类 (per ctf-wiki 原理 + v0.5-train-005 反馈).
+    """逐 entry 分类 (per ctf-wiki 原理 + v0.5-train-005/006 反馈).
 
     算法 (per ctf-wiki 伪加密原理 https://ctf-wiki.org/misc/archive/zip/):
     1) 收 LFH map (fname → (lfh_offset, lfh_flag, comp_size, data_start))
@@ -37,9 +37,16 @@ def _classify_zip_entries(zip_path: Path) -> dict:
        - LFH bit0=0 AND CDH bit0=0 → clear (完全明文, 不需要修)
        - LFH bit0=1 OR CDH bit0=1:
          - comp_size < 12 → pseudo (太短不可能有真加密 PKCS#5 header)
-         - data[data_start + 11] in range(12) → real (有 PKCS#5 末位, 修不了)
-         - else → pseudo (无 PKCS#5 末位)
+         - 尝试直接 raw inflate + CRC 校验:
+           * 成功 + CRC 匹配 → pseudo (data 是明文 deflate)
+         - 尝试跳过 12-byte PKCS#5 header + raw inflate + CRC 校验:
+           * 成功 + CRC 匹配 → real (data 是真加密的 deflate)
+         - 都不通过 → real (保守归类, per v0.5-train-006)
     4) 不 short-circuit — 扫完所有 entry (per AGENTS §5.5「可疑点越多越好」)
+
+    **v0.5-train-006 修复**: 旧版本用 `data[data_start + 11] in range(12)` 启发式判定真伪加密,
+    实测命中率仅 12/256 ≈ 4.7%, 绝大多数真加密 zip 会被错判成伪加密.
+    新版本用 zlib.decompress + CRC-32 校验, 是 ZIP 标准自带的客观判据, 不依赖启发式.
 
     Returns:
         {
@@ -102,10 +109,44 @@ def _classify_zip_entries(zip_path: Path) -> dict:
             else:
                 k += 1
 
-    # 3) 逐 entry 分类 (per ctf-wiki 原理 + owner 决策 A)
+    # 3) 逐 entry 分类 (per ctf-wiki 原理 + owner 决策 A + v0.5-train-006 fix)
     pseudo: dict = {}
     real: dict = {}
     clear: dict = {}
+
+    # 延迟 import: zlib 是 stdlib, 这里为避免顶部污染 (zip_chain.py 已有 struct 等)
+    import zlib
+
+    def _try_inflate_with_crc(buf: bytes, expected_crc: int) -> bool:
+        """尝试 raw deflate + CRC-32 校验.
+
+        Args:
+            buf: 待解压数据
+            expected_crc: header CRC-32 (little-endian u32)
+
+        Returns:
+            True = 解压成功且 CRC 匹配 (data 是明文/正确解密的 deflate)
+            False = 解压失败或 CRC 不匹配
+        """
+        try:
+            decompressed = zlib.decompress(buf, -15)  # -15 = raw deflate (no zlib header)
+        except zlib.error:
+            return False
+        return (zlib.crc32(decompressed) & 0xFFFFFFFF) == expected_crc
+
+    def _check_pseudo(file_data: bytes, expected_crc: int, method: int) -> bool:
+        """检查 data 是否是明文 (伪加密特征).
+
+        - method 0 (stored): data 即未压缩内容, 直接 CRC-32 比对
+        - method 8 (deflate): 尝试 raw inflate + 解压结果 CRC 比对
+        - 其他 method: 不常见, 保守返回 False
+        """
+        if method == 0:
+            return (zlib.crc32(file_data) & 0xFFFFFFFF) == expected_crc
+        if method == 8:
+            return _try_inflate_with_crc(file_data, expected_crc)
+        # 其他 method (bzip2, LZMA 等): 保守不归 pseudo
+        return False
 
     for fname, (lfh_offset, lfh_flag, comp_size, data_start) in lfh_map.items():
         cdh_offset, cdh_flag = cdh_map.get(fname, (-1, 0))
@@ -121,14 +162,24 @@ def _classify_zip_entries(zip_path: Path) -> dict:
             pseudo[fname] = (lfh_offset, cdh_offset)
             continue
 
-        # 看 data 起始 12 字节末位 (PKCS#5 末字节) 是否在 0-11
-        last_byte = data[data_start + 11]
-        if last_byte in range(12):
-            # 有 PKCS#5 header → 真加密 (修了也白修, data 仍加密)
-            real[fname] = (lfh_offset, cdh_offset)
-        else:
-            # 无 PKCS#5 header → 伪加密
+        # 读 header 字段 (CRC, compression method) 用于判定
+        crc = struct.unpack("<I", data[lfh_offset + 14 : lfh_offset + 18])[0]
+        method = struct.unpack("<H", data[lfh_offset + 8 : lfh_offset + 10])[0]
+        file_data = data[data_start : data_start + comp_size]
+
+        # 1) 检查 data 是否是明文 (按 compression method 分别处理) → 伪加密特征
+        if _check_pseudo(file_data, crc, method):
             pseudo[fname] = (lfh_offset, cdh_offset)
+            continue
+
+        # 2) 跳过 12-byte PKCS#5 header 再 inflate → 真加密特征 (data 是加密 deflate)
+        if comp_size > 12 and _try_inflate_with_crc(file_data[12:], crc):
+            real[fname] = (lfh_offset, cdh_offset)
+            continue
+
+        # 3) 都不通过 → 保守归 real (per v0.5-train-006 §4「保守归类原则」)
+        #    不能 deflate + CRC 不匹配时, 默认归真加密: 不误导用户跑 ZipCenOp r 浪费时间
+        real[fname] = (lfh_offset, cdh_offset)
 
     return {"pseudo": pseudo, "real": real, "clear": clear}
 
