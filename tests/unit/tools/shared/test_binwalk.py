@@ -1,8 +1,9 @@
-"""测试 tools/shared/binwalk.py (v0.5-binwalk-extract 扩展)
+"""测试 tools/shared/binwalk.py (v0.5-philosophy-rethink)
 
 含：
-- 原 4 个测试（registered / zip / png / text）
-- v0.5-binwalk-extract 新增 (PEM/SSH 关键字 + extract_files)
+- 原 4 个测试 (registered / zip / png / text)
+- v0.5-binwalk-extract 历史 (PEM/SSH 关键字白名单保留)
+- v0.5-philosophy-rethink 新增: 验证 adapter 不雕文件
 """
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ def test_binwalk_plain_text_no_file_header(tmp_text_file):
     assert len(file_header_sp) == 0
 
 
-# ---------- v0.5-binwalk-extract 新增测试 ----------
+# ---------- 关键字白名单测试 (v0.5-binwalk-extract 保留) ----------
 
 def test_keyword_whitelist_includes_pem_ssh_rsa():
     """v0.5-binwalk-extract 关键字白名单必须含 PEM/SSH/RSA 三种私钥格式."""
@@ -86,12 +87,10 @@ DECIMAL                            HEXADECIMAL                        DESCRIPTIO
 
 
 def test_adapter_parses_pem_hits_from_greatescape():
-    """mock 扫描输出: 2 个 PEM private key 应被识别 (之前会丢)."""
+    """mock 扫描输出: 2 个 PEM private key 应被识别 (v0.5-binwalk-extract 历史行为)."""
     a = BinwalkAdapter()
     with patch.object(a, "_run_subprocess", return_value=(0, SAMPLE_BINWALK_GREATESCAPE, "", 30)):
-        # mock _extract_files 不实际跑 binwalk -e
-        with patch.object(a, "_extract_files", return_value=[]):
-            result = a.run("/tmp/fake.pcap")
+        result = a.run("/tmp/fake.pcap")
 
     pem_sps = [sp for sp in result.suspicious_points if "PEM" in sp.matched_pattern]
     assert len(pem_sps) == 2
@@ -101,61 +100,56 @@ def test_adapter_parses_pem_hits_from_greatescape():
         assert "PEM private key @ offset" in sp.matched_pattern
 
 
-def test_adapter_includes_extracted_path_in_context():
-    """当 _extract_files 返回真文件时, SP context 应含路径."""
-    fake_extracted = [
-        "/tmp/fake__binwalk_extracted/fake.extracted/51D60/pem.key",
-    ]
+# ---------- v0.5-philosophy-rethink 新增: 验证不雕文件 ----------
+
+def test_adapter_does_not_extract_on_run():
+    """v0.5-philosophy-rethink: binwalk adapter 跑完不雕文件.
+
+    之前 v0.5-binwalk-extract 会在 run() 里调 _extract_files (binwalk -e),
+    违背 owner 决策 1 "auto_run 不抢 flag". 现在:
+    - 命中 file header keyword → SP 里 suggested_action 提示用户手工触发
+    - 不会调 _extract_files (该方法已删)
+    - metadata 不再有 extracted_files / extract_dir
+    """
     a = BinwalkAdapter()
     with patch.object(a, "_run_subprocess", return_value=(0, SAMPLE_BINWALK_GREATESCAPE, "", 30)):
-        with patch.object(a, "_extract_files", return_value=fake_extracted):
-            result = a.run("/tmp/fake.pcap")
+        result = a.run("/tmp/fake.pcap")
 
-    # 找到 offset 0x51D60 (=335200) 对应的 SP
-    pem_335200 = [sp for sp in result.suspicious_points
-                  if sp.matched_pattern == "PEM private key @ offset 335200"][0]
-    # context 应含 "extracted_files="
-    assert "extracted_files=" in pem_335200.context
-    assert "51D60/pem.key" in pem_335200.context
-    # suggested_action 应含 Wireshark 模板
-    assert "Wireshark" in pem_335200.suggested_action
-    assert "--ssl.keys" in pem_335200.suggested_action
-    assert "已提取" in pem_335200.suggested_action
+    # 1. SP 正常产生 (检测 OK)
+    pem_sps = [sp for sp in result.suspicious_points if "PEM" in sp.matched_pattern]
+    assert len(pem_sps) == 2
+
+    # 2. suggested_action 提示手工触发 (而不是已自动提取)
+    for sp in pem_sps:
+        assert "建议 foremost / binwalk -e 分离" in sp.suggested_action
+        assert "工具栏 foremost" in sp.suggested_action or "Chain 菜单 binwalk" in sp.suggested_action
+
+    # 3. metadata 不再有 extracted_files / extract_dir (v0.5-philosophy-rethink)
+    assert "extracted_files" not in result.metadata
+    assert "extract_dir" not in result.metadata
+
+    # 4. SP context 不再有 "extracted_files=" 前缀
+    for sp in pem_sps:
+        assert "extracted_files=" not in sp.context
 
 
-def test_adapter_no_hits_no_extract_call():
-    """0 hits → _extract_files 不被调用 (避免无谓的 binwalk -e 跑)."""
+def test_adapter_extract_files_method_removed():
+    """v0.5-philosophy-rethink: _extract_files method 已删 (BinwalkExtractAction 独立实现)."""
     a = BinwalkAdapter()
-    no_hits = "DECIMAL  HEXADECIMAL  DESCRIPTION\n--------------------------------\n0          0x0         (no signatures)\n"
-    with patch.object(a, "_run_subprocess", return_value=(0, no_hits, "", 10)):
-        with patch.object(a, "_extract_files") as mock_extract:
-            result = a.run("/tmp/fake.pcap")
-
-    mock_extract.assert_not_called()
-    assert result.suspicious_points == []
-
-
-def test_adapter_metadata_records_extracted_files():
-    """metadata['extracted_files'] 应是真文件路径列表."""
-    fake_extracted = [
-        "/tmp/fake__binwalk_extracted/fake.extracted/51D60/pem.key",
-        "/tmp/fake__binwalk_extracted/fake.extracted/52A7D/pem.key",
-    ]
-    a = BinwalkAdapter()
-    with patch.object(a, "_run_subprocess", return_value=(0, SAMPLE_BINWALK_GREATESCAPE, "", 30)):
-        with patch.object(a, "_extract_files", return_value=fake_extracted):
-            result = a.run("/tmp/fake.pcap")
-
-    assert "extracted_files" in result.metadata
-    assert result.metadata["extracted_files"] == fake_extracted
-    assert "extract_dir" in result.metadata
-    assert result.metadata["extract_dir"].endswith("__binwalk_extracted")
+    assert not hasattr(a, "_extract_files"), (
+        "BinwalkAdapter._extract_files 已删 (per v0.5-philosophy-rethink); "
+        "分离逻辑独立到 core/actions/binwalk_extract.py::BinwalkExtractAction"
+    )
 
 
 # ---------- 集成：真 pcap 跑 greatescape（需 binwalk + 真 fixture） ----------
 
 def test_adapter_real_greatescape_pcap():
-    """真实 pcap 跑: greatescape 命中 2 个 PEM private key + 提取到 samedir."""
+    """真实 pcap 跑: greatescape 命中 2 个 PEM private key (纯探测, 不雕文件).
+
+    v0.5-philosophy-rethink: 删 v0.5-extract 的自动 binwalk -e 提取,
+    集成测试也只验证检测 + suggested_action 提示, 不验证 extracted 路径.
+    """
     pcap = "tests/fixtures/challenges/greatescape.pcap"
     if not os.path.exists(pcap):
         pytest.skip(f"fixture not found: {pcap}")
@@ -170,10 +164,10 @@ def test_adapter_real_greatescape_pcap():
     # greatescape 含 2 个 PEM 私钥
     assert len(pem_sps) >= 2
 
-    # 第一个 SP context 应含 extracted 路径
-    assert "extracted_files=" in pem_sps[0].context
-    assert "pem.key" in pem_sps[0].context
+    # v0.5-philosophy-rethink: context 不再含 extracted 路径
+    for sp in pem_sps:
+        assert "extracted_files=" not in sp.context
 
-    # metadata 应含真提取文件
-    assert "extracted_files" in result.metadata
-    assert len(result.metadata["extracted_files"]) >= 2
+    # metadata 也不再有 extracted_files
+    assert "extracted_files" not in result.metadata
+    assert "extract_dir" not in result.metadata
