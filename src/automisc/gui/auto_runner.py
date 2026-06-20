@@ -57,12 +57,13 @@ SHORT_CIRCUIT_SEVERITY = 99
 # - **不**含: foremost / binwalk_extract / steghide_extract / john / fix_pseudo / bruteforce (这些留 GUI 工具栏 / CLI 链)
 # - binwalk adapter 默认探测模式 (跑 `binwalk <file>` 不带 -e), 写 SP 到 journal — OK
 FIND_SUSPICIOUS_PICTURE_TOOLS = [
-    "zsteg",        # PNG LSB 隐写探测
+    "zsteg",        # PNG LSB 隐写探测 (JPEG/BMP/GIF 会 fail, 不影响)
+    "steghide",     # JPEG/BMP 隐写 info (无密码, 纯探测; PNG/GIF 不支持会 fail)
     "exiftool",     # EXIF metadata
     "binwalk",      # 探测 (不 -e)
     "strings",      # rule_scanner 可疑字符串
     "file",         # 文件类型
-]
+]  
 FIND_SUSPICIOUS_TRAFFIC_TOOLS = [
     "pcap_protocol_router",  # pcap 协议分类 + key 候选
     "tshark",                # 协议解析

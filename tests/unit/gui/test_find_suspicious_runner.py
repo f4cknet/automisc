@@ -70,6 +70,25 @@ class TestPickSuspiciousPool:
         _, tools = pick_suspicious_pool("/tmp/x.png")
         assert tools == FIND_SUSPICIOUS_PICTURE_TOOLS
 
+    def test_picture_pool_includes_steghide(self) -> None:
+        """v0.5 实战反馈 (per Owner 2026-06-20 13:26):
+        writeup 用 `steghide info good-已合并.jpg` 拿 qwe.zip 密码 — steghide 必须进 picture pool.
+
+        steghide adapter 只跑 `steghide info` (纯探测, 无密码) — 不违背 owner 决策 1
+        "auto_run 不抢 flag" (extract 留给 GUI 工具栏 / CLI 手工触发).
+        """
+        _, tools = pick_suspicious_pool("/tmp/x.jpg")
+        assert "steghide" in tools, (
+            f"picture pool 必须含 steghide (per Owner 实测): {tools}"
+        )
+
+    def test_picture_pool_has_six_tools(self) -> None:
+        """picture pool 现在有 6 个工具: zsteg/steghide/exiftool/binwalk/strings/file."""
+        _, tools = pick_suspicious_pool("/tmp/x.png")
+        assert len(tools) == 6, (
+            f"picture pool 应有 6 个工具, 实际 {len(tools)}: {tools}"
+        )
+
     def test_traffic_pool_matches_constant(self) -> None:
         _, tools = pick_suspicious_pool("/tmp/x.pcap")
         assert tools == FIND_SUSPICIOUS_TRAFFIC_TOOLS
@@ -137,7 +156,7 @@ class TestFindSuspiciousRunner:
     """FindSuspiciousRunner QThread 跑完整 pool."""
 
     def test_picture_pool_runs_all_tools(self, qtbot, sample_text) -> None:
-        """png-like 文件 → picture pool → 跑 5 个工具."""
+        """png-like 文件 → picture pool → 跑 6 个工具 (含 zsteg/steghide/exiftool/binwalk/strings/file)."""
         core = CoreOrchestrator()
         runner = FindSuspiciousRunner(core, str(sample_text.with_suffix(".png")))
         # 用 sample_text (txt) 跑 png 工具 (适配器应该按文件内容/扩展名判断)
@@ -155,7 +174,7 @@ class TestFindSuspiciousRunner:
                 runner.start()
             summaries = finished[0]
             tools_run = [s.tool_name for s in summaries]
-            # picture pool 应跑 5 个工具 (部分可能失败因为 .png 适配器不适合 txt 内容)
+            # picture pool 应跑 6 个工具 (部分可能失败因为 .png 适配器不适合 txt 内容)
             assert set(tools_run) <= set(FIND_SUSPICIOUS_PICTURE_TOOLS), (
                 f"tools_run={tools_run} should be subset of picture pool"
             )
