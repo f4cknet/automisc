@@ -44,8 +44,9 @@ class TestAutoRunnerSuccess:
     def test_tool_started_signal(self, qtbot, sample_text):
         """tool_started signal 触发 (tool, index, total).
 
-        v0.5-short-circuit: sample_text 含 flag{smoke} 触发 strings 命中 severity=5,
-        所以 file 跑完后 strings 命中 -> short-circuit, xxd 不跑.
+        v0.5-journal-highlight-keywords Q12 (per Owner 2026-06-16 2:12 铁律):
+        "永远跑完所有 max_tools 个工具" — sample_text 含 flag{smoke} 触发 strings
+        命中 severity=5, 但不 short-circuit, xxd 仍要跑.
         """
         core = CoreOrchestrator()
         recs = [_rec("file"), _rec("strings"), _rec("xxd")]
@@ -54,8 +55,8 @@ class TestAutoRunnerSuccess:
         runner.tool_started.connect(lambda t, i, n: events.append((t, i, n)))
         with qtbot.waitSignal(runner.chain_finished, timeout=10000):
             runner.start()
-        # file 启动 (0/3) + strings 启动 (1/3) -> 命中 -> xxd 不启动
-        assert events == [("file", 0, 3), ("strings", 1, 3)]
+        # Q12: 全部 3 个 tool 都启动, 不 short-circuit
+        assert events == [("file", 0, 3), ("strings", 1, 3), ("xxd", 2, 3)]  
 
     def test_tool_finished_with_summary(self, qtbot, sample_text):
         """tool_finished 触发 + summary 含 exit_code + sps."""
@@ -76,7 +77,12 @@ class TestAutoRunnerSuccess:
 
 class TestAutoRunnerFiltering:
     def test_zero_score_filtered(self, qtbot, sample_text):
-        """score=0 的工具跳过 (v0.5: short-circuit 仍生效 - sample_text 含 flag{smoke} 触发 strings 命中)."""
+        """score=0 的工具跳过; Q12 永不 short-circuit, 其余工具全跑.
+
+        v0.5-journal-highlight-keywords Q12 (per Owner 2026-06-16 2:12 铁律):
+        sample_text 含 flag{smoke} 触发 strings 命中 severity=5, 但 SHORT_CIRCUIT_SEVERITY=99
+        永不触发, binwalk 仍跑.
+        """
         core = CoreOrchestrator()
         recs = [_rec("strings", score=10), _rec("file", score=0), _rec("binwalk", score=5)]
         runner = AutoRunner(core, recs, str(sample_text))
@@ -89,10 +95,11 @@ class TestAutoRunnerFiltering:
         tools = [s.tool_name for s in finished[0]]
         # file 被 score=0 过滤
         assert "file" not in tools
-        # v0.5-short-circuit: strings 命中 severity=5 (sample_text 含 flag{smoke_test})
-        # 所以 binwalk 跳过, 链在 strings 处终止
+        # Q12: strings + binwalk 都跑 (无 short-circuit)
         assert "strings" in tools
-        assert sc == ["strings"]
+        assert "binwalk" in tools
+        # Q12: short_circuited 信号永远不发
+        assert sc == []  
 
     def test_max_tools_limit(self, qtbot, sample_text):
         """max_tools 限制最大跑几个."""

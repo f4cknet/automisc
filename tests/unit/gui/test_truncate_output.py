@@ -109,12 +109,23 @@ class TestGrepRenderedOutput:
 
 
 # ---------- AutoRunner short-circuit ----------
+# v0.5-journal-highlight-keywords Q12 (per Owner 2026-06-16 2:12 铁律):
+# "可疑点越多越好, 永远跑完所有 max_tools 个工具"
+# SHORT_CIRCUIT_SEVERITY = 99 → 永不触发 short-circuit
+# 这些 test 验证新行为: 命中 severity=5 也不停, 跑完全部
 class TestAutoRunnerShortCircuit:
     def test_short_circuit_on_flag(self, qtbot, tmp_path):
-        """tool 命中 severity=5 -> 链终止, 不跑后续."""
+        """tool 命中 severity=5 → 仍跑完全部 max_tools 个工具 (per owner 铁律 Q12).
+
+        SHORT_CIRCUIT_SEVERITY = 99 (永不 short-circuit), 即使 strings 命中 severity=5,
+        binwalk/exiftool 仍要跑完 (宁可多给错给, 也不能少给).
+        """
         from automisc.gui.auto_runner import AutoRunner, SHORT_CIRCUIT_SEVERITY
         from automisc.core.orchestrator import CoreOrchestrator
         from automisc.core.router import RouteRecommendation
+
+        # 验证常量 = 99 (锁死铁律)
+        assert SHORT_CIRCUIT_SEVERITY == 99
 
         # 造一个文件含 flag{test_short_circuit} 关键字
         f = tmp_path / "flag.txt"
@@ -137,14 +148,12 @@ class TestAutoRunnerShortCircuit:
             runner.start()
 
         tools = [s.tool_name for s in finished[0]]
-        # strings 命中 -> 终止, binwalk/exiftool 不跑
+        # Q12: 全跑完, strings 命中也不停
         assert "strings" in tools
-        assert "binwalk" not in tools
-        assert "exiftool" not in tools
-        # short_circuited 信号
-        assert len(sc) == 1
-        assert sc[0][0] == "strings"
-        assert "severity=5" in sc[0][1]
+        assert "binwalk" in tools
+        assert "exiftool" in tools
+        # Q12: short_circuited 信号永不触发
+        assert sc == []  
 
     def test_no_short_circuit_on_low_severity(self, qtbot, tmp_path):
         """tool 命中 severity=3 (普通) -> 不 short-circuit, 继续跑."""
@@ -176,9 +185,16 @@ class TestAutoRunnerShortCircuit:
 
 
 # ---------- main_window 渲染 short-circuit 信息 ----------
+# v0.5-journal-highlight-keywords Q12: SHORT_CIRCUIT_SEVERITY=99 永不 short-circuit
+# → output 永远**不**渲染 [short-circuit] 信息 (旧行为已删)
 class TestMainWindowShortCircuitRender:
     def test_short_circuit_message_in_output(self, qtbot, tmp_path):
-        """main_window 监听 short_circuited 信号 -> output 渲染 [short-circuit] 信息."""
+        """main_window: SHORT_CIRCUIT_SEVERITY=99 → output **不**渲染 [short-circuit] 信息.
+
+        之前 v0.5-short-circuit-on-flag 设计 (severity>=5 终止链) 已删除 (per Owner 铁律
+        "可疑点越多越好, 宁可多给错给, 也不能少给"). 现在 auto-run 永远跑完所有 max_tools,
+        所以 [short-circuit] 永远不会出现在 output 区.
+        """
         from automisc.gui.main_window import MainWindow
         from automisc.gui.auto_runner import AutoRunner
         from automisc.core.orchestrator import CoreOrchestrator
@@ -211,7 +227,9 @@ class TestMainWindowShortCircuitRender:
         QApplication.processEvents()
 
         out = w.output_view.toPlainText()
-        # [short-circuit] 信息应在 output
-        assert "[short-circuit]" in out
+        # Q12: [short-circuit] 信息**永不**渲染 (旧行为已删)
+        assert "[short-circuit]" not in out
+        assert "后续 tools 跳过" not in out
+        # strings + file 都跑了
         assert "strings" in out
-        assert "后续 tools 跳过" in out
+        assert "file" in out
