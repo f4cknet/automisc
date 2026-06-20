@@ -424,6 +424,127 @@ def run_brainfuck(text=None, file_path=None, **_):
     )
 
 
+# === BrainFuck runner (bytes-based) ===
+
+def run_brainfuck(text=None, file_path=None, **_):
+    try:
+        data = _read_input_bytes(text, file_path, "brainfuck")
+    except FileNotFoundError as e:
+        return DecodeResult(codec="brainfuck", input="", error=str(e))
+    try:
+        result = classical_ext.brainfuck_eval(data.decode("latin-1", errors="replace"))
+    except (ValueError, TypeError) as e:
+        return DecodeResult(
+            codec="brainfuck",
+            input=data.decode("latin-1", errors="replace"),
+            error=str(e),
+        )
+    try:
+        output_text = result.decode("utf-8")
+    except UnicodeDecodeError:
+        output_text = result.decode("utf-8", errors="replace")
+    return DecodeResult(
+        codec="brainfuck",
+        input=data.decode("latin-1", errors="replace"),
+        output_text=output_text,
+        output_bytes=result,
+        hint=f"BF 解释器跑完, 输出 {len(result)} bytes",
+    )
+
+
+# === Ook! runner (per Owner 2026-06-20 20:50 实战反馈) ===
+#
+# Ook! 是 BrainFuck 的变种, 用 "Ook." "Ook!" "Ook?" 三种 token 两两配对, 替代 BF 8 指令.
+# 标准 token 映射 (per https://en.wikipedia.org/wiki/Ook!):
+#   Ook. Ook. → +
+#   Ook! Ook! → -
+#   Ook! Ook? → >
+#   Ook? Ook! → <
+#   Ook. Ook! → .
+#   Ook? Ook. → ,
+#   Ook. Ook? → [
+#   Ook? Ook. → ]
+#
+# 实施策略: token 转换 + delegate 给 brainfuck_eval (现有 BF 解释器复用, 不重写)
+
+_OOK_TO_BF: dict[str, str] = {
+    # per 知乎 "Ook详解" (https://zhuanlan.zhihu.com/p/44097403) — CTF 实战常用映射
+    # 也跟 splitbrain.org 在线解码器一致
+    # (Wikipedia 表格反了 — 之前我用 Wikipedia 错的, 现以知乎 + splitbrain 为准)
+    "Ook. Ook.": "+",   # increment cell
+    "Ook! Ook!": "-",   # decrement cell
+    "Ook. Ook?": ">",   # move pointer right
+    "Ook? Ook.": "<",   # move pointer left
+    "Ook. Ook!": ",",   # input char
+    "Ook! Ook.": ".",   # output char
+    "Ook! Ook?": "[",   # jump past if zero
+    "Ook? Ook!": "]",   # jump back if nonzero
+}
+
+
+def _ook_to_brainfuck(ook_text: str) -> str:
+    """Ook! token 配对 → BF 字符. 不匹配 token 对跳过 (宽容)."""
+    import re
+    # 抽所有 Ook. / Ook! / Ook? token (允许任意非字母数字分隔)
+    tokens = re.findall(r"Ook[.!?]", ook_text)
+    bf_chars: list[str] = []
+    i = 0
+    while i + 1 < len(tokens):
+        pair = f"{tokens[i]} {tokens[i+1]}"
+        bf_char = _OOK_TO_BF.get(pair)
+        if bf_char:
+            bf_chars.append(bf_char)
+        # 不匹配 token 对 (单数 / 非法配对) → 静默跳过 (宽容)
+        i += 2
+    return "".join(bf_chars)
+
+
+def run_ook(text=None, file_path=None, **_):
+    """Ook! decoder — BrainFuck 变种, token 转换后调 brainfuck_eval.
+
+    per Owner 2026-06-20 20:50 实战反馈 (面具下的flag):
+    - key_part_two/where_is_flag_part_two.txt 是 Ook! 不是 BF
+    - key_part_one/NUL 才是真 BF (用 run_brainfuck 解)
+    - 本 runner 解 Ook! 类型的样本
+    """
+    try:
+        data = _read_input_bytes(text, file_path, "ook")
+    except FileNotFoundError as e:
+        return DecodeResult(codec="ook", input="", error=str(e))
+
+    ook_text = data.decode("utf-8", errors="replace")
+    bf_code = _ook_to_brainfuck(ook_text)
+
+    if not bf_code:
+        return DecodeResult(
+            codec="ook",
+            input=ook_text[:500] + ("... (truncated)" if len(ook_text) > 500 else ""),
+            error="no valid Ook! token pairs found (预期是 Ook. Ook. / Ook! Ook! 等配对)",
+        )
+
+    try:
+        result = classical_ext.brainfuck_eval(bf_code)
+    except (ValueError, TypeError) as e:
+        return DecodeResult(
+            codec="ook",
+            input=ook_text[:500] + ("... (truncated)" if len(ook_text) > 500 else ""),
+            error=f"Ook→BF 转换后 BF 解释器报错: {e}",
+        )
+
+    try:
+        output_text = result.decode("utf-8")
+    except UnicodeDecodeError:
+        output_text = result.decode("utf-8", errors="replace")
+
+    return DecodeResult(
+        codec="ook",
+        input=ook_text[:500] + ("... (truncated)" if len(ook_text) > 500 else ""),
+        output_text=output_text,
+        output_bytes=result,
+        hint=f"Ook! → BF ({len(bf_code)} chars) → brainfuck_eval, 输出 {len(result)} bytes",
+    )
+
+
 # === BubbleBabble runner (bytes-based) ===
 
 def run_bubblebabble(text=None, file_path=None, **_):
@@ -492,6 +613,8 @@ def _register_all() -> None:
          "Quoted-Printable =XX 转义还原 (RFC 2045)"),
         ("brainfuck",      "🧠 BrainFuck 解密",   run_brainfuck,
          "BrainFuck 8 指令解释器 (><+-.,[])"),
+        ("ook",            "🦧 Ook! 解密",         run_ook,
+         "Ook! 语言 (BF 变种, Ook./Ook!/Ook? 三 token 配对) → 转 BF → 解释器"),
         ("bubblebabble",   "🫧 BubbleBabble 解密", run_bubblebabble,
          "Bubble Babble 校验和编码解码 (PGP fingerprint 风格)"),
     ]

@@ -27,6 +27,7 @@ EXPECTED_TEXT_ONLY_DECODERS = [
     "caesar", "bacon", "rail-fence", "pigpen", "morse",
     "xxencode", "uuencode", "jsfuck", "jjencode",
     "quoted-printable", "brainfuck", "bubblebabble",
+    "ook",  # v0.5-ook-decoder (BF 变种, text input)
     # 14 base/rot (per v0.5-base-rot-decoders PR3)
     "base16", "base32", "base36", "base58", "base62", "base64",
     "base85", "base91", "base92", "base100", "base32768", "base65536",

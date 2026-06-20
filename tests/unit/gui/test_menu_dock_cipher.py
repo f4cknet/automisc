@@ -37,14 +37,14 @@ def test_cipher_categories_from_registry_helper():
     """_get_cipher_categories_from_registry() 返回 3 个分类 (含 12+1+1 items)."""
     from automisc.gui.menu_dock import _get_cipher_categories_from_registry
     cats = _get_cipher_categories_from_registry()
-    # 3 个分类都应出现 (因为 cipher_decoders.py 注册了 12+1+1=14 spec)
+    # 3 个分类都应出现 (因为 cipher_decoders.py 注册了 13+1+1=15 spec, per v0.5-ook-decoder)
     titles = list(cats.keys())
     assert any("解密工具1" in t for t in titles), titles
     assert any("解密工具2" in t for t in titles), titles
     assert any("解密工具3" in t for t in titles), titles
-    # 解密工具1 = 12 items (12 cipher)
+    # 解密工具1 = 13 items (12 cipher + 1 ook, per v0.5-ook-decoder)
     g1 = next(t for t in titles if "解密工具1" in t)
-    assert len(cats[g1]) == 12, f"解密工具1 期望 12 cipher, got {len(cats[g1])}: {cats[g1]}"
+    assert len(cats[g1]) == 13, f"解密工具1 期望 13 cipher, got {len(cats[g1])}: {cats[g1]}"
     # 解密工具2 = 1 (占位)
     g2 = next(t for t in titles if "解密工具2" in t)
     assert len(cats[g2]) == 1, f"解密工具2 期望 1 占位, got {len(cats[g2])}"
@@ -53,8 +53,8 @@ def test_cipher_categories_from_registry_helper():
     assert len(cats[g3]) == 1, f"解密工具3 期望 1 占位, got {len(cats[g3])}"
 
 
-def test_cipher_categories_contain_12_cipher_names():
-    """解密工具1 含全部 12 个 cipher decoder name."""
+def test_cipher_categories_contain_13_cipher_names():
+    """解密工具1 含全部 13 个 cipher decoder name (per v0.5-ook-decoder)."""
     from automisc.gui.menu_dock import _get_cipher_categories_from_registry
     cats = _get_cipher_categories_from_registry()
     g1 = next(v for k, v in cats.items() if "解密工具1" in k)
@@ -62,16 +62,17 @@ def test_cipher_categories_contain_12_cipher_names():
         "decoder:caesar", "decoder:bacon", "decoder:rail-fence", "decoder:pigpen",
         "decoder:morse", "decoder:xxencode", "decoder:uuencode", "decoder:jsfuck",
         "decoder:jjencode", "decoder:quoted-printable", "decoder:brainfuck",
+        "decoder:ook",       # v0.5-ook-decoder
         "decoder:bubblebabble",
     }
     assert set(g1) == expected, f"got {g1}, expected {expected}"
 
 
-def test_cipher_display_names_helper_returns_12_plus_2():
-    """_get_cipher_display_names() 返回 12+2=14 display name."""
+def test_cipher_display_names_helper_returns_13_plus_2():
+    """_get_cipher_display_names() 返回 13+2=15 display name (per v0.5-ook-decoder)."""
     from automisc.gui.menu_dock import _get_cipher_display_names
     names = _get_cipher_display_names()
-    assert len(names) == 14, f"expected 14, got {len(names)}"
+    assert len(names) == 15, f"expected 15, got {len(names)}"
     # 占位的 display 是 "（占位 — TBD）"
     placeholder_keys = [k for k in names if "placeholder" in k]
     assert len(placeholder_keys) == 2
@@ -93,8 +94,8 @@ def test_menu_dock_renders_cipher_groups(cipher_menu_dock):
     assert any("解密工具3" in t for t in titles), f"missing 解密工具3: {titles}"
 
 
-def test_menu_dock_decrypt_tool1_has_12_children(cipher_menu_dock):
-    """🔤 解密工具1 含 12 个 cipher child item."""
+def test_menu_dock_decrypt_tool1_has_13_children(cipher_menu_dock):
+    """🔤 解密工具1 含 13 个 cipher child item (12 cipher + 1 ook, per v0.5-ook-decoder)."""
     dock = cipher_menu_dock
     g1 = None
     for i in range(dock.tree.topLevelItemCount()):
@@ -106,7 +107,7 @@ def test_menu_dock_decrypt_tool1_has_12_children(cipher_menu_dock):
     # 展开
     assert g1.isExpanded()
     # 12 个 cipher
-    assert g1.childCount() == 12, f"expected 12 children, got {g1.childCount()}"
+    assert g1.childCount() == 13, f"expected 13 children, got {g1.childCount()}"
     # 子项是 ✓ 标记 (因为不在 ADAPTER_TOOLS)
     for j in range(g1.childCount()):
         text = g1.child(j).text(0)
@@ -157,14 +158,14 @@ def test_menu_dock_cipher_children_dispatch_to_decoder_callback(cipher_menu_dock
             child = cat.child(j)
             dock._on_item_clicked(child, 0)
 
-    # 12 个 click 应全部 kind='decoder'
+    # 13 个 click 应全部 kind='decoder' (per v0.5-ook-decoder)
     decoder_clicks = [(n, k) for n, k in captured if k == "decoder"]
-    assert len(decoder_clicks) == 12, f"expected 12, got {len(decoder_clicks)}"
-    # name 应都在 cipher 列表里
+    assert len(decoder_clicks) == 13, f"expected 13, got {len(decoder_clicks)}"
+    # name 应都在 cipher 列表里 (12 cipher + 1 ook, per v0.5-ook-decoder)
     expected_names = {
         "caesar", "bacon", "rail-fence", "pigpen", "morse",
         "xxencode", "uuencode", "jsfuck", "jjencode",
-        "quoted-printable", "brainfuck", "bubblebabble",
+        "quoted-printable", "brainfuck", "ook", "bubblebabble",
     }
     got_names = {n for n, _ in decoder_clicks}
     assert got_names == expected_names, f"got {got_names}, expected {expected_names}"

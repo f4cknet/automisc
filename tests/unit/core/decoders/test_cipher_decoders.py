@@ -500,22 +500,152 @@ class TestBrainFuckUnicodeInput:
         assert r.error is None
         assert r.output_text == "h"
 
-    def test_read_input_bytes_handles_unicode(self):
+def test_read_input_bytes_handles_unicode():
         """直接测 `_read_input_bytes` 对 unicode text 不抛错."""
         from automisc.core.decoders.cipher_decoders import _read_input_bytes
 
         # 关键: latin-1 不能编码 unicode, 必须 errors="replace" 才不抛错
         text_with_chinese = "+" * 30 + "中文标点、。，《》" + "+" * 30
-        # 不应抛 UnicodeEncodeError
+        # 不应抛 UnicodeDecodeError
         try:
             data = _read_input_bytes(text=text_with_chinese, file_path=None, codec_name="brainfuck")
-        except UnicodeEncodeError as e:
-            pytest.fail(f"_read_input_bytes 不应抛 UnicodeEncodeError: {e}")
+        except UnicodeDecodeError as e:
+            pytest.fail(f"_read_input_bytes 不应抛 UnicodeDecodeError: {e}")
 
         # 验证: 返回的 bytes 中, 中文位置被替换成 '?' (latin-1 replace)
         assert isinstance(data, bytes)
         # bytes 长度应 = 原始 unicode 长度 (latin-1 replace 1:1 替换)
         assert len(data) == len(text_with_chinese)
+
+
+# === Ook! decoder (per Owner 2026-06-20 20:50 实战反馈) ===
+
+from pathlib import Path  # noqa: E402  (TestOokDecoder 用了)
+
+
+class TestOokDecoder:
+    """per Owner 2026-06-20 20:50 实战反馈 (面具下的flag):
+    where_is_flag_part_two.txt 是 Ook! 语言 (BF 变种, 用 Ook./Ook!/Ook? 三 token 配对).
+    现有 run_brainfuck 只识别 8 个 BF 字符, Ook! token 全部被清理掉, 跑出空.
+
+    本测试覆盖:
+    - token 配对映射 (per 知乎 + splitbrain.org, NOT Wikipedia 错的)
+    - Ook Hello World 对照
+    - owner 实战文件 (key_part_two Ook!) 解出 _i5_funny!}
+    - BF 文件 (key_part_one/NUL) 走 run_brainfuck 解出 flag{N7F5_AD5
+    """
+
+    def test_ook_hello_world(self):
+        """Ook Hello World — 经典 BF 'Hello World' 转 Ook → 解回 'Hello World!'."""
+        from automisc.core.decoders.cipher_decoders import run_ook
+
+        bf_hello = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+        bf_to_ook = {
+            "+": "Ook. Ook.",
+            "-": "Ook! Ook!",
+            ">": "Ook. Ook?",
+            "<": "Ook? Ook.",
+            ".": "Ook! Ook.",
+            ",": "Ook. Ook!",
+            "[": "Ook! Ook?",
+            "]": "Ook? Ook!",
+        }
+        ook_str = " ".join(bf_to_ook[c] for c in bf_hello if c in bf_to_ook)
+        r = run_ook(text=ook_str)
+        assert r.error is None, f"Ook Hello World 应该解出 'Hello World!', got error: {r.error}"
+        assert r.output_text == "Hello World!\n", f"got {r.output_text!r}"
+
+    def test_ook_token_pair_mapping(self):
+        """验证 8 个 token 配对映射 (知乎 / splitbrain.org)."""
+        from automisc.core.decoders.cipher_decoders import _OOK_TO_BF
+
+        expected = {
+            "Ook. Ook.": "+",
+            "Ook! Ook!": "-",
+            "Ook. Ook?": ">",
+            "Ook? Ook.": "<",
+            "Ook. Ook!": ",",
+            "Ook! Ook.": ".",
+            "Ook! Ook?": "[",
+            "Ook? Ook!": "]",
+        }
+        assert _OOK_TO_BF == expected, (
+            f"Ook→BF 映射应跟知乎/splitbrain 一致, got diff: "
+            f"missing={set(expected) - set(_OOK_TO_BF)}, "
+            f"extra={set(_OOK_TO_BF) - set(expected)}"
+        )
+
+    def test_ook_round_trip_through_bf(self):
+        """BF → Ook → BF 循环 → 应解出原 BF 同样字符."""
+        from automisc.core.decoders.cipher_decoders import _ook_to_brainfuck
+
+        bf_orig = "++++++++[>+++++++++++++<-]>."
+        bf_to_ook = {
+            "+": "Ook. Ook.",
+            "-": "Ook! Ook!",
+            ">": "Ook. Ook?",
+            "<": "Ook? Ook.",
+            ".": "Ook! Ook.",
+            ",": "Ook. Ook!",
+            "[": "Ook! Ook?",
+            "]": "Ook? Ook!",
+        }
+        ook = " ".join(bf_to_ook[c] for c in bf_orig)
+        bf_recovered = _ook_to_brainfuck(ook)
+        assert bf_recovered == bf_orig, (
+            f"BF→Ook→BF 循环应回到原 BF, got diff: {bf_orig!r} vs {bf_recovered!r}"
+        )
+
+    def test_ook_no_valid_pairs_returns_error(self):
+        """无 Ook token → 返回 error (不是抛异常)."""
+        from automisc.core.decoders.cipher_decoders import run_ook
+
+        r = run_ook(text="just plain english text, no Ook at all")
+        assert r.error is not None
+        assert "no valid ook" in r.error.lower()
+
+    def test_ook_registered_in_decoder_registry(self):
+        """Ook! decoder 应在 registry 里, GUI 自动渲染."""
+        from automisc.core.decoders import REGISTRY
+
+        ook_spec = next((s for s in REGISTRY if s.name == "ook"), None)
+        assert ook_spec is not None, "ook decoder 应注册到 REGISTRY"
+        assert ook_spec.group == "解密工具1", (
+            f"ook 应在 解密工具1 分类, got: {ook_spec.group}"
+        )
+        assert "Ook" in ook_spec.display, (
+            f"display 应含 Ook, got: {ook_spec.display}"
+        )
+
+    @pytest.mark.skipif(
+        not Path("/Users/minzhizhou/Downloads/面具下的flag").exists(),
+        reason="owner 实战样本未提供",
+    )
+    def test_ook_owner_real_file_key_part_two(self):
+        """owner 实战完整 flag_part_two 解出 _i5_funny!} (拼 flag{N7F5_AD5_i5_funny!)."""
+        from automisc.core.decoders.cipher_decoders import run_ook
+
+        f = "/Users/minzhizhou/Downloads/面具下的flag/mianju__foremost/zip/00000934_unzipped/flag__7z_extracted/key_part_two/where_is_flag_part_two.txt:flag_part_two_is_here.txt"
+        r = run_ook(file_path=f)
+        assert r.error is None, f"owner 实战 Ook! 文件应解出 _i5_funny!}}, got error: {r.error}"
+        assert r.output_text == "_i5_funny!}", (
+            f"owner 实战文件应解出 '_i5_funny!}}', got: {r.output_text!r}"
+        )
+
+    @pytest.mark.skipif(
+        not Path("/Users/minzhizhou/Downloads/面具下的flag").exists(),
+        reason="owner 实战样本未提供",
+    )
+    def test_brainfuck_owner_real_file_key_part_one(self):
+        """owner 实战完整 flag_part_one 解出 flag{N7F5_AD5 (拼 flag{N7F5_AD5_i5_funny!)."""
+        from automisc.core.decoders.cipher_decoders import run_brainfuck
+
+        f = "/Users/minzhizhou/Downloads/面具下的flag/mianju__foremost/zip/00000934_unzipped/flag__7z_extracted/key_part_one/NUL"
+        r = run_brainfuck(file_path=f)
+        assert r.error is None, f"owner 实战 BF 文件应解出 flag{{N7F5_AD5, got error: {r.error}"
+        assert r.output_text == "flag{N7F5_AD5", (
+            f"owner 实战文件应解出 'flag{{{{N7F5_AD5', got: {r.output_text!r}"
+        )
 
 
 # === BubbleBabble ===
