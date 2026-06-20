@@ -229,18 +229,29 @@ class LSBExtractAction(Action):
             main = best_sensitive or seen_texts[0]
             flag_candidate = main["text"] if main["sensitive_keyword"] else None
 
+            # v0.5-train-008 fix: text 通道 main 也写文件 (per Owner 决策)
+            # 命名规则: <stem>__lsb.txt (跟 file 分支一致, output_path_for 同目录)
+            main_extracted_path = output_path_for(
+                file_path, suffix=".txt", purpose="lsb"
+            )
+            main_extracted_path.write_text(
+                main["text"], encoding="utf-8", errors="replace"
+            )
+
             return ActionResult(
                 success=True,
                 data={
                     "lsb_text": {
                         "channel": main["channel"],
                         "text": main["text"],
+                        "extracted_path": str(main_extracted_path),
                         "severity": main["severity"],
                         "sensitive_keyword": main["sensitive_keyword"],
                         "length": main["length"],
                     },
                     "lsb_texts_scanned": seen_texts,  # 扫过的全部通道 (供 GUI 渲染)
                     "lsb_text_found": True,
+                    "extracted_files": [str(main_extracted_path)],  # 跟 file 分支 schema 一致
                     "flag_candidate": flag_candidate,
                 },
                 message=(
@@ -248,6 +259,7 @@ class LSBExtractAction(Action):
                     f"severity={main['severity']}, len={main['length']}, "
                     f"扫描了 {len(seen_texts)} 个 text 通道)"
                     + (" [高亮] 命中敏感关键词" if main["sensitive_keyword"] else "")
+                    + f" → {main_extracted_path}"
                 ),
             )
 

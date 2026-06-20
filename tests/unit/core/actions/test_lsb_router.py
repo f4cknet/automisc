@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from automisc.core.actions.lsb_extract import LSBExtractAction
@@ -189,3 +191,114 @@ class TestLSBExtractAction:
         result = action.run({"file_path": str(png)})
         assert result.success is False
         assert "zsteg" in result.message
+
+    # ---------- v0.5-train-008: text 通道也写文件 ----------
+    def test_text_branch_writes_file_to_samedir(self, tmp_path, monkeypatch):
+        """v0.5-train-008: text 通道 main 也写到 <stem>__lsb.txt, 同目录."""
+        from automisc.core.actions import lsb_extract
+
+        # mock zsteg 检测: 返回 1 个 text 行 (b1,rgb,lsb,xy)
+        fake_zsteg_stdout = (
+            "b1,rgb,lsb,xy         .. text: \"Hey I think we can write safely\"\n"
+        )
+
+        def fake_detect(file_path):
+            return fake_zsteg_stdout
+
+        def fake_extract(file_path, channel):
+            return b"Hey I think we can write safely in this file."
+
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_detect", fake_detect)
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_extract", fake_extract)
+
+        png = tmp_path / "challenge.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+
+        action = LSBExtractAction()
+        result = action.run({"file_path": str(png)})
+
+        assert result.success is True
+        # main extracted_path 应该存在
+        extracted_path = result.data["lsb_text"]["extracted_path"]
+        assert Path(extracted_path).exists()
+        # 路径在 input.parent (同目录)
+        assert Path(extracted_path).parent == png.parent
+        # 文件名是 <stem>__lsb.txt
+        assert Path(extracted_path).name == "challenge__lsb.txt"
+        # 内容 == main text
+        assert Path(extracted_path).read_text(encoding="utf-8").startswith(
+            "Hey I think we can write safely"
+        )
+        # extracted_files schema 跟 file 分支一致
+        assert result.data["extracted_files"] == [extracted_path]
+
+    def test_text_branch_sensitive_keyword_still_writes_file(self, tmp_path, monkeypatch):
+        """v0.5-train-008: severity=5 命中敏感词时 main 也写文件 (不会因为 break 跳过)."""
+        from automisc.core.actions import lsb_extract
+
+        fake_zsteg_stdout = (
+            "b1,rgb,lsb,xy         .. text: \"secret key is: st3g0_saurus_wr3cks\"\n"
+            "b1,r,lsb,xy           .. text: \"random garbage\"\n"
+        )
+
+        def fake_detect(file_path):
+            return fake_zsteg_stdout
+
+        def fake_extract(file_path, channel):
+            if "rgb" in channel:
+                return b"the secret key is: st3g0_saurus_wr3cks"
+            return b"random garbage"
+
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_detect", fake_detect)
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_extract", fake_extract)
+
+        png = tmp_path / "steg.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+
+        action = LSBExtractAction()
+        result = action.run({"file_path": str(png)})
+
+        assert result.success is True
+        # main 是 severity=5 (敏感词)
+        assert result.data["lsb_text"]["sensitive_keyword"] is True
+        assert result.data["lsb_text"]["severity"] == 5
+        assert result.data["flag_candidate"] is not None
+        # 仍然写文件
+        extracted_path = Path(result.data["lsb_text"]["extracted_path"])
+        assert extracted_path.exists()
+        assert extracted_path.name == "steg__lsb.txt"
+        assert "st3g0_saurus_wr3cks" in extracted_path.read_text(encoding="utf-8")
+        assert result.data["extracted_files"] == [str(extracted_path)]
+        # severity=5 立即停 → 只扫了 1 个通道
+        assert len(result.data["lsb_texts_scanned"]) == 1
+
+    def test_text_branch_overwrite_on_rerun(self, tmp_path, monkeypatch):
+        """v0.5-train-008: 同 stem + purpose + suffix 重名, 二次跑覆盖前次结果 (per output_path_for 规则)."""
+        from automisc.core.actions import lsb_extract
+
+        def fake_detect(file_path):
+            return "b1,rgb,lsb,xy         .. text: \"first run\"\n"
+
+        def fake_extract_first(file_path, channel):
+            return b"first run content"
+
+        def fake_extract_second(file_path, channel):
+            return b"second run content"
+
+        png = tmp_path / "x.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)
+
+        # 第 1 次跑
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_detect", fake_detect)
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_extract", fake_extract_first)
+        action = LSBExtractAction()
+        r1 = action.run({"file_path": str(png)})
+        assert r1.success is True
+        out_path = Path(r1.data["lsb_text"]["extracted_path"])
+        assert out_path.read_text(encoding="utf-8") == "first run content"
+
+        # 第 2 次跑 (内容变了) → 覆盖
+        monkeypatch.setattr(lsb_extract, "_run_zsteg_extract", fake_extract_second)
+        r2 = action.run({"file_path": str(png)})
+        assert r2.success is True
+        assert out_path.read_text(encoding="utf-8") == "second run content"
