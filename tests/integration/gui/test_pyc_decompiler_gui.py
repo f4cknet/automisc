@@ -4,6 +4,11 @@
 - "🐍 Pyc 反编译 (默认 Python 2)" 显示名正确
 - tool name = "decoder:pyc_decompiler", click 触发 on_tool_selected callback
 - 解码流程跑通 (mock .pyc 输入)
+
+**TestPycDecompilerRun 是 owner-specific smoke 测试**:
+- 依赖 `/tmp/writeup_literal.pyc` (Owner 06-21 11:24 smoke 生成)
+- 默认 skip (env RUN_PYC_SMOKE=1 启用)
+- pytest 全套跑时跟其他 GUI 集成测试有资源竞争风险 (触发 SIGABRT)
 """
 from __future__ import annotations
 
@@ -14,6 +19,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from pathlib import Path
+
+
+# opt-in 环境变量: 默认 skip,避免 pytest tests/ 全套跑时触发 SIGABRT
+RUN_PYC_SMOKE = os.environ.get("RUN_PYC_SMOKE") == "1"
 
 
 # ---------- ToolMenuDock 渲染测试 ----------
@@ -122,6 +131,13 @@ class TestPycDecompilerInMenuDock:
 
 
 # ---------- decoder run 集成测试 ----------
+@pytest.mark.skipif(
+    not RUN_PYC_SMOKE,
+    reason=(
+        "Owner-specific smoke 测试: 依赖 /tmp/writeup_literal.pyc + 在 GUI 测试全套跑时"
+        " 会触发 SIGABRT (PySide6 + uncompyle6 资源竞争). opt-in via env RUN_PYC_SMOKE=1"
+    ),
+)
 class TestPycDecompilerRun:
     """pyc_decompiler 跑 .pyc 文件反编译."""
 

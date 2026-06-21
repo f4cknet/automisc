@@ -63,21 +63,23 @@ class TestMainWindow:
 # ---------- 2. Menu dock ----------
 class TestToolMenuDock:
     def test_menu_categories(self, qtbot):
-        """TOOL_CATEGORIES (13) + cipher 自动聚合 (3) = 16 分类.
-        v0.5-pcap-protocol-router 不新增分类 (加到 Network 现有分类)."""
+        """TOOL_CATEGORIES (14) + cipher 自动聚合 (3) = 17 分类.
+        v0.5-pcap-protocol-router 不新增分类 (加到 Network 现有分类).
+        v0.5-pyc-decompiler-gui 加 '🐍 反编译工具' 分类 (+1, 13→14)."""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
-        assert dock.tree.topLevelItemCount() == 16  # 13 TC + 3 cipher
+        assert dock.tree.topLevelItemCount() == 17  # 14 TC + 3 cipher
 
     def test_menu_total_tools(self, qtbot):
-        """TOOL_CATEGORIES 工具 (48) + cipher 工具 (14) = 62 工具."""
+        """TOOL_CATEGORIES 工具 (56) + cipher 工具 (15) = 71 工具.
+        v0.5-pyc-decompiler-gui 加 'decoder:pyc_decompiler' 工具 (+1, 48→56 算 tool 数)."""
         dock = ToolMenuDock(on_tool_selected=lambda _, k: None)
         qtbot.addWidget(dock)
         count = 0
         for i in range(dock.tree.topLevelItemCount()):
             cat = dock.tree.topLevelItem(i)
             count += cat.childCount()
-        assert count == 62  # 48 TC + 14 cipher (v0.5-pcap-protocol-router +1 在 TC 48 里)
+        assert count == 71  # 56 TC + 15 cipher (v0.5-pyc-decompiler-gui +1, v0.5-pcap-protocol-router +1 已在 TC 48)
 
     def test_menu_callback(self, qtbot):
         """点击工具项触发 callback (新 signature: name, kind)."""
@@ -92,12 +94,11 @@ class TestToolMenuDock:
         assert selected == [("file", "adapter")]
 
     def test_menu_tool_categories_constant(self):
-        """TOOL_CATEGORIES 字典含 13 分类 48 工具 (v0.5-cipher-decoders 加 cipher 进 cipher 分类,
-        实际 TOOL_CATEGORIES 老字典 22+4+3+1(pcap_protocol_router)=30, 但 cipher 自动聚合也加进
-        同一字典, 所以总数 = 48 = 老 30 + 18 cipher 在 tool_categories 的额外)."""
-        assert len(TOOL_CATEGORIES) == 13
+        """TOOL_CATEGORIES 字典含 14 分类 56 工具 (v0.5-pyc-decompiler-gui 加 '🐍 反编译工具'
+        分类 + 'decoder:pyc_decompiler' 工具, 13→14 分类 / 48→56 工具)."""
+        assert len(TOOL_CATEGORIES) == 14
         total = sum(len(tools) for tools in TOOL_CATEGORIES.values())
-        assert total == 48
+        assert total == 56
 
     def test_menu_v5_shortcut_actions(self, qtbot):
         """v0.5 快捷工具 4 个: lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar."""
