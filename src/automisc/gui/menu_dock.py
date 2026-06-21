@@ -90,6 +90,11 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
         # 1 个 Base64 隐写 (per PR2)
         "decoder:base64-stego",
     ],
+    # v0.5-pyc-decompiler-gui (per Owner 06-21 11:54): Py2.x / Py3.x .pyc 反编译
+    # Owner 决策: "大多数 pyc 反编译时 python2", 默认走 uncompyle6 (Py2.x)
+    "🐍 反编译工具 (v0.5-pyc-decompiler-gui)": [
+        "decoder:pyc_decompiler",  # Py2.x uncompyle6 / Py3.x decompyle3 / dis fallback
+    ],
 }
 
 
@@ -134,6 +139,8 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "decoder:dec-hex":   "🔟 10 进制转 16 进制",
     "decoder:hex-dec":   "🔢 16 进制转 10 进制",
     "decoder:ascii-bin": "🔤 文本转 2 进制",
+    # v0.5-pyc-decompiler-gui (per Owner 06-21 11:54): 默认 Python 2 反编译
+    "decoder:pyc_decompiler": "🐍 Pyc 反编译 (默认 Python 2)",
 }
 
 

@@ -176,7 +176,7 @@ automisc/
 | **🔤 解密工具1** (12 cipher) | `core/decoders/cipher_decoders.py` | decoder |
 | **📦 解密工具2/3** (占位 TBD) | `core/decoders/cipher_decoders.py` (placeholder) | decoder |
 | **🔍 Magic Sniffer** (v0.5-lsb-byte-stream-extract) | `core/decoders/magic_sniffer.py` | decoder |
-| **🐍 Pyc 反编译** (v0.5-pyc-magic-sniffer) | `core/decoders/pyc_decompiler.py` | decoder |
+| **🐍 Pyc 反编译** (v0.5-pyc-magic-sniffer, **GUI 渲染 per v0.5-pyc-decompiler-gui**) | `core/decoders/pyc_decompiler.py` | decoder |
 
 ### 何时用 adapter vs decoder?
 
