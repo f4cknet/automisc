@@ -57,13 +57,15 @@ from .auto_runner import (
 from .chain_runner import ChainRunner
 from .decode_runner import DecodeRunner
 from .journal_panel import JournalPanel
+from .lsb_bytes_dialog import LSBBytesParamDialog  # v0.5-lsb-bytes-gui
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
 from .runner import ToolRunner
 
 
 # Chain 菜单项 (v0.5 chain 系列, 与 CLI 一致)
-_CHAIN_NAMES = ("zip", "zip-full", "binwalk", "foremost", "lsb")
+# v0.5-lsb-bytes-gui: lsb-bytes 加到末尾 (GUI 第一个带 4 参数 dialog 的 chain)
+_CHAIN_NAMES = ("zip", "zip-full", "binwalk", "foremost", "lsb", "lsb-bytes")
 
 
 class MainWindow(QMainWindow):
@@ -374,13 +376,18 @@ class MainWindow(QMainWindow):
         run_menu.addAction(self.auto_run_action)
 
         # Chain menu (v0.5 chain 系列, 同步 CLI)
-        # 5 链 + 4 快捷 action = 9 入口
+        # 5 链 + 1 带参 chain (lsb-bytes) + 4 快捷 action = 10 入口
+        # v0.5-lsb-bytes-gui: lsb-bytes 弹 4 参数 dialog (其他 chain 直接调 _run_chain)
         chain_menu = menubar.addMenu("&Chain")
         for chain_name in _CHAIN_NAMES:
-            action = QAction(f"Run &{chain_name} chain", self)
-            action.triggered.connect(
-                lambda checked=False, name=chain_name: self._run_chain(name)
-            )
+            if chain_name == "lsb-bytes":
+                action = QAction(f"Run &{chain_name} chain (4 params)", self)
+                action.triggered.connect(self._run_lsb_bytes_chain)
+            else:
+                action = QAction(f"Run &{chain_name} chain", self)
+                action.triggered.connect(
+                    lambda checked=False, name=chain_name: self._run_chain(name)
+                )
             chain_menu.addAction(action)
         chain_menu.addSeparator()
         # v0.5 快捷 action (Owner GUI 工具栏需求)
@@ -713,6 +720,29 @@ class MainWindow(QMainWindow):
             return
         self.output_view.append_text("\n[Steghide] 用户密码已输入 (隐藏)\n")
         self._run_chain("steghide_extract", extra_context={"__password__": password})
+
+    # ---------- v0.5-lsb-bytes-gui: lsb-bytes chain 入口 (弹 4 参数 dialog) ----------
+    def _run_lsb_bytes_chain(self) -> None:
+        """lsb-bytes chain GUI 入口 (per v0.5-lsb-bytes-gui spec).
+
+        弹 LSBBytesParamDialog 收 4 参数 (channels/bit/scan_order/byte_bit_order)
+        → _run_chain("lsb-bytes", extra_context={__lsb_*}).
+
+        **GUI 第一个带 4 参数 dialog 的 chain**, 跟 steghide 系列的 dialog 风格一致.
+        """
+        if not self.current_file:
+            self.statusBar().showMessage("请先拖入或打开文件")
+            self.output_view.append_text("[!] no file selected\n")
+            return
+
+        dialog = LSBBytesParamDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self.statusBar().showMessage("lsb-bytes 取消")
+            return
+
+        kwargs = dialog.get_kwargs()
+        self.output_view.append_text(f"\n[lsb-bytes] params: {kwargs}\n")
+        self._run_chain("lsb-bytes", extra_context=kwargs)
 
     def _on_chain_started(self, chain_name: str, file_path: str) -> None:
         self.statusBar().showMessage(

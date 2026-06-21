@@ -217,10 +217,11 @@ automisc/
 | `binwalk` | binwalk_extract (检测 + foremost 提取) | 复合文件分离 |
 | `foremost` | foremost_extract (skip binwalk) | 已确认要 foremost |
 | `lsb` | binwalk_extract → lsb_extract (zsteg-based) | PNG 隐写 + 自动路由(text 终止 / file 二次 router) |
-| `lsb-bytes` | binwalk_extract → lsb_bytes_extract (PIL/numpy) | PNG/BMP/GIF 隐写 + 自定义通道位组合(per v0.5-lsb-byte-stream-extract, 跟 `lsb` 并行不冲突) |
+| `lsb-bytes` | binwalk_extract → lsb_bytes_extract (PIL/numpy) | PNG/BMP/GIF 隐写 + 自定义通道位组合(per v0.5-lsb-byte-stream-extract, 跟 `lsb` 并行不冲突;**GUI Run→Chain 入口 + 4 参数 dialog per v0.5-lsb-bytes-gui**) |
 
-CLI: `automisc chain --chain {name} --file <path> [--bruteforce-limit N]`  
-GUI: Run → Chain → Run {name} chain
+CLI: `automisc chain --chain {name} --file <path> [--bruteforce-limit N]`
+GUI: Run → Chain → Run {name} chain  
+GUI: Run → Chain → Run lsb-bytes chain (4 params) → 弹 `LSBBytesParamDialog` (channels/bit/scan_order/byte_bit_order)
 
 ---
 

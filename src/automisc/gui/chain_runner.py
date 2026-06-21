@@ -28,6 +28,8 @@ _CHAIN_BUILDERS = {
     "binwalk": "build_binwalk_extract_dag",
     "foremost": "build_foremost_extract_dag",
     "lsb": "build_lsb_extract_chain",
+    # v0.5-lsb-bytes-gui: lsb-bytes chain (user-controlled 4 参数, 走 extra_context 透传)
+    "lsb-bytes": "build_lsb_bytes_chain",
 }
 
 
@@ -114,6 +116,7 @@ class ChainRunner(QThread):
             from automisc.core.chains import (
                 build_binwalk_extract_dag,
                 build_foremost_extract_dag,
+                build_lsb_bytes_chain,  # v0.5-lsb-bytes-gui
                 build_lsb_extract_chain,
                 build_zip_chain_dag,
                 build_zip_chain_with_bruteforce,
@@ -124,19 +127,32 @@ class ChainRunner(QThread):
                 context["__bruteforce_limit__"] = self.bruteforce_limit
             # v0.5-steghide-GUI: 合并 GUI 传入的 extra context
             # (e.g. __wordlist__ for bruteforce, __password__ for user-pw extract)
+            # v0.5-lsb-bytes-gui: __lsb_channels__ / __lsb_bit__ / __lsb_scan_order__ / __lsb_byte_bit_order__
             if self.extra_context:
                 context.update(self.extra_context)
 
-            # 模式 1: 5 链 (DAG)
+            # 模式 1: 6 链 (DAG), v0.5-lsb-bytes-gui 加 lsb-bytes
             chain_builders = {
                 "zip": build_zip_chain_dag,
                 "zip-full": build_zip_chain_with_bruteforce,
                 "binwalk": build_binwalk_extract_dag,
                 "foremost": build_foremost_extract_dag,
                 "lsb": build_lsb_extract_chain,
+                "lsb-bytes": build_lsb_bytes_chain,
             }
             if self.chain_name in chain_builders:
-                dag: DAG = chain_builders[self.chain_name]()
+                # v0.5-lsb-bytes-gui: lsb-bytes 是 GUI 第一个带参数的 chain
+                # 从 extra_context 抽 4 个 __lsb_* 参数 → 调 build_lsb_bytes_chain(**kwargs)
+                if self.chain_name == "lsb-bytes":
+                    lsb_kwargs = {
+                        "channels": self.extra_context.get("__lsb_channels__"),
+                        "bit": int(self.extra_context.get("__lsb_bit__", 0)),
+                        "scan_order": self.extra_context.get("__lsb_scan_order__", "row"),
+                        "byte_bit_order": self.extra_context.get("__lsb_byte_bit_order__", "MSB"),
+                    }
+                    dag: DAG = chain_builders[self.chain_name](**lsb_kwargs)
+                else:
+                    dag: DAG = chain_builders[self.chain_name]()
                 context = dag.execute(context)
             # 模式 2: 4 快捷 action (单 Action)
             elif self.chain_name in _ACTION_REGISTRY:
