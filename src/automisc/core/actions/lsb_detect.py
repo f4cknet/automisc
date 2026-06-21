@@ -68,22 +68,41 @@ _BYTE_PREVIEW_LIMIT = 200  # 跟 output_view.py:141 一致
 # Owner 反馈: "只要存在 ascii 32-126 区间之外的字符, 那就不应该判定为是 text"
 # 字节流**全** printable = text, 命中 → SP severity=5
 # 注: printable 32-126 = 95 chars (空格 ~ ~)
-_PRINTABLE_RE = re.compile(rb"^[\x20-\x7e]+$")
+#
+# v0.5-train-011 修复 (per Owner 实战 steg.png 反馈):
+# - 旧逻辑: 整段字节流**全** printable 才报 text
+# - 问题: steg.png 实际只有前 ~150 字节是 printable ("Hey I think..." + 后面 secret key),
+#   后面几千字节是图本身 LSB 噪声, 整段判定 fail → 漏报
+# - 新逻辑: 字节流**前 1000 字节**里含 ≥ 20 字节**连续** printable = text
+#   (跟 zsteg 行为一致: zsteg 抽字节流后用 print heuristic 找 printable 段)
+_MIN_PRINTABLE_RUN = 20  # 最少连续 printable 字节数才算 text (跟 zsteg 启发式对齐)
+_PRINTABLE_WINDOW = 1000  # 检查前 N 字节
 
 
 def _is_printable_text(byte_stream: bytes) -> bool:
-    """判定字节流是否**全** printable ASCII (32-126 区间).
+    """判定字节流是否含**足够长连续 printable 段** (per zsteg 启发式, v0.5-train-011 修复).
 
     Args:
         byte_stream: 抽出的字节流
 
     Returns:
-        True = 全 printable (判定为 text)
-        False = 含非 printable 字符 (走文件头判定)
+        True = 字节流前 1000 字节里含 ≥ 20 字节连续 printable ASCII (32-126) 段
+        False = 没找到足够长 printable 段 (走文件头判定)
     """
-    if not byte_stream:
-        return False  # 空字节流不算 text
-    return bool(_PRINTABLE_RE.match(byte_stream))
+    if not byte_stream or len(byte_stream) < _MIN_PRINTABLE_RUN:
+        return False  # 字节流太短, 不算 text
+    max_run = 0
+    current_run = 0
+    for b in byte_stream[:_PRINTABLE_WINDOW]:
+        if 32 <= b <= 126:
+            current_run += 1
+            if current_run > max_run:
+                max_run = current_run
+            if max_run >= _MIN_PRINTABLE_RUN:
+                return True  # 早退: 已找到足够长 printable 段
+        else:
+            current_run = 0
+    return max_run >= _MIN_PRINTABLE_RUN
 
 
 # ----- 文件头判定: hex magic 主 + `file` 命令辅 (per spec Q3=A 双机制) -----
@@ -338,17 +357,16 @@ class LSBDetectAction(Action):
         for perm in _PERMUTATIONS:
             perm_n = _perm_name(perm)
             for scan in _SCAN_ORDERS:
-                # 按 perm 顺序, **每 channel 单独 flatten 再 concatenate** (per channel 连续,
-                # 跟 v0.5-lsb-byte-stream-extract LSBBytesExtractAction 行为一致)
-                # 不是 HWC interleaved (per pixel 3 通道)
-                bits_per_channel: list[np.ndarray] = []
-                for ch_idx in perm:
-                    channel_bits = (arr[:, :, ch_idx] & 1).astype(np.uint8)
-                    if scan == "row":
-                        bits_per_channel.append(channel_bits.flatten())  # row-major
-                    else:
-                        bits_per_channel.append(channel_bits.T.flatten())  # col-major
-                bits_flat = np.concatenate(bits_per_channel)
+                # 抽 3 通道 (按 perm 顺序) bit 0 plane, **HWC interleaved flatten**
+                # (per pixel 3 通道交错顺序, **跟 zsteg 一致**, 跟实战事实标准对齐)
+                # 注: 之前 d66177c commit 改 per channel 连续是错的, 跟 zsteg 顺序不一致
+                # 导致 steg.png (v0.5-LSB-router 实战题, zsteg b1,rgb,lsb,xy 命中) 0 SP
+                # (per v0.5-train-011 训练日志, 待写)
+                bit0_planes = arr[:, :, list(perm)] & 1  # shape (H, W, 3) 各通道 bit 0
+                if scan == "row":
+                    bits_flat = bit0_planes.flatten()  # row-major HWC
+                else:
+                    bits_flat = bit0_planes.T.flatten()  # col-major HWC
                 n_bytes = len(bits_flat) // 8
                 if n_bytes < 16:
                     continue  # 字节流太短, 跳过 (text/file 判定需要 ≥ 16 字节才有意义)

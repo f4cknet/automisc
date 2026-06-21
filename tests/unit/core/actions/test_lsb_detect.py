@@ -32,30 +32,29 @@ from automisc.core.actions.lsb_detect import (
 # ---------- fixtures: 合成 PNG 测试图 ----------
 @pytest.fixture
 def synthetic_text_png(tmp_path) -> Path:
-    """合成 PNG, 嵌入 'Hello, World!Hello, World!' 字符串到 RGB 三通道 bit 0.
+    """合成 PNG, 嵌入 'Hello, World!Hello, World!' 字符串到 RGB 三通道 bit 0 (HWC interleaved).
 
-    嵌入方式:
-    - 24 字节 = 192 bit, 8x8=64 像素 × 3 通道
-    - 3 通道 bit 0 各自填同一 printable 字节流的 bit 模式
-    - 12 组合 (6 排列 × 2 scan) 字节流都是 R+G+B 拼起来, 全 printable
+    嵌入方式 (per v0.5-train-011 修复: lsb_detect 用 HWC interleaved 跟 zsteg 一致):
+    - 24 字节 = 192 bit, 8x8=64 像素 × 3 通道 = 192 bit (刚好 24 字节)
+    - **HWC interleaved 写**: per pixel R/G/B 顺序, 8 bit 拼 1 byte
+    - lsb_detect 抽 RGB row 组合 → 字节流 = "Hello, World!Hello, World!" (MSB first)
     """
-    arr = np.zeros((8, 8, 3), dtype=np.uint8)  # 8x8 RGB, 默认全 0
+    arr = np.zeros((8, 8, 3), dtype=np.uint8)
     text_bytes = b"Hello, World!Hello, World!"  # 24 byte printable
-    # 写 24 byte = 192 bit 到 3 通道 (各 64 bit = 8 byte)
+    # HWC interleaved 写: per pixel R/G/B 顺序, 8 bit 拼 1 byte
+    # 24 字节 = 192 bit, 8x8 像素 × 3 通道 = 192 像素位
     bit_idx = 0
-    for ch_idx in range(3):  # R / G / B
-        for byte in text_bytes:
-            for bit_pos in range(8):
-                if bit_idx >= 64:
-                    break
-                row = bit_idx // 8
-                col = bit_idx % 8
-                b = (byte >> (7 - bit_pos)) & 1
-                arr[row, col, ch_idx] = (arr[row, col, ch_idx] & 0xFE) | b
-                bit_idx += 1
-            if bit_idx >= 64:
+    for byte in text_bytes:
+        for bit_pos in range(8):
+            if bit_idx >= 192:
                 break
-        bit_idx = 0  # 重置, 3 通道都写同样 8 byte
+            pixel_idx = bit_idx // 3  # 0..63
+            ch_idx = bit_idx % 3      # 0=R, 1=G, 2=B (RGB 顺序)
+            row = pixel_idx // 8
+            col = pixel_idx % 8
+            b = (byte >> (7 - bit_pos)) & 1
+            arr[row, col, ch_idx] = (arr[row, col, ch_idx] & 0xFE) | b
+            bit_idx += 1
     png_path = tmp_path / "text.png"
     Image.fromarray(arr).save(png_path)
     return png_path
@@ -63,25 +62,28 @@ def synthetic_text_png(tmp_path) -> Path:
 
 @pytest.fixture
 def synthetic_zip_png(tmp_path) -> Path:
-    """合成 PNG, 嵌入 ZIP magic (50 4B 03 04) 到 RGB 通道 bit 0.
+    """合成 PNG, 嵌入 ZIP magic (50 4B 03 04) 到 RGB 通道 bit 0 (HWC interleaved).
 
-    ZIP 头 4 字节 = 0x504B0304, 二进制:
-      0x50 = 01010000
-      0x4B = 01001011
-      0x03 = 00000011
-      0x04 = 00000100
-    32 bit, 写满前 32 像素 (R 通道 bit 0)
+    ZIP 头 4 字节 = 0x504B0304.
+    HWC interleaved 写: per pixel R/G/B 顺序, 8 bit 拼 1 byte, 前 4 字节是 ZIP magic.
+    lsb_detect 抽 RGB row 组合 → 字节流前 4 字节 = "PK\\x03\\x04" (MSB first).
     """
     arr = np.zeros((8, 8, 3), dtype=np.uint8)
-    zip_bytes = b"PK\x03\x04" + b"\x00" * 28  # 4 字节 magic + 28 字节 padding
-    bits = []
+    # HWC interleaved 写: 8 byte = 64 bit, 每 byte 8 bit, MSB first
+    # 前 4 字节 = ZIP magic
+    zip_bytes = b"PK\x03\x04" + b"Hello" + b"\x00" * 19  # 4 magic + 24 byte = 192 bit
+    bit_idx = 0
     for byte in zip_bytes:
         for bit_pos in range(8):
-            bits.append((byte >> (7 - bit_pos)) & 1)
-    for i, b in enumerate(bits[:64]):
-        row = i // 8
-        col = i % 8
-        arr[row, col, 0] = (arr[row, col, 0] & 0xFE) | b
+            if bit_idx >= 192:
+                break
+            pixel_idx = bit_idx // 3
+            ch_idx = bit_idx % 3
+            row = pixel_idx // 8
+            col = pixel_idx % 8
+            b = (byte >> (7 - bit_pos)) & 1
+            arr[row, col, ch_idx] = (arr[row, col, ch_idx] & 0xFE) | b
+            bit_idx += 1
     png_path = tmp_path / "zip.png"
     Image.fromarray(arr).save(png_path)
     return png_path
@@ -134,20 +136,37 @@ class TestIsPrintableText:
     """text 判定: printable ASCII 32-126 区间 (per Owner 21:29 拍板)."""
 
     def test_is_printable_text_true(self):
-        """全 printable ASCII = text."""
-        assert _is_printable_text(b"Hello, World!") is True
+        """全 printable ASCII ≥ 20 字节 = text."""
+        assert _is_printable_text(b"Hello, World! This is printable text.") is True
 
     def test_is_printable_text_with_numbers(self):
-        """数字 + 字母 + 标点 = text."""
-        assert _is_printable_text(b"flag{test_123}") is True
+        """数字 + 字母 + 标点 ≥ 20 字节 = text."""
+        assert _is_printable_text(b"flag{test_123_long_enough_to_pass}") is True
+
+    def test_is_printable_text_short_under_min_run(self):
+        """< 20 字节 = 不是 text (per _MIN_PRINTABLE_RUN=20 阈值)."""
+        assert _is_printable_text(b"flag{short}") is False
 
     def test_is_not_printable_text_with_null(self):
-        """含 \\x00 = 不是 text."""
+        """含 \\x00 = 不是 text (per v0.5-train-011 修复: null 切断连续段, 段长 < 20)."""
+        # 'Hello' (5) + null + 'World' (5) = 两段 < 20 字节, 都不算 text
         assert _is_printable_text(b"Hello\x00World") is False
+
+    def test_is_not_printable_text_with_null_scattered(self):
+        """null 散布 (每段都 < 20) = 不是 text."""
+        text_with_nulls = b"Hello" + b"\x00" * 100 + b"World" + b"\x00" * 100 + b"Test"  # 段 5, 5, 4 都 < 20
+        assert _is_printable_text(text_with_nulls) is False
 
     def test_is_not_printable_text_with_high_bit(self):
         """含 \\x80+ 高位 = 不是 text (非 ASCII)."""
-        assert _is_printable_text(b"Hello\xc0\x80World") is False
+        assert _is_printable_text(b"Hello\xc0\x80WorldThisIsNotPrint") is False
+
+    def test_is_printable_text_with_leading_printable_then_garbage(self):
+        """steg.png 场景: 前 ~150 字节 printable (Hey I think...), 后面 garbage.
+        应该报 text (per v0.5-train-011 修复: 找连续 ≥ 20 字节段)."""
+        steg_like = b"Hey I think we can write safely in this file without anyone seeing it. Anyway, the secret key is: st3g0_saurus_wr3cks"
+        steg_like += b"\x00\x01\x02\xff" * 100  # 后面 garbage
+        assert _is_printable_text(steg_like) is True
 
     def test_is_empty_text_false(self):
         """空字节流 = 不是 text (per implementation, return False)."""
@@ -380,3 +399,30 @@ class TestLSBDetectAction:
         import glob
         tmp_files = glob.glob("/tmp/lsb_detect_*")
         assert len(tmp_files) == 0, f"unexpected tmp files: {tmp_files}"
+
+    def test_action_steg_png_real(self):
+        """实战 steg.png (v0.5-LSB-router 训练题): RGB row 字节流前 150 字节是
+        'Hey I think we can write safely in this file without anyone seeing it. Anyway, the secret key is: st3g0_saurus_wr3cks'.
+
+        修复前 (per v0.5-train-011): text 判定要全 printable, 字节流后面几千字节是图 LSB 噪声 → 漏报.
+        修复后: 找连续 ≥ 20 字节 printable 段 → 命中 lsb_text sev=5.
+        """
+        steg_png = "/Users/minzhizhou/Downloads/镜子里面的世界/steg.png"
+        import os
+        if not os.path.exists(steg_png):
+            pytest.skip(f"steg.png not found at {steg_png}, skip实战 test")
+
+        action = LSBDetectAction()
+        result = action.run({"file_path": steg_png})
+        assert result.success
+        sps = result.data["suspicious_points"]
+        # 期望至少 1 条 lsb_text SP, 包含 "Hey I think" 或 "st3g0_saurus"
+        text_sps = [sp for sp in sps if sp["category"] == "lsb_text"]
+        assert len(text_sps) >= 1, (
+            f"expected ≥ 1 lsb_text SP (v0.5-train-011 修复应命中), got {len(text_sps)}"
+        )
+        # 验证 matched_pattern 含关键内容
+        all_text = " ".join(sp["matched_pattern"] for sp in text_sps)
+        assert "Hey I think" in all_text or "st3g0_saurus" in all_text, (
+            f"expected 'Hey I think' or 'st3g0_saurus' in text SPs, got: {all_text[:200]}"
+        )
