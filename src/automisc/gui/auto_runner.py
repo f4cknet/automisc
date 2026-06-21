@@ -63,6 +63,7 @@ FIND_SUSPICIOUS_PICTURE_TOOLS = [
     "binwalk",      # 探测 (不 -e)
     "strings",      # rule_scanner 可疑字符串
     "file",         # 文件类型
+    "lsb_bytes_extract",  # v0.5-lsb-bytes-auto-run: auto-run 兜底 zsteg 漏报 (12 组合 PIL/numpy 直抽, ~5s)
 ]  
 FIND_SUSPICIOUS_TRAFFIC_TOOLS = [
     "pcap_protocol_router",  # pcap 协议分类 + key 候选
