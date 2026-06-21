@@ -111,11 +111,12 @@ automisc/
 | `core/orchestrator.py` | 主调度，桥接 router / adapter / journal | `CoreOrchestrator` |
 | `core/router.py` | ext + magic 头 → 工具推荐 (top N) | `FileRouter`, `recommend_tools`, `detect_magic` |
 | `core/dag.py` | Action 抽象 + DAGNode + DAG.execute | `Action`, `ActionResult`, `DAG`, `DAGNode` |
-| `core/chains.py` | 5 chain 模板 builder | `build_zip_chain_dag`, `build_zip_chain_with_bruteforce`, `build_binwalk_extract_dag`, `build_foremost_extract_dag`, `build_lsb_extract_chain` |
+| `core/chains.py` | 6 chain 模板 builder (5 + v0.5-lsb-byte-stream-extract) | `build_zip_chain_dag`, `build_zip_chain_with_bruteforce`, `build_binwalk_extract_dag`, `build_foremost_extract_dag`, `build_lsb_extract_chain`, `build_lsb_bytes_chain` |
 | `core/actions/binwalk_extract.py` | binwalk 检测 + 委托 foremost 提取 | `BinwalkExtractAction` |
 | `core/actions/foremost_extract.py` | 独立 foremost 提取 + helper | `ForemostExtractAction`, `find_foremost_extract` |
 | `core/actions/zip_chain.py` | try_unzip / fix_pseudo / bruteforce 3 Action | `TryUnzipAction`, `FixPseudoEncryptionAction`, `BruteforceZipAction` |
-| `core/actions/lsb_extract.py` | LSB 抽取后智能路由 (v0.5 核心) | `LSBExtractAction` |
+| `core/actions/lsb_extract.py` | LSB 抽取后智能路由 (zsteg-based, v0.5-LSB-router 核心) | `LSBExtractAction` |
+| `core/actions/lsb_bytes_extract.py` | **v0.5-lsb-byte-stream-extract 能力 B**: LSB 字节流自定义抽取 (PIL/numpy 直抽, 4 参数 user-controlled: channel × bit × scan_order × byte_bit_order) | `LSBBytesExtractAction` |
 | `core/encoding_detector.py` | text 严重度评分 (Q1 决策) | `score_text_severity`, `has_sensitive_keyword` |
 | `core/exceptions.py` | 异常体系 (单 Owner 简化: 1 基类 + 6 子类) | `AutomiscError` + 6 子类 |
 | `core/journal.py` | 操作日志 (累积 + 过滤 + 导出 JSONL) | `Journal`, `JournalEntry` |
@@ -129,6 +130,7 @@ automisc/
 | `core/decoders/base_rot_decoders.py` | 18 个 base/rot decoder 聚合注册 | — |
 | `core/decoders/coords_to_qr.py` | 坐标串 → QR PNG → zbar decoder | — |
 | `core/decoders/cipher_decoders.py` | 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble) + 2 占位 → 解密工具1/2/3 | `run_caesar`, `run_bacon`, ..., `run_bubblebabble`, `run_placeholder` |
+| `core/decoders/magic_sniffer.py` | **v0.5-lsb-byte-stream-extract 能力 C**: 字节流 magic 嗅探 (滑动窗口扫 offset 0~32, 39 文件 magic: PNG/ZIP/pyc/JPEG/ELF/WASM/Mach-O/Java/...), 解决 `router.detect_magic` 只看 offset 0 痛点 | `sniff_magic`, `run_magic_sniffer`, `EXTENDED_MAGIC_SIGNATURES` |
 | `gui/main_window.py` | QMainWindow + 5 菜单 + 拖文件 | `MainWindow` |
 | `gui/chain_runner.py` | 链 QThread (v0.5) | `ChainRunner` |
 
@@ -172,6 +174,7 @@ automisc/
 | **🔐 Base/ROT 解码** (18 个) | `core/decoders/base_rot_decoders.py` | decoder |
 | **🔤 解密工具1** (12 cipher) | `core/decoders/cipher_decoders.py` | decoder |
 | **📦 解密工具2/3** (占位 TBD) | `core/decoders/cipher_decoders.py` (placeholder) | decoder |
+| **🔍 Magic Sniffer** (v0.5-lsb-byte-stream-extract) | `core/decoders/magic_sniffer.py` | decoder |
 
 ### 何时用 adapter vs decoder?
 
@@ -211,7 +214,8 @@ automisc/
 | `zip-full` | try_unzip → fix_pseudo → bruteforce → 终止 | zip 真加密爆破 |
 | `binwalk` | binwalk_extract (检测 + foremost 提取) | 复合文件分离 |
 | `foremost` | foremost_extract (skip binwalk) | 已确认要 foremost |
-| `lsb` | binwalk_extract → lsb_extract | PNG 隐写 + 自动路由 |
+| `lsb` | binwalk_extract → lsb_extract (zsteg-based) | PNG 隐写 + 自动路由(text 终止 / file 二次 router) |
+| `lsb-bytes` | binwalk_extract → lsb_bytes_extract (PIL/numpy) | PNG/BMP/GIF 隐写 + 自定义通道位组合(per v0.5-lsb-byte-stream-extract, 跟 `lsb` 并行不冲突) |
 
 CLI: `automisc chain --chain {name} --file <path> [--bruteforce-limit N]`  
 GUI: Run → Chain → Run {name} chain

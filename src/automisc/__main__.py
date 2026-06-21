@@ -160,10 +160,12 @@ def cmd_chain(args: argparse.Namespace) -> int:
     - binwalk: binwalk 检测 + foremost 提取
     - foremost: foremost 单独提取 (skip binwalk detection)
     - lsb: binwalk 提取 + LSB 智能路由 (text 终止 / file 二次 router)
+    - lsb-bytes: binwalk 提取 + LSB 字节流自定义抽取 (4 参数 user-controlled)
     """
     from automisc.core.chains import (
         build_binwalk_extract_dag,
         build_foremost_extract_dag,
+        build_lsb_bytes_chain,
         build_lsb_extract_chain,
         build_zip_chain_dag,
         build_zip_chain_with_bruteforce,
@@ -196,6 +198,14 @@ def cmd_chain(args: argparse.Namespace) -> int:
         dag = build_foremost_extract_dag()
     elif chain_name == "lsb":
         dag = build_lsb_extract_chain()
+    elif chain_name == "lsb-bytes":
+        # v0.5-lsb-byte-stream-extract: 4 参数 user-controlled
+        dag = build_lsb_bytes_chain(
+            channels=getattr(args, "channels", None),
+            bit=getattr(args, "bit", 0),
+            scan_order=getattr(args, "scan_order", "row"),
+            byte_bit_order=getattr(args, "byte_bit_order", "MSB"),
+        )
     else:
         print(f"unknown chain: {chain_name}")
         return 1
@@ -266,6 +276,8 @@ def build_parser() -> argparse.ArgumentParser:
     from automisc.core.decoders import base64_image  # noqa: F401
     from automisc.core.decoders import base_convert  # noqa: F401
     from automisc.core.decoders import coords_to_qr  # noqa: F401
+    # v0.5-lsb-byte-stream-extract: magic_sniffer decoder
+    from automisc.core.decoders import magic_sniffer  # noqa: F401
     from automisc.core.decoders.registry import list_decoders
     for spec in list_decoders():
         p_sub = p_decode_sub.add_parser(spec.name, help=spec.description)
@@ -304,14 +316,19 @@ def build_parser() -> argparse.ArgumentParser:
             "--word-sep", default=None,
             help="摩尔斯单词间分隔符 (morse 用, 默认 ' '; 传 '' 拼成连续字符串, CTF 数字串场景)"
         )
+        # v0.5-lsb-byte-stream-extract: magic_sniffer decoder 通用参数
+        p_sub.add_argument(
+            "--max-offset", type=int, default=32,
+            help="magic 嗅探扫描最大偏移 (magic_sniffer 用, 默认 32)"
+        )
         p_sub.set_defaults(func=cmd_decode_dispatcher, decoder_name=spec.name)
 
     p_chain = sub.add_parser("chain", help="运行预定义 DAG chain (v0.5-DAG)")
     p_chain.add_argument(
         "--chain",
         required=True,
-        choices=["zip", "zip-full", "binwalk", "foremost", "lsb"],
-        help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取)",
+        choices=["zip", "zip-full", "binwalk", "foremost", "lsb", "lsb-bytes"],
+        help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取) / lsb (zsteg 智能路由) / lsb-bytes (4 参数自定义抽取)",
     )
     p_chain.add_argument("--file", required=True, help="目标文件路径")
     p_chain.add_argument(
@@ -324,6 +341,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-backup",
         action="store_true",
         help="保留 fix_pseudo 的 .bak 备份 (默认清理)",
+    )
+    # v0.5-lsb-byte-stream-extract: lsb-bytes chain 4 参数
+    p_chain.add_argument(
+        "--channels",
+        default=None,
+        help="lsb-bytes 用: 通道列表 e.g. 'G' 或 'RGB' (默认 RGB 三通道)",
+    )
+    p_chain.add_argument(
+        "--bit",
+        type=int,
+        default=0,
+        help="lsb-bytes 用: bit 位 0~7 (默认 0 = LSB)",
+    )
+    p_chain.add_argument(
+        "--scan-order",
+        default="row",
+        choices=["row", "col"],
+        help="lsb-bytes 用: 扫描顺序 (默认 row, writeup 是 col)",
+    )
+    p_chain.add_argument(
+        "--byte-bit-order",
+        default="MSB",
+        choices=["MSB", "LSB"],
+        help="lsb-bytes 用: 字节内 bit 顺序 (默认 MSB)",
     )
     p_chain.set_defaults(func=cmd_chain)
 

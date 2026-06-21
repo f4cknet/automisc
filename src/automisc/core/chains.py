@@ -2,11 +2,11 @@
 
 按文件类型 / 工具输出触发对应 chain。
 """
-
 from __future__ import annotations
 
 from automisc.core.actions.binwalk_extract import BinwalkExtractAction
 from automisc.core.actions.foremost_extract import ForemostExtractAction
+from automisc.core.actions.lsb_bytes_extract import LSBBytesExtractAction
 from automisc.core.actions.lsb_extract import LSBExtractAction
 from automisc.core.actions.zip_chain import (
     BruteforceZipAction,
@@ -73,6 +73,43 @@ def build_lsb_extract_chain() -> DAG:
     return DAG(start_node=binwalk_node)
 
 
+def build_lsb_bytes_chain(
+    channels: list[str] | str | None = None,
+    bit: int = 0,
+    scan_order: str = "row",
+    byte_bit_order: str = "MSB",
+) -> DAG:
+    """LSB 字节流自定义抽取链（v0.5-lsb-byte-stream-extract, B+C 合并）:
+
+    binwalk_extract → lsb_bytes_extract → 终止
+
+    - binwalk 检测 binwalk/foremost 提取嵌入文件
+    - lsb_bytes_extract: PIL/numpy 直接抽字节流 (4 参数 user-controlled)
+      → 写 `<stem>__lsb_<channel>_b<bit>_<order>_<byteord>.bin` 到 input 同目录
+
+    **后续 magic_sniffer** 是 decoder, 走 CLI/GUI 单独触发 (`automisc decode magic_sniffer`),
+    不在 DAG 里 (DAG 是 Action 序列, decoder 不混进 Action 链).
+
+    Args:
+        channels: 通道列表, e.g. ["G"] 或 "RGB", 默认 None (Action 默认 RGB 三通道)
+        bit: bit 位 0~7, 默认 0 (LSB)
+        scan_order: "row" / "col", 默认 "row"
+        byte_bit_order: "MSB" / "LSB", 默认 "MSB"
+    """
+    binwalk_node = DAGNode(BinwalkExtractAction())
+    lsb_bytes_node = DAGNode(LSBBytesExtractAction(
+        channels=channels,
+        bit=bit,
+        scan_order=scan_order,
+        byte_bit_order=byte_bit_order,
+    ))
+    binwalk_node.on_success = lsb_bytes_node
+    binwalk_node.on_failure = lsb_bytes_node  # binwalk 无嵌入也跑 LSB
+    lsb_bytes_node.on_success = None
+    lsb_bytes_node.on_failure = None
+    return DAG(start_node=binwalk_node)
+
+
 # ---------- 检测 binwalk 输出含 ZIP / 7z / rar / tar 等 ----------
 def find_embedded_archives(binwalk_stdout: str) -> list[str]:
     """从 binwalk 输出找出 archive offsets (e.g. "12345: ZIP archive")."""
@@ -90,5 +127,6 @@ __all__ = [
     "build_binwalk_extract_dag",
     "build_foremost_extract_dag",
     "build_lsb_extract_chain",
+    "build_lsb_bytes_chain",
     "find_embedded_archives",
 ]
