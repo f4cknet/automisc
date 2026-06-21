@@ -15,7 +15,7 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 >
 > **GUI 工具栏来源**: 见 `STRUCTURE.md §3.5` — GUI 工具有两种后端来源: `tools/` adapter (调外部 CLI) vs `core/decoders/` decoder (纯计算). Owner 找 cipher 解密工具找不到 `tools/cipher/` 时, 先查 §3.5.
 
-## 1. 5 铁律（不可绕过）
+## 1. 7 铁律（不可绕过）
 
 | 铁律 | 核心 |
 |---|---|
@@ -24,6 +24,8 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 | **3 · 任务有状态** | `upgrade.md` 每行有 ⏳🔄✅⚠️❌ 状态；代码 + 文档**同 commit** |
 | **4 · 未验证 = 未完成** | ① 合 main ② 单测全绿 ③ GUI 改跑集成 ④ 真实样本 smoke ⑤ Owner 自审 ⑥ 文档同步 |
 | **5 · 训练驱动迭代** | 用真实 CTF 赛题喂 automisc；失败 → AI + ctf-misc/ctf-forensics 兜底解题 → 沉淀 `upgrade/v0.5-train-NNN-*.md`。详见下文 §5 专章。 |
+| **6 · 架构优先** (per §5.2) | 单题打补丁陷阱: 任何针对单题的优化, 必须回答"能否泛化到同类题"。能泛化 (≥ 3 道同类命中) → 走架构层升级;只救这一道 → 写训练日志, 不动代码 |
+| **7 · auto_run = 纯探测不抢下一步** (2026-06-21 18:57 Owner 拍板) | 整个 `automisc-gui` 的 auto_run (`find_suspicious_from_<type>`) 不论拖入图片/zip/rar/其他文件，铁律是**分析并发现尽可能多的可疑点进入"可疑点列表"**。由做题人 (Owner) 根据这些可疑点决定下一步用什么工具。<br/>**不**触发下一步工具 (chain / 操作 / extract) — SP 写到 journal 是建议，Owner 决策。<br/>**不**雕不修不爆 — auto_run 路径**禁止**任何写文件/触发 chain/调用操作类 adapter 的逻辑。<br/>反面 (2026-06-21 18:41 实战教训): v0.5-lsb-bytes-auto-run (`2025a51` + `a6fa83e`) 把 `lsb_bytes_extract` (操作类, 写 12 个 .bin) 接进 `FIND_SUSPICIOUS_PICTURE_TOOLS`, 违反本铁律, **已 revert (`d47c7c6` + `f239497`)**。正确路径: lsb_bytes_extract 只走 CLI (`automisc chain --chain lsb-bytes`) + GUI Run→Chain 弹 dialog (per v0.5-lsb-bytes-gui `c898a46`)。 |
 
 > 第 4 条"完成"**不追求 flag 匹配**——automisc 是半自动化辅助工具，验收是"工具调用成功 + journal 关键可疑点命中"。
 >
