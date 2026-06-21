@@ -206,6 +206,14 @@ automisc/
 | Misc/Brainteaser | `zbar` (QR) |
 | Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
 
+**auto-run 池** (拖入图片/zip/rar/其他文件, 自动跑, per AGENTS.md §1 铁律 7 = 纯探测不抢下一步):
+- picture: `zsteg`, `stegseek`, `exiftool`, `binwalk`, `strings`, `file` (6 tools)
+- traffic: `pcap_protocol_router`, `tshark`, `strings`, `file`
+- archive: `sevenz`, `unzip` (列表 `-l`, 不实际解压), `zip_classify`, `file`, `strings`
+- binary: `file`, `strings`, `binwalk`, `exiftool`
+
+**v0.5-auto-run-suggest**: auto-run 命中后 (zsteg lsb_text / binwalk ZIP/7z/RAR/pyc / strings 敏感关键词) 写 suggest SP severity=4 "建议手工跑 X chain", **不**触发下一步 (per 铁律 7)
+
 ---
 
 ## 5. 链 (chain) 速查
