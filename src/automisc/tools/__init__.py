@@ -20,7 +20,8 @@ from automisc.tools.shared import foremost  # noqa: F401
 from automisc.tools.shared import strings  # noqa: F401
 from automisc.tools.shared import xxd  # noqa: F401
 
-# steganography/image/ 的 2 个 adapter（v0.1.0b-PR2）
+# steganography/image/ 的 3 个 adapter（v0.1.0b-PR2 + v0.5-lsb-detector）
+from automisc.tools.steganography.image import lsb_detect_adapter as _lsb_detect_v050  # noqa: F401  # v0.5-lsb-detector Owner 2026-06-21 22:00
 from automisc.tools.steganography.image import steghide  # noqa: F401
 from automisc.tools.steganography.image import zsteg  # noqa: F401
 
