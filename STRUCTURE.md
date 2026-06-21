@@ -207,12 +207,14 @@ automisc/
 | Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
 
 **auto-run 池** (拖入图片/zip/rar/其他文件, 自动跑, per AGENTS.md §1 铁律 7 = 纯探测不抢下一步):
-- picture: `zsteg`, `stegseek`, `exiftool`, `binwalk`, `strings`, `file` (6 tools)
+- picture: `lsb_detect`, `stegseek`, `exiftool`, `binwalk`, `strings`, `file` (6 tools, **v0.5-lsb-detector 替代 zsteg**)
 - traffic: `pcap_protocol_router`, `tshark`, `strings`, `file`
 - archive: `sevenz`, `unzip` (列表 `-l`, 不实际解压), `zip_classify`, `file`, `strings`
 - binary: `file`, `strings`, `binwalk`, `exiftool`
 
-**v0.5-auto-run-suggest**: auto-run 命中后 (zsteg lsb_text / binwalk ZIP/7z/RAR/pyc / strings 敏感关键词) 写 suggest SP severity=4 "建议手工跑 X chain", **不**触发下一步 (per 铁律 7)
+**v0.5-lsb-detector**: auto-run readonly 智能 LSB 检测 (替代 zsteg, 6 tools 不变) — RGB 3 通道 6 排列 × 2 scan = 12 组合, text 判定 (printable ASCII 32-126) + 文件头双机制 (hex magic 主 + `file` 命令辅) + 单通道 8 bit 概率检测 (entropy + unique count) — 字节流不写文件 (per 铁律 7 readonly), 命中写 journal SP sev=5 真可疑 / sev=4 info 概率
+
+**v0.5-auto-run-suggest**: auto-run 命中后 (lsb_detect lsb_text / lsb_file_header / lsb_channel_anomaly + binwalk ZIP/7z/RAR/pyc / strings 敏感关键词) 写 suggest SP severity=4 "建议手工跑 X chain", **不**触发下一步 (per 铁律 7)
 
 ---
 
