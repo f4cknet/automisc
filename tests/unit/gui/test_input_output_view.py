@@ -876,3 +876,66 @@ class TestMainWindowStringsOutputSize:
         # 也清 samedir
         for f in glob.glob("Challenge/hex_router_*"):
             _P(f).unlink(missing_ok=True)
+
+
+# ---------- v0.5-decoder-friendly-hint: paste 后智能提示 ----------
+class TestPasteDecoderHint:
+    """v0.5-decoder-friendly-hint: paste 后调 detect_input_intent, 命中类型追加 [hint] 行.
+
+    Owner 2026-06-20 21:25 实战: paste Ook! (2289 chars) 误点 BF decoder → output 全 \\x00.
+    加 hint 后用户能看提示直接选对 decoder (不阻挡, 老手忽略).
+    """
+
+    def test_paste_ook_triggers_hint(self, qtbot):
+        """paste Ook! 代码 → hint 推荐 🦧 Ook! 解密."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        QApplication.clipboard().setText(
+            "Ook. Ook. Ook. Ook. Ook. Ook. Ook. Ook. Ook. Ook. Ook. Ook."
+        )
+        v.paste_clipboard()
+        text = v.toPlainText()
+        assert "[hint]" in text
+        assert "Ook!" in text or "🦧" in text
+        assert "推荐" in text
+
+    def test_paste_bf_triggers_hint(self, qtbot):
+        """paste BF 代码 → hint 推荐 🧠 BrainFuck 解密."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        QApplication.clipboard().setText(
+            "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>."
+        )
+        v.paste_clipboard()
+        text = v.toPlainText()
+        assert "[hint]" in text
+        assert "BrainFuck" in text or "🧠" in text
+
+    def test_paste_hex_triggers_hint(self, qtbot):
+        """paste hex 串 → hint 推荐 🔢 16 进制转文本."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        QApplication.clipboard().setText("deadbeef48656c6c6f")
+        v.paste_clipboard()
+        text = v.toPlainText()
+        assert "[hint]" in text
+        assert "hex" in text.lower() or "16" in text or "进制" in text
+
+    def test_paste_short_text_no_hint(self, qtbot):
+        """paste 短文本 (如单词) → 不触发 hint (避免噪音)."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        QApplication.clipboard().setText("hi")
+        v.paste_clipboard()
+        text = v.toPlainText()
+        assert "[hint]" not in text
+
+    def test_paste_empty_no_hint(self, qtbot):
+        """paste 空 → 只显示 [paste] clipboard is empty, 不触发 hint."""
+        v = InputOutputView()
+        qtbot.addWidget(v)
+        QApplication.clipboard().setText("")
+        v.paste_clipboard()
+        text = v.toPlainText()
+        assert "[paste]" in text
+        assert "[hint]" not in text

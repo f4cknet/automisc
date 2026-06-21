@@ -267,6 +267,9 @@ class InputOutputView(QWidget):
         - 总是先 clear, 再 paste (替代模式 - 用户意图是"用粘贴板内容替换")
         - paste 后追加 newline 让 run_hex_to_ascii 选最后一行能选中
         - 如果 read-only, 自动切到可编辑模式 (因为用户要粘贴)
+        - v0.5-decoder-friendly-hint: paste 后调 detect_input_intent,
+          如果识别到特定类型内容 (Ook!/BF/base64/...), 追加 [hint] 行提示推荐 decoder.
+          不阻挡 — 老手忽略即可.
         """
         from PySide6.QtWidgets import QApplication
         cb = QApplication.clipboard()
@@ -286,6 +289,21 @@ class InputOutputView(QWidget):
         if not text.endswith("\n"):
             cursor.insertText("\n")
         self.append_text(f"[pasted {len(text)} chars]")
+
+        # v0.5-decoder-friendly-hint: 内容类型检测 + 推荐 decoder 提示
+        # 触发: Owner 2026-06-20 21:25 paste Ook! (2289 chars) 误点 BF decoder
+        #       → output 全 \x00, 提示用户直接选对 decoder
+        try:
+            from automisc.core.decoders.content_detector import detect_input_intent
+            detection = detect_input_intent(text)
+            if detection:
+                hint = (
+                    f"[hint] 💡 检测到 {detection.kind} ({detection.reason}),"
+                    f" 推荐菜单 Tools → 对应分类 → {detection.display}"
+                )
+                self.append_text(hint)
+        except Exception:  # noqa: BLE001 — hint 失败不影响 paste 主流程
+            pass
 
     def run_hex_to_ascii(self) -> None:
         """把当前 input 区文本当 hex/binary/base64/base32 → ASCII.

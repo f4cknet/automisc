@@ -86,6 +86,7 @@
 | v0.5-sevenz-toolbar-cleanup | **GUI menu 清理**: sevenz (探测类) 从 `TOOL_CATEGORIES["Misc/Archive"]` + `ADAPTER_TOOLS` 移除,但 **保留 adapter** (auto_run / router / find_suspicious 还在用);新原则: "用于自动化探测的工具,可不显示在 GUI menu" (per Owner 20:03);跨项目 GUI menu 设计铁律 | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-sevenz-toolbar-cleanup.md`](upgrade/v0.5-sevenz-toolbar-cleanup.md) |
 | v0.5-decoder-arch-doc | **文档化架构**: `STRUCTURE.md` 新增 §3.5 "GUI 工具来源 (tools/ vs decoders/)" — 解 cipher 解密工具为啥在 `core/decoders/` 不在 `tools/` (adapter 调外部 CLI vs decoder 纯计算); `AGENTS.md` §0 加指针 (per Owner 20:40 拍板);**0 代码改动** | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-decoder-arch-doc.md`](upgrade/v0.5-decoder-arch-doc.md) |
 | v0.5-decoder-friendly-candidate | **extract_base_candidate 加 decoder-friendly 特例**: raw brainfuck / raw Ook! 代码 paste 到 input 区 算候选 (per Owner 21:17 实战 — GUI 之前报"input 区为空");不动 base64/hex/binary/caesar 现有判定 | 🔄 in-progress | (无 commit，待 push) | [`upgrade/v0.5-decoder-friendly-candidate.md`](upgrade/v0.5-decoder-friendly-candidate.md) |
+| v0.5-decoder-friendly-hint | **paste 后智能 hint**: 新建 `content_detector.detect_input_intent` 检测 input 区内容类型 (Ook!/BF/base64/base32/hex/binary/caesar 7 规则), GUI paste_clipboard 末尾追加 hint 行 `💡 检测到 X, 推荐 🦧 Ook! 解密`;**不阻挡老手选择** (per Owner 21:25 选 Y = 方案 A);触发 Owner 实战 Ook! 跑 BF 误操作 | ✅ done | (1 commit; +29 单测; decoder 24 + GUI paste hint 5) | [`upgrade/v0.5-decoder-friendly-hint.md`](upgrade/v0.5-decoder-friendly-hint.md) |
 
 ---
 
