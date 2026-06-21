@@ -112,6 +112,114 @@ EXTENSION_TO_POOL: dict[str, str] = {
 }
 
 
+# v0.5-auto-run-suggest: auto_run 命中后写"建议手工跑 X chain" SP (per Owner 06-21 18:41 + 18:57)
+#
+# **核心**: auto_run 跑完 zsteg / binwalk / strings 后, 对命中 SP 加 suggest SP (severity=4)
+#          告诉 Owner "可以手工跑 X chain 进一步分析"。
+# **铁律 7 合规**: 不触发下一步工具, 只写 SP 建议 (Owner 决策)。
+#
+# key 格式: "<tool_name>:<sp_category>" (binwalk:file_header_* 细分靠 matched_pattern)
+# value: (suggest_category, suggest_text)
+_SUGGEST_MAP: dict[str, tuple[str, str]] = {
+    # zsteg 命中 lsb_text → 建议手工跑 lsb-bytes chain (4 参数 dialog)
+    # Owner 18:41 实战触发: zsteg 默认行扫描漏 col, lsb-bytes chain 才能命中 N=NP 类
+    "zsteg:lsb_text": (
+        "auto_run_suggest",
+        "🔍 zsteg 命中 lsb_text, 但默认行扫描可能漏 col, "
+        "建议手工跑 lsb-bytes chain (Run→Chain→lsb-bytes, 4 参数 dialog)",
+    ),
+    # binwalk 命中 ZIP → 建议 zip chain
+    "binwalk:file_header_zip": (
+        "auto_run_suggest",
+        "📦 binwalk 命中 ZIP, 建议手工跑 zip chain (Run→Chain→zip, 雕 + 尝试解压)",
+    ),
+    # binwalk 命中 7z → 建议 sevenz_extract
+    "binwalk:file_header_7z": (
+        "auto_run_suggest",
+        "📦 binwalk 命中 7z, 建议手工跑 sevenz_extract (Tools 菜单)",
+    ),
+    # binwalk 命中 RAR → 建议 unzip 或 bruteforce_rar
+    "binwalk:file_header_rar": (
+        "auto_run_suggest",
+        "📦 binwalk 命中 RAR, 建议手工跑 unzip 或 bruteforce_rar (Tools 菜单)",
+    ),
+    # binwalk 命中 pyc → 建议 pyc_decompiler
+    "binwalk:file_header_pyc": (
+        "auto_run_suggest",
+        "🐍 binwalk 命中 pyc 字节码, 建议手工跑 pyc_decompiler (Tools 菜单, 默认 Python 2)",
+    ),
+    # strings 命中敏感关键词 → 建议配合 bruteforce 使用
+    "strings:敏感关键词_line": (
+        "auto_run_suggest",
+        "🔑 命中疑似密码/flag 关键词, 配合 zip/rar bruteforce 或直接用",
+    ),
+    # future candidates (per v0.5-auto-run-suggest spec §4.2 OUT):
+    # - stegseek:steghide (JPEG 隐写命中)
+    # - exiftool:suspicious (EXIF metadata 可疑)
+    # - binwalk:file_header_elf / exe / macho (Linux/Windows/Mac 可执行)
+}
+
+
+def _maybe_suggest(
+    tool_name: str,
+    suspicious_points: list,
+    file_path: str,
+) -> list:
+    """对 auto_run 命中的 SP, 加 1 条 suggest SP (severity=4).
+
+    dedup: 每个 tool + 每个 sub-category 只加 1 条 suggest。
+    binwalk:file_header 细分靠 matched_pattern (ZIP / 7z / RAR / pyc)。
+
+    Args:
+        tool_name: 跑的工具名 (e.g. "zsteg" / "binwalk" / "strings")
+        suspicious_points: ToolResult.suspicious_points 列表
+        file_path: 目标文件路径
+
+    Returns:
+        list[SuspiciousPoint]: suggest SP 列表 (可能空)
+    """
+    from automisc.core.suspicious import SuspiciousPoint
+
+    suggests: list = []
+    seen_keys: set[str] = set()
+
+    for sp in suspicious_points:
+        # binwalk:file_header 特殊处理: 细分 ZIP / 7z / RAR / pyc 靠 matched_pattern
+        if tool_name == "binwalk" and sp.category == "file_header":
+            matched = sp.matched_pattern.upper()
+            if "ZIP" in matched:
+                key = "binwalk:file_header_zip"
+            elif "7Z" in matched:
+                key = "binwalk:file_header_7z"
+            elif "RAR" in matched:
+                key = "binwalk:file_header_rar"
+            elif "PYC" in matched.upper() or "PYTHON" in matched.upper():
+                key = "binwalk:file_header_pyc"
+            else:
+                continue  # 其他 file_header (PNG/JPEG/ELF/...) 不加 suggest
+        else:
+            key = f"{tool_name}:{sp.category}"
+
+        if key in _SUGGEST_MAP and key not in seen_keys:
+            seen_keys.add(key)
+            cat, text = _SUGGEST_MAP[key]
+            suggests.append(SuspiciousPoint(
+                id="",
+                tool_name="auto_run_suggest",
+                file_path=file_path,
+                category=cat,
+                offset=sp.offset,
+                matched_pattern=text,
+                severity=4,  # info, 不是真正可疑
+                suggested_action=(
+                    "看 auto_run 命中的 SP 决定下一步, "
+                    "GUI Run→Chain 弹 dialog 跑对应 chain"
+                ),
+            ))
+
+    return suggests
+
+
 def pick_suspicious_pool(file_path: str) -> tuple[str, list[str]]:
     """根据文件扩展名选 find_suspicious_from_<type> 工具池.
 
@@ -165,6 +273,9 @@ def find_suspicious_from_picture(core: CoreOrchestrator, file_path: str) -> list
                 )
             )
             continue
+        # v0.5-auto-run-suggest: 命中后写 suggest SP (severity=4)
+        # per 铁律 7: 只写 SP 不触发下一步, Owner 决策
+        result.suspicious_points.extend(_maybe_suggest(tool_name, result.suspicious_points, file_path))
         results.append(result)
     return results
 
@@ -190,6 +301,9 @@ def find_suspicious_from_traffic(core: CoreOrchestrator, file_path: str) -> list
                 )
             )
             continue
+        # v0.5-auto-run-suggest: 命中后写 suggest SP (severity=4)
+        # per 铁律 7: 只写 SP 不触发下一步, Owner 决策
+        result.suspicious_points.extend(_maybe_suggest(tool_name, result.suspicious_points, file_path))
         results.append(result)
     return results
 
@@ -216,6 +330,9 @@ def find_suspicious_from_archive(core: CoreOrchestrator, file_path: str) -> list
                 )
             )
             continue
+        # v0.5-auto-run-suggest: 命中后写 suggest SP (severity=4)
+        # per 铁律 7: 只写 SP 不触发下一步, Owner 决策
+        result.suspicious_points.extend(_maybe_suggest(tool_name, result.suspicious_points, file_path))
         results.append(result)
     return results
 
@@ -241,6 +358,9 @@ def find_suspicious_from_binary(core: CoreOrchestrator, file_path: str) -> list[
                 )
             )
             continue
+        # v0.5-auto-run-suggest: 命中后写 suggest SP (severity=4)
+        # per 铁律 7: 只写 SP 不触发下一步, Owner 决策
+        result.suspicious_points.extend(_maybe_suggest(tool_name, result.suspicious_points, file_path))
         results.append(result)
     return results
 
