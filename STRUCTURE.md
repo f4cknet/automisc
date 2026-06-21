@@ -115,7 +115,7 @@ automisc/
 | `core/actions/binwalk_extract.py` | binwalk 检测 + 委托 foremost 提取 | `BinwalkExtractAction` |
 | `core/actions/foremost_extract.py` | 独立 foremost 提取 + helper | `ForemostExtractAction`, `find_foremost_extract` |
 | `core/actions/zip_chain.py` | try_unzip / fix_pseudo / bruteforce 3 Action | `TryUnzipAction`, `FixPseudoEncryptionAction`, `BruteforceZipAction` |
-| `core/actions/lsb_extract.py` | LSB 抽取后智能路由 (zsteg-based, v0.5-LSB-router 核心) | `LSBExtractAction` |
+| `core/actions/lsb_extract.py` | LSB 抽取后智能路由 (zsteg-based, v0.5-LSB-router 核心); **v0.5-lsb-extract-output-bytes 修写真**: magic 判定后缀 (89 50 4E 47 = .png / 50 4B = .zip 等, 复用 `lsb_detect._detect_file_header_hex`) + `write_bytes` 写真二进制 (per Owner "用 python wb") + fallback `.bin` 默认; GUI 工具栏 "🎨 PNG LSB 智能提取" 入口调它 | `LSBExtractAction`, `_decide_suffix`, `_write_tmp_extracted` |
 | `core/actions/lsb_bytes_extract.py` | **v0.5-lsb-byte-stream-extract 能力 B**: LSB 字节流自定义抽取 (PIL/numpy 直抽, 4 参数 user-controlled: channel × bit × scan_order × byte_bit_order) | `LSBBytesExtractAction` |
 | `core/encoding_detector.py` | text 严重度评分 (Q1 决策) | `score_text_severity`, `has_sensitive_keyword` |
 | `core/exceptions.py` | 异常体系 (单 Owner 简化: 1 基类 + 6 子类) | `AutomiscError` + 6 子类 |
