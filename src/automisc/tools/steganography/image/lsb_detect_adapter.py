@@ -57,7 +57,7 @@ class LsbDetectAdapter(ToolAdapter):
     def __init__(
         self,
         entropy_threshold: float = 5.0,
-        unique_threshold: int = 250,
+        unique_threshold: int = 200,
         enable_channel_anomaly: bool = True,
     ):
         """工厂参数 (per spec §3.2 工厂参数).

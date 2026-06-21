@@ -195,34 +195,29 @@ def _detect_file_header_file_cmd(byte_stream: bytes, file_path: str) -> str | No
 # ----- 单通道 8 bit 概率检测 (per spec §2.2 + Q4=A entropy + unique) -----
 
 def _channel_8bit_byte_stream(plane: np.ndarray) -> bytes:
-    """单通道 8 bit plane 拼成字节流.
+    """单通道 8 bit 字节流: **1 像素 = 1 byte** (per PIL Image.getpixel() 风格).
 
     拼接规则 (per v0.5-train-010 §3.2 验证):
-    - 8 个 bit plane (b0~b7) 各 flatten
-    - 每 8 个像素的同一 bit 拼成一个字节 (bit 0 = LSB, bit 7 = MSB)
-    - 结果: shape (H*W/8,) uint8 array
+    - 每像素值 0-255, 本身就是 1 byte
+    - 8 个 bit plane (b0~b7) 各 flatten, 累加到 byte_stream 各 bit 位
+    - byte_stream[i] = plane.flatten()[i] (像素值 = byte 值)
+    - 结果: shape (H*W,) uint8 array = 字节流
+
+    注: N=NP writeup 思路 (v0.5-train-009 §3.1) 写"G 通道存在数据"指 G 通道
+    像素值序列本身, 不是 8 像素 1 byte 的位重排。
 
     Args:
         plane: (H, W) uint8 通道数据
 
     Returns:
-        bytes 字节流
+        bytes 字节流 (len = H*W)
     """
-    h, w = plane.shape
-    n_bytes = (h * w) // 8
-    if n_bytes == 0:
+    if plane.size == 0:
         return b""
 
-    byte_stream = np.zeros(n_bytes, dtype=np.uint8)
-    for bit_pos in range(8):
-        # 该 bit 位的 0/1 序列
-        bits = ((plane >> bit_pos) & 1).flatten()  # shape (H*W,)
-        # reshape (n_bytes, 8), 每 8 像素一个字节, bit_pos 位置是该字节的 bit_pos 位
-        bits_reshaped = bits[: n_bytes * 8].reshape(n_bytes, 8)
-        # bit_pos = 0 是 LSB, = 7 是 MSB
-        byte_stream |= (bits_reshaped[:, bit_pos] << bit_pos).astype(np.uint8)
-
-    return bytes(byte_stream.astype(np.uint8).tolist())
+    flat = plane.flatten().astype(np.uint8)
+    # 直接返回: 像素值 = byte 值, 等价于 8 bit 拼 byte
+    return bytes(flat.tolist())
 
 
 def _shannon_entropy(byte_stream: bytes) -> float:
@@ -308,7 +303,7 @@ class LSBDetectAction(Action):
     def __init__(
         self,
         entropy_threshold: float = 5.0,
-        unique_threshold: int = 250,
+        unique_threshold: int = 200,
         enable_channel_anomaly: bool = True,
     ):
         self.entropy_threshold = entropy_threshold
@@ -342,21 +337,27 @@ class LSBDetectAction(Action):
         # ========== 需求 1: 12 组合 LSB (bit 0) 智能检测 ==========
         for perm in _PERMUTATIONS:
             perm_n = _perm_name(perm)
-            # 抽 3 通道 (按 perm 顺序) bit 0 plane
-            bit0_planes = arr[:, :, list(perm)] & 1  # shape (H, W, 3) 各通道 bit 0
             for scan in _SCAN_ORDERS:
-                if scan == "row":
-                    bits_flat = bit0_planes.flatten()  # row-major
-                else:
-                    bits_flat = bit0_planes.T.flatten()  # col-major
-                # 8 bit 拼 byte (LSB first, per v0.5-lsb-byte-stream-extract 默认)
+                # 按 perm 顺序, **每 channel 单独 flatten 再 concatenate** (per channel 连续,
+                # 跟 v0.5-lsb-byte-stream-extract LSBBytesExtractAction 行为一致)
+                # 不是 HWC interleaved (per pixel 3 通道)
+                bits_per_channel: list[np.ndarray] = []
+                for ch_idx in perm:
+                    channel_bits = (arr[:, :, ch_idx] & 1).astype(np.uint8)
+                    if scan == "row":
+                        bits_per_channel.append(channel_bits.flatten())  # row-major
+                    else:
+                        bits_per_channel.append(channel_bits.T.flatten())  # col-major
+                bits_flat = np.concatenate(bits_per_channel)
                 n_bytes = len(bits_flat) // 8
                 if n_bytes < 16:
                     continue  # 字节流太短, 跳过 (text/file 判定需要 ≥ 16 字节才有意义)
+                # 8 bit 拼 byte — **MSB first** (跟 v0.5-lsb-byte-stream-extract LSBBytesExtractAction 默认一致,
+                # 也跟 N=NP writeup 风格一致: bit 0 = byte MSB = bit 7)
                 byte_stream_int = np.zeros(n_bytes, dtype=np.uint8)
                 for bit_pos in range(8):
                     byte_stream_int |= (
-                        bits_flat[bit_pos::8][:n_bytes] << bit_pos
+                        bits_flat[bit_pos::8][:n_bytes] << (7 - bit_pos)
                     ).astype(np.uint8)
                 byte_stream = bytes(byte_stream_int.tolist())
 
