@@ -29,10 +29,31 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from automisc.core.actions.lsb_detect import _detect_file_header_hex
 from automisc.core.dag import Action, ActionResult
 from automisc.core.encoding_detector import score_text_severity
 from automisc.core.router import detect_magic
 from automisc.core.utils.output_path import output_path_for
+
+
+# v0.5-lsb-extract-output-bytes (per Owner 2026-06-21 22:55 实战反馈):
+# 修 lsb_extract.py 写文件 — suffix 写死 .txt 改 magic 判定后缀
+# 复用 lsb_detect._detect_file_header_hex 25+ magic 库
+def _decide_suffix(raw_bytes: bytes, default: str = ".bin") -> str:
+    """根据字节流文件头决定后缀 (per Owner "89 50 4E 47 是 PNG").
+
+    Args:
+        raw_bytes: 抽出的字节流
+        default: 没命中 magic 的 fallback 后缀 (默认 .bin, 跟 lsb_bytes_extract 一致)
+
+    Returns:
+        后缀字符串 (含点), e.g. ".png" / ".zip" / ".pyc" / ".bin"
+    """
+    magic_hit = _detect_file_header_hex(raw_bytes)
+    if magic_hit:
+        ext, _ = magic_hit
+        return f".{ext}"
+    return default
 
 
 # zsteg 输出行格式: "<bit>,<channel>,<order>,<scan>   .. <type>: <content>"
@@ -134,12 +155,17 @@ def _pick_first_file_channel(parsed: list[dict[str, str]]) -> dict[str, str] | N
 def _write_tmp_extracted(extracted: bytes, file_path: str, hint_ext: str = ".bin") -> str:
     """写抽出的 bytes 到 output (v0.5-output-samedir: 与 input 同目录, 命名 <stem>__lsb.<ext>).
 
+    v0.5-lsb-extract-output-bytes 修复 (per Owner 2026-06-21 22:55 实战反馈):
+    - 旧: suffix=hint_ext 写死 (e.g. ".bin")
+    - 新: 实际 magic 判定覆盖 hint_ext (更准确, per "89 50 4E 47 是 PNG")
+    - 写二进制: write_bytes (per Owner "用 python wb")
+
     Args:
         extracted: 抽出的 bytes
         file_path: 原输入文件路径 (用来决定 output 目录)
-        hint_ext: 文件后缀 hint
+        hint_ext: 文件后缀 hint (fallback, 实际 magic 优先)
     """
-    out_path = output_path_for(file_path, suffix=hint_ext, purpose="lsb")
+    out_path = output_path_for(file_path, suffix=_decide_suffix(extracted, hint_ext), purpose="lsb")
     out_path.write_bytes(extracted)
     return str(out_path)
 
@@ -202,20 +228,24 @@ class LSBExtractAction(Action):
             seen_texts: list[dict[str, Any]] = []
             best_sensitive: dict[str, Any] | None = None  # severity=5 命中
             for entry in text_entries:
-                # 抽 raw text
+                # 抽 raw bytes
                 raw = _run_zsteg_extract(file_path, entry["channel"])
                 if raw is None:
                     # 抽不出 raw, 退而用 zsteg 显示的 content
                     text = entry["content"]
+                    raw_for_write = text.encode("utf-8", errors="replace")
                 else:
-                    # 抽出的 raw bytes 可能含 0xff 等非 UTF-8 字符
-                    # 用 errors='replace' 容错 (e.g. KEY.exe 解出的 133x133 PNG 含 0xff 字节)
+                    # raw 是真实 bytes (可能是 PNG/zip/elf 二进制, 也可能是 printable text)
+                    # 写文件用 raw (per v0.5-lsb-extract-output-bytes 修复: write_bytes 不 write_text)
+                    # text 仅用于 severity 判定 + GUI 展示
+                    raw_for_write = raw
                     text = raw.decode("utf-8", errors="replace").rstrip("\x00").strip()
                 severity = score_text_severity(text)
                 is_sensitive = severity == 5
                 seen_texts.append({
                     "channel": entry["channel"],
                     "text": text,
+                    "raw": raw_for_write,  # 存 raw bytes, 写文件用 (per v0.5-lsb-extract-output-bytes)
                     "severity": severity,
                     "sensitive_keyword": is_sensitive,
                     "length": len(text),
@@ -230,13 +260,15 @@ class LSBExtractAction(Action):
             flag_candidate = main["text"] if main["sensitive_keyword"] else None
 
             # v0.5-train-008 fix: text 通道 main 也写文件 (per Owner 决策)
-            # 命名规则: <stem>__lsb.txt (跟 file 分支一致, output_path_for 同目录)
+            # v0.5-lsb-extract-output-bytes 修复 (per Owner 2026-06-21 22:55 实战反馈):
+            # - 旧: suffix=".txt" 写死 + write_text (UTF-8 decode) → 二进制 (e.g. PNG) 写成乱码 .txt
+            # - 新: magic 判定后缀 (89 50 4E 47 = .png / 50 4B = .zip / 03 f3 0d 0a = .pyc 等)
+            #       + write_bytes 写真二进制 (per Owner "用 python wb")
+            #       + fallback .bin 默认
             main_extracted_path = output_path_for(
-                file_path, suffix=".txt", purpose="lsb"
+                file_path, suffix=_decide_suffix(main["raw"]), purpose="lsb"
             )
-            main_extracted_path.write_text(
-                main["text"], encoding="utf-8", errors="replace"
-            )
+            main_extracted_path.write_bytes(main["raw"])
 
             return ActionResult(
                 success=True,

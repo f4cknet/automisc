@@ -194,7 +194,13 @@ class TestLSBExtractAction:
 
     # ---------- v0.5-train-008: text 通道也写文件 ----------
     def test_text_branch_writes_file_to_samedir(self, tmp_path, monkeypatch):
-        """v0.5-train-008: text 通道 main 也写到 <stem>__lsb.txt, 同目录."""
+        """v0.5-train-008 + v0.5-lsb-extract-output-bytes: text 通道 main 也写到 <stem>__lsb.<ext>, 同目录.
+
+        v0.5-lsb-extract-output-bytes 修复:
+        - 旧: 写死 .txt + write_text (UTF-8 decode, 二进制乱码)
+        - 新: magic 判定后缀 + write_bytes (per Owner "89 50 4E 47 是 PNG" + "用 python wb")
+        - text 字节流没 magic → .bin fallback
+        """
         from automisc.core.actions import lsb_extract
 
         # mock zsteg 检测: 返回 1 个 text 行 (b1,rgb,lsb,xy)
@@ -223,12 +229,17 @@ class TestLSBExtractAction:
         assert Path(extracted_path).exists()
         # 路径在 input.parent (同目录)
         assert Path(extracted_path).parent == png.parent
-        # 文件名是 <stem>__lsb.txt
-        assert Path(extracted_path).name == "challenge__lsb.txt"
-        # 内容 == main text
-        assert Path(extracted_path).read_text(encoding="utf-8").startswith(
-            "Hey I think we can write safely"
+        # v0.5-lsb-extract-output-bytes 修复: text 字节流没 magic, fallback .bin
+        assert Path(extracted_path).name == "challenge__lsb.bin", (
+            f"expected .bin fallback (text bytes have no magic), got: {Path(extracted_path).name}"
         )
+        # 写真二进制 (per v0.5-lsb-extract-output-bytes: write_bytes 替代 write_text)
+        written_bytes = Path(extracted_path).read_bytes()
+        assert written_bytes == b"Hey I think we can write safely in this file.", (
+            "written bytes should match raw (no UTF-8 decode loss)"
+        )
+        # text 字段 decode 后内容正确 (GUI 展示用)
+        assert result.data["lsb_text"]["text"].startswith("Hey I think we can write safely")
         # extracted_files schema 跟 file 分支一致
         assert result.data["extracted_files"] == [extracted_path]
 
@@ -263,11 +274,18 @@ class TestLSBExtractAction:
         assert result.data["lsb_text"]["sensitive_keyword"] is True
         assert result.data["lsb_text"]["severity"] == 5
         assert result.data["flag_candidate"] is not None
-        # 仍然写文件
+        # 仍然写文件 (v0.5-lsb-extract-output-bytes 修复: write_bytes + magic 后缀)
         extracted_path = Path(result.data["lsb_text"]["extracted_path"])
         assert extracted_path.exists()
-        assert extracted_path.name == "steg__lsb.txt"
-        assert "st3g0_saurus_wr3cks" in extracted_path.read_text(encoding="utf-8")
+        # v0.5-lsb-extract-output-bytes 修复: text 字节流没 magic → .bin fallback (不是 .txt)
+        assert extracted_path.name == "steg__lsb.bin", (
+            f"expected .bin fallback (text bytes have no magic), got: {extracted_path.name}"
+        )
+        # 写真二进制
+        written_bytes = extracted_path.read_bytes()
+        assert b"st3g0_saurus_wr3cks" in written_bytes, (
+            "written bytes should contain secret key (no UTF-8 decode loss)"
+        )
         assert result.data["extracted_files"] == [str(extracted_path)]
         # severity=5 立即停 → 只扫了 1 个通道
         assert len(result.data["lsb_texts_scanned"]) == 1
