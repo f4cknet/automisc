@@ -82,12 +82,11 @@ class TestPickSuspiciousPool:
             f"picture pool 必须含 steghide (per Owner 实测): {tools}"
         )
 
-    def test_picture_pool_has_seven_tools(self) -> None:
-        """picture pool 现在有 7 个工具 (per v0.5-lsb-bytes-auto-run, 加 lsb_bytes_extract 兜底):
-        zsteg/stegseek/exiftool/binwalk/strings/file/lsb_bytes_extract."""
+    def test_picture_pool_has_six_tools(self) -> None:
+        """picture pool 现在有 6 个工具: zsteg/steghide/exiftool/binwalk/strings/file."""
         _, tools = pick_suspicious_pool("/tmp/x.png")
-        assert len(tools) == 7, (
-            f"picture pool 应有 7 个工具, 实际 {len(tools)}: {tools}"
+        assert len(tools) == 6, (
+            f"picture pool 应有 6 个工具, 实际 {len(tools)}: {tools}"
         )
 
     def test_traffic_pool_matches_constant(self) -> None:

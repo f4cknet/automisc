@@ -162,7 +162,6 @@ automisc/
 | GUI 菜单分类 | 后端位置 | 类型 |
 |---|---|---|
 | **共享基础工具** (file/strings/binwalk/...) | `tools/shared/` | adapter |
-| **🎨 LSB 字节流抽取** (auto-run 同款, per v0.5-lsb-bytes-auto-run) | `tools/shared/lsb_bytes_extract_adapter.py` | adapter (12 组合兜底) |
 | **Stego/Image** (zsteg/stegseek) | `tools/steganography/image/` | adapter |
 | **Forensics/Network** (tshark/tcpdump) | `tools/forensics/network/` | adapter |
 | **Stego/Audio+Video** (ffmpeg/sox) | `tools/steganography/{audio,video}/` | adapter |
@@ -206,7 +205,6 @@ automisc/
 | Misc/Archive | `sevenz_extract`, `unzip`, `john`, `zip_classify` (sevenz 探测类, GUI 不显示, per Owner 20:03) |
 | Misc/Brainteaser | `zbar` (QR) |
 | Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
-| **图片 auto-run 池** (拖 PNG 自动跑) | `zsteg`, `stegseek`, `exiftool`, `binwalk`, `strings`, `file`, **`lsb_bytes_extract`** (v0.5-lsb-bytes-auto-run, 12 组合兜底 zsteg 漏报) |
 
 ---
 

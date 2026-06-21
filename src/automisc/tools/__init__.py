@@ -17,7 +17,6 @@ from automisc.tools.shared import binwalk  # noqa: F401
 from automisc.tools.shared import exiftool  # noqa: F401
 from automisc.tools.shared import file  # noqa: F401
 from automisc.tools.shared import foremost  # noqa: F401
-from automisc.tools.shared import lsb_bytes_extract_adapter  # noqa: F401  # v0.5-lsb-bytes-auto-run
 from automisc.tools.shared import strings  # noqa: F401
 from automisc.tools.shared import xxd  # noqa: F401
 

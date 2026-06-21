@@ -30,12 +30,7 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 # 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 21 decoder + 14 cipher/占位）
 # v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
-    "共享基础工具 (PR1)": [
-        "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
-        # v0.5-lsb-bytes-auto-run: auto-run 兜底 zsteg 漏报 (12 组合 PIL/numpy 直抽, ~5s)
-        # 跟 GUI user-controlled 入口 (v0.5-lsb-bytes-gui '🐍 Pyc 反编译' ... 不, '🎨 LSB 字节流') 区别
-        "lsb_bytes_extract",
-    ],
+    "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
     "Stego/Image (PR2)": ["zsteg", "stegseek"],
     "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
@@ -111,7 +106,6 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "lsb_extract": "🎨 PNG LSB 智能提取",
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
     "sevenz_extract": "📦 7z 解压",  # v0.5-sevenz-extract Owner 2026-06-20 19:48
-    "lsb_bytes_extract": "🎨 LSB 字节流抽取 (auto-run 同款, 12 组合)",  # v0.5-lsb-bytes-auto-run Owner 06-21 18:11
     "decoder:base64-image": "🔓 Base64 → 图片",
     # v0.5-cn-display (per Owner 22:39): 中文 display
     "decoder:hex-ascii": "🔢 16 进制转文本",
@@ -160,7 +154,6 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 # v0.5-sevenz-extract (per Owner 2026-06-20 19:48): 加 sevenz_extract 7z 解压
 # v0.5-sevenz-toolbar-cleanup (per Owner 2026-06-20 20:03): 探测类 (sevenz) 不显示在 GUI menu,
 #   但 adapter 仍注册 (auto_run / router / find_suspicious 用)
-# v0.5-lsb-bytes-auto-run (per Owner 06-21 18:11): 加 lsb_bytes_extract (auto-run 兜底 zsteg 漏报)
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
     "zsteg", "stegseek",
@@ -170,7 +163,6 @@ ADAPTER_TOOLS: set[str] = {
     "grep", "evtx_dump",
     "zbar",
     "vol",
-    "lsb_bytes_extract",  # v0.5-lsb-bytes-auto-run
 }
 
 
