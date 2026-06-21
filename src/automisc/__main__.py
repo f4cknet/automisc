@@ -278,6 +278,8 @@ def build_parser() -> argparse.ArgumentParser:
     from automisc.core.decoders import coords_to_qr  # noqa: F401
     # v0.5-lsb-byte-stream-extract: magic_sniffer decoder
     from automisc.core.decoders import magic_sniffer  # noqa: F401
+    # v0.5-pyc-magic-sniffer: pyc_decompiler decoder
+    from automisc.core.decoders import pyc_decompiler  # noqa: F401
     from automisc.core.decoders.registry import list_decoders
     for spec in list_decoders():
         p_sub = p_decode_sub.add_parser(spec.name, help=spec.description)

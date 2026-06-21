@@ -210,3 +210,76 @@ class TestRunMagicSniffer:
         result = run_magic_sniffer(str(bin_path), max_offset=32, write_files=False)
         assert result.has_hits
         assert result.written_files == []
+
+
+# ---------- v0.5-pyc-magic-sniffer: Py2.x / Py3.x magic 字典扩展 (per Owner 06-21 11:40 Q1=Y) ----------
+class TestPycMagicExtensions:
+    """v0.5-pyc-magic-sniffer: Py2.x / Py3.x magic 字典扩展 (per Owner 06-21 11:40 Q1=Y).
+
+    覆盖: Py2.4 / Py2.5 / Py2.6 / Py2.7 + Py3.0 / Py3.6 / Py3.10 / Py3.12 + 滑动窗口。
+    """
+
+    def test_py27_magic_at_offset_0(self):
+        """Python 2.7 pyc magic 03 f3 0d 0a (62211) → 命中 (per N=NP 题核心命中)."""
+        data = b"\x03\xf3\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 2.7" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py26_magic_at_offset_0(self):
+        """Python 2.6 pyc magic 81 f2 0d 0a (62081) → 命中."""
+        data = b"\x81\xf2\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 2.6" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py24_magic_at_offset_0(self):
+        """Python 2.4 pyc magic 3b f2 0d 0a (62061) → 命中."""
+        data = b"\x3b\xf2\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 2.4" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py30_magic_at_offset_0(self):
+        """Python 3.0 pyc magic b8 0b 0d 0a (3000) → 命中."""
+        data = b"\xb8\x0b\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 3.0" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py36_magic_at_offset_0(self):
+        """Python 3.6 pyc magic 5c 0d 0d 0a (3420) → 命中."""
+        data = b"\x5c\x0d\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 3.6" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py312_magic_at_offset_0(self):
+        """Python 3.12 pyc magic cb 0d 0d 0a (3531) → 命中."""
+        data = b"\xcb\x0d\x0d\x0a" + b"\x00" * 32
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 3.12" in h.description]
+        assert any(h.offset == 0 for h in pyc_hits)
+
+    def test_py27_magic_at_offset_n(self):
+        """Py2.7 magic 在 offset 8 → 命中 (滑动窗口)."""
+        data = b"\xff" * 8 + b"\x03\xf3\x0d\x0a" + b"\x00" * 16
+        hits = sniff_magic(data, max_offset=32)
+        pyc_hits = [h for h in hits if "Python 2.7" in h.description]
+        assert any(h.offset == 8 for h in pyc_hits)
+
+    def test_py27_magic_writes_pyc(self, tmp_path):
+        """Py2.7 magic 命中 → 写 .pyc 文件 (per spec §6 ④)."""
+        data = b"\x03\xf3\x0d\x0a" + b"\x00" * 100
+        bin_path = tmp_path / "x.bin"
+        bin_path.write_bytes(data)
+
+        result = run_magic_sniffer(str(bin_path), max_offset=32)
+        pyc_writes = [w for w in result.written_files if w.endswith(".pyc")]
+        assert len(pyc_writes) == 1
+
+    def test_all_python_magics_have_pyc_ext(self):
+        """所有 Python pyc magic 都应该 ext='pyc'."""
+        for magic, desc, ext in EXTENDED_MAGIC_SIGNATURES:
+            if "pyc" in desc.lower() or "python" in desc.lower():
+                assert ext == "pyc", f"{desc} should have ext='pyc'"

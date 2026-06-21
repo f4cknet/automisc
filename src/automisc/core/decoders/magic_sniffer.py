@@ -70,16 +70,32 @@ EXTENDED_MAGIC_SIGNATURES: list[tuple[bytes, str, str]] = [
     (b"\x7fELF", "ELF binary (Linux/Unix)", "elf"),
     # ----- 数据库 / 字节码 -----
     (b"SQLite format 3", "SQLite DB", "sqlite"),
-    # Python pyc 字节码 (per v0.5-train-009 N=NP 题核心命中)
-    # pyc magic 是 4 字节: 不同 Python 版本 magic 不同, 共同点首字节 >= 0xe0
-    # 简化嗅探: 只匹配前 1 字节 >= 0xe0 标识为 "可能是 pyc", 需要后续 unhexlify 验证
-    # 完整 magic 表见: https://github.com/python/cpython/blob/main/Lib/importlib/_bootstrap_external.py
-    # 这里列 5 个最常见 Python 3.x magic
-    (b"\xe3\x00\x00\x00", "Python 3.0 pyc (magic 3000)", "pyc"),
+    # Python pyc 字节码 (per v0.5-train-009 N=NP 题核心命中 + v0.5-pyc-magic-sniffer 扩展)
+    # pyc magic 是 4 字节: 2 字节 magic (LE) + 2 字节 0x0d 0x0a
+    # Py2.x: 0x0d0a 结尾; Py3.x: 0x0d0a 结尾
+    # 完整 magic 表: https://github.com/python/cpython/blob/main/Lib/importlib/_bootstrap_external.py
+    # Py2.x 系列 (62211 = 0xf303 = '03 f3 0d 0a' LE)
+    (b"\x3b\xf2\x0d\x0a", "Python 2.4 pyc (magic 62061)", "pyc"),
+    (b"\x61\xf2\x0d\x0a", "Python 2.5 pyc (magic 62071)", "pyc"),
+    (b"\x81\xf2\x0d\x0a", "Python 2.6 pyc (magic 62081)", "pyc"),
+    (b"\x03\xf3\x0d\x0a", "Python 2.7 pyc (magic 62211, N=NP 题命中)", "pyc"),
+    # Py3.x 系列
+    (b"\xb8\x0b\x0d\x0a", "Python 3.0 pyc (magic 3000)", "pyc"),
+    (b"\x4e\x0c\x0d\x0a", "Python 3.1 pyc (magic 3150)", "pyc"),
+    (b"\x20\x0d\x0d\x0a", "Python 3.2 pyc (magic 3360)", "pyc"),
+    (b"\x2f\x0d\x0d\x0a", "Python 3.3 pyc (magic 3375)", "pyc"),
     (b"\x33\x0d\x0d\x0a", "Python 3.3-3.7 pyc (magic 3379-3394)", "pyc"),
     (b"\x42\x0d\x0d\x0a", "Python 3.8-3.9 pyc (magic 3400-3450)", "pyc"),
+    (b"\x48\x0d\x0d\x0a", "Python 3.4 / 3.8 pyc (magic 3400)", "pyc"),
+    (b"\x52\x0d\x0d\x0a", "Python 3.5 pyc (magic 3410)", "pyc"),
+    (b"\x5c\x0d\x0d\x0a", "Python 3.6 pyc (magic 3420)", "pyc"),
     (b"\x61\x0d\x0d\x0a", "Python 3.10+ pyc (magic 3439-3495)", "pyc"),
-    (b"\x6c\x0d\x0d\x0a", "Python 2.x pyc (magic 62011-62611)", "pyc"),
+    (b"\x6f\x0d\x0d\x0a", "Python 3.10 pyc (magic 3439)", "pyc"),
+    (b"\xa7\x0d\x0d\x0a", "Python 3.11 pyc (magic 3495)", "pyc"),
+    (b"\xcb\x0d\x0d\x0a", "Python 3.12 pyc (magic 3531)", "pyc"),
+    # 兼容旧 dict 残留 (避免破坏现有单测)
+    (b"\xe3\x00\x00\x00", "Python 3.0 legacy pyc (magic 3000, 旧 dict)", "pyc"),
+    (b"\x6c\x0d\x0d\x0a", "Python 2.x legacy pyc (旧 dict)", "pyc"),
     # ----- WebAssembly / Mach-O / Java class -----
     (b"\x00asm", "WebAssembly binary", "wasm"),
     (b"\xcf\xfa\xed\xfe", "Mach-O 32-bit (Mach-O magic LE)", "macho"),

@@ -130,7 +130,8 @@ automisc/
 | `core/decoders/base_rot_decoders.py` | 18 个 base/rot decoder 聚合注册 | — |
 | `core/decoders/coords_to_qr.py` | 坐标串 → QR PNG → zbar decoder | — |
 | `core/decoders/cipher_decoders.py` | 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble) + 2 占位 → 解密工具1/2/3 | `run_caesar`, `run_bacon`, ..., `run_bubblebabble`, `run_placeholder` |
-| `core/decoders/magic_sniffer.py` | **v0.5-lsb-byte-stream-extract 能力 C**: 字节流 magic 嗅探 (滑动窗口扫 offset 0~32, 39 文件 magic: PNG/ZIP/pyc/JPEG/ELF/WASM/Mach-O/Java/...), 解决 `router.detect_magic` 只看 offset 0 痛点 | `sniff_magic`, `run_magic_sniffer`, `EXTENDED_MAGIC_SIGNATURES` |
+| `core/decoders/magic_sniffer.py` | **v0.5-lsb-byte-stream-extract 能力 C**: 字节流 magic 嗅探 (滑动窗口扫 offset 0~32, 50+ 文件 magic: PNG/ZIP/Py2.x pyc/Py3.x pyc/JPEG/ELF/WASM/Mach-O/Java/...), 解决 `router.detect_magic` 只看 offset 0 痛点 | `sniff_magic`, `run_magic_sniffer`, `EXTENDED_MAGIC_SIGNATURES` |
+| `core/decoders/pyc_decompiler.py` | **v0.5-pyc-magic-sniffer 能力 E**: Py2.x / Py3.x .pyc 文件反编译到 Python 源码 (uncompyle6 / decompyle3 / dis fallback), 输入 .pyc 路径 → 输出 source_code + 元数据 (magic_int / version) | `run_pyc_decompiler`, `PycDecompileResult` |
 | `gui/main_window.py` | QMainWindow + 5 菜单 + 拖文件 | `MainWindow` |
 | `gui/chain_runner.py` | 链 QThread (v0.5) | `ChainRunner` |
 
@@ -175,6 +176,7 @@ automisc/
 | **🔤 解密工具1** (12 cipher) | `core/decoders/cipher_decoders.py` | decoder |
 | **📦 解密工具2/3** (占位 TBD) | `core/decoders/cipher_decoders.py` (placeholder) | decoder |
 | **🔍 Magic Sniffer** (v0.5-lsb-byte-stream-extract) | `core/decoders/magic_sniffer.py` | decoder |
+| **🐍 Pyc 反编译** (v0.5-pyc-magic-sniffer) | `core/decoders/pyc_decompiler.py` | decoder |
 
 ### 何时用 adapter vs decoder?
 
