@@ -41,7 +41,7 @@
 | ⚠️ | 源码/jar 在但需额外配置（pyenv shim / python2 wrapper / 需 brew 额外依赖）| v0.1 可写 adapter（带 wrapper 脚本） |
 | ❌ | 未安装 / 源码缺失 | v0.1 不写 adapter；按 §3 安装指引手动装 |
 
-> **判断标准**：本表状态基于 macOS 当前环境（2026-06-13 实测 `which` + `import` 抽查）。
+> **判断标准**：本表状态基于 Windows 当前环境（2026-06-27 实测 `where` + `import` 抽查），工具链走 `extend-tools/bin/win-x64/`。
 
 ---
 
@@ -516,6 +516,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-27 | **2.5** | v0.5-windows-only 治理变更 v3.3：项目定位收窄为 Windows only（per `AGENTS.md §2.3`）；`extend-tools/bin/win-x64/` 是 Win 优先工具链；macOS / Linux 路径探测代码 + brew 注释清理待 PR5/6 实施；详见 [`upgrade/v0.5-windows-only.md`](./upgrade/v0.5-windows-only.md)。 |
 | 2026-06-13 | 1.0 | 初版：扫描 9 个 subflow + macOS 工具抽查。详见 git history。 |
 | 2026-06-13 | **2.0** | 重大分支重整：从 9 subflow 改为 11 subflow（Forensics×4 + Stego×3 + Encoding×3 + Misc Others×3）；54 工具（28✅/2⚠️/24❌）；Encoding 内置实现。详见 commit `9401f98`。 |
 | 2026-06-13 | **2.1** | v0.1.0b-PR1 实施完成：6 个共享 adapter 落地（61 tests PASS）。详见 commit `9401f98`。 |

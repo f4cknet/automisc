@@ -1,6 +1,6 @@
 # AGENTS.md — AutoMisc
 
-> **本文件 ≤ 200 行 · 治理变更 v3.2 · 2026-06-27**（per Owner: 跨平台 extend-tools/）
+> **本文件 ≤ 200 行 · 治理变更 v3.3 · 2026-06-27**（per Owner: Windows only）
 
 ## 0. 启动必读
 
@@ -35,7 +35,7 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 
 - **2.1 粒度**：单 PR ≤ 400 行；不跨任务 ID；GUI 改 / Core 改分离
 - **2.2 单 Owner**：Owner 自审 = Reviewer；main 唯一长期分支
-- **2.3 multi-platform**（v0.5-platform-extend-tools 治理变更 2026-06-27）：GUI / Core 在 **macOS + Windows** 双平台验证；subprocess 走 `tools/paths.py:resolve_tool_binary`（PATH 优先 → `extend-tools/bin/<platform>/` fallback，per [`upgrade/v0.5-platform-extend-tools.md`](upgrade/v0.5-platform-extend-tools.md)）；GUI 菜单 `✓/✗` marker 同时检查 binary 可执行；macOS 优先 brew / Windows 优先 extend-tools，互不破坏；Linux 不在范围（v0.5+ 评估 CI）
+- **2.3 Windows only**（v0.5-windows-only 治理变更 v3.3 · 2026-06-27）：GUI / Core 仅在 **Windows** 平台验证；subprocess 走 `tools/paths.py:resolve_tool_binary`（PATH 优先 → `extend-tools/bin/win-x64/` fallback，per [`upgrade/v0.5-windows-only.md`](upgrade/v0.5-windows-only.md)）；GUI 菜单 `✓/✗` marker 检查 binary 可执行；Win 优先 extend-tools/ 装 .exe binary；macOS / Linux **不在范围**（v0.5+ 不评估）
 - **2.4 单 Owner Git 全权**（v0.1.1 治理）：
   - AI Agent **全权**执行 `git add/commit/branch/checkout/merge --no-ff/rebase/cherry-pick/fetch/log/diff`
   - AI Agent **必须询问 Owner** 后执行 `git push` / `gh pr merge` / 删临时分支（per §4 询问卡模板）
@@ -50,7 +50,7 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 
 ## 4. 紧急通道（仅跳过铁律 2，1/3/4 永远不跳）
 
-1. macOS 紧急修复（PySide6 兼容）：24h 内补铁律 2
+1. Windows 紧急修复（PySide6 兼容）：24h 内补铁律 2
 2. CI 全红 hotfix：文档同 PR 跟上
 3. Owner 现场特批：PR 描述写明原因 + 授权人
 
@@ -132,9 +132,9 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-27 21:54 | **3.2** | **跨平台 extend-tools/**（per Owner 2026-06-27 Y）：§2.3 macOS only → multi-platform (macOS + Windows)；新建 `extend-tools/` 目录 (manifest.yaml + install.ps1 + bin/win-x64/) + `src/automisc/tools/paths.py:resolve_tool_binary` (PATH 优先 → extend-tools fallback)；GUI 菜单 `✓/✗` marker 增强（同时检查 binary 可执行）；steghide / zsteg Windows unavailable（zsteg 用 lsb_detect 替代 per v0.5-lsb-detector）；详见 [`upgrade/v0.5-platform-extend-tools.md`](upgrade/v0.5-platform-extend-tools.md)。PR 拆分 4 步（PR1 治理+骨架 / PR2 paths+adapter / PR3 GUI+tests / PR4 验证）。 |
+| 2026-06-27 23:25 | **3.3** | **Windows only**（per Owner 2026-06-27 23:25 Y）：v3.2 后 1 小时, Owner Win 端实测 `automisc-gui` 已启动成功 + `extend-tools/` 是 Windows `.exe` → **回退跨平台承诺**，`§2.3 multi-platform` → `Windows only`；**方案 Y · forward commit 收窄**（保留 v3.2 `extend-tools/` 骨架, 删 darwin 代码路径 + 文档改写）；§4 紧急通道 "macOS 紧急修复" → "Windows 紧急修复"；详见 [`upgrade/v0.5-windows-only.md`](upgrade/v0.5-windows-only.md)。7 PR 拆解（PR1 治理+文档 / PR2 平台探测 / PR3 CLI+GUI 元数据 / PR4 extend-tools 平台无关化 / PR5 adapter 描述 / PR6 Core 业务 / PR7 测试）。 |
+| 2026-06-27 21:54 | **3.2** | **跨平台 extend-tools/**（per Owner 2026-06-27 Y）— **被 v3.3 收窄为 Windows only**：§2.3 macOS only → multi-platform (macOS + Windows)；新建 `extend-tools/` 目录 (manifest.yaml + install.ps1 + bin/win-x64/) + `src/automisc/tools/paths.py:resolve_tool_binary` (PATH 优先 → extend-tools fallback)；GUI 菜单 `✓/✗` marker 增强（同时检查 binary 可执行）；steghide / zsteg Windows unavailable（zsteg 用 lsb_detect 替代 per v0.5-lsb-detector）；详见 [`upgrade/v0.5-platform-extend-tools.md`](upgrade/v0.5-platform-extend-tools.md)。PR 拆分 4 步（PR1 治理+骨架 / PR2 paths+adapter / PR3 GUI+tests / PR4 验证）。 |
 | 2026-06-14 20:37 | **3.1** | **训练驱动 + 架构优先**（per Owner）：§1 加铁律 5 / 6；新增 §5「训练驱动迭代」专章（5.1 铁律定义 / 5.2 架构判定标准 / 5.3 标准动作 / 5.4 归档规范 / 5.5 命名规则）；§5~§8 顺移到 §6~§9。训练日志 `upgrade/v0.5-train-NNN-*.md` 走 gitignore 就地归档（不 commit 原文件）。 |
 | 2026-06-13 23:01 | **3.0** | **文档体系 v3.0**：`AGENTS.md` 压到 ≤ 200 行（删 §9 任务快照 / §3-§4 简化 / 变更日志砍到 4 条）；`prd.md` frozen + 跳到 STRUCTURE.md；新增 `STRUCTURE.md` 186 行取代已删 Architecture.md。**净压缩 60% 行数**（1903 → 1160 → ≈ 800）。 |
-| 2026-06-13 22:44 | **1.20** | **§2.4 简化 v3**（v0.1.1 治理）：AI Agent 全权 git（含 push/merge），3 类高风险操作必询问 Owner；批量授权不豁免询问。 |
 
 > 末次归档：2026-06-13（v1.0~v1.19 + v2.0 已归档到 `docs/changelog/AGENTS.md_archived.md`）。

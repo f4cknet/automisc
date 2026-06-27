@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "automisc"
 version = "0.1.0b.dev0"
-description = "AutoMisc — macOS GUI 半自动化 CTF Misc 工具箱（v0.1.dev）"
+description = "AutoMisc — Windows GUI 半自动化 CTF Misc 工具箱（v0.5+）"
 readme = "../README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
