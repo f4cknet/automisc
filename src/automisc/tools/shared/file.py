@@ -19,7 +19,15 @@ class FileAdapter(ToolAdapter):
     description = "通过 magic bytes 识别文件类型"
 
     def run(self, file_path: str) -> ToolResult:
-        cmd = [self.binary_path or "file", "--brief", file_path]
+        # per v0.5-windows-tool-compat PR2: 走 resolve_tool_binary (PATH → extend-tools/
+        # fallback) 而非硬编码 "file". Win 上 file CLI 不在系统 PATH, 必须依赖
+        # extend-tools/bin/win-x64/file.exe (per install.ps1 + manifest.yaml).
+        from automisc.tools.paths import resolve_tool_binary
+        cmd = [
+            self.binary_path or resolve_tool_binary("file") or "file",
+            "--brief",
+            file_path,
+        ]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []

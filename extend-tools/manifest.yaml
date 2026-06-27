@@ -50,6 +50,17 @@ platforms:
         available: true
         notes: "第三方 fork (CTF 圈通用), 官方无 Windows 版"
 
+      file:
+        version: "5.29"
+        url: "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
+        sha256: "21ACF14A7C7A5971DA369B1022764526F3D71895387829C640C3E2960E56E057"  # 2026-06-28 PR2 install 算出
+        available: true
+        notes: |
+          file CLI v5.29 (libmagic), nscaife/file-windows prebuilt (2017-01-08 最后 release,
+          CTF 社区常用, 下载 11 万次). 原生 Unix `file` CLI Win 不可用.
+          zip 包含: file.exe + libgnurx-0.dll + libmagic-1.dll + magic.mgc (4.8MB) + 2 个 COPYING.
+          install.ps1 全部部署到 extend-tools/bin/win-x64/ (libmagic 依赖要求同目录).
+
     pip_packages:
       # 1 Python package (pip install by install.ps1)
       binwalk:

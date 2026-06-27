@@ -60,6 +60,15 @@ $binaries = @(
         url = "https://github.com/raddyfiy/foremost/raw/master/binary/foremost.exe"
         target = "foremost.exe"
         post_extract = $null
+    },
+    @{
+        name = "file"
+        version = "5.29"
+        # nscaife/file-windows 2017-01-08 release (latest). file CLI Win 不可用,
+        # libmagic 预编译 + GPL 兼容 license.
+        url = "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
+        target = "file.exe"
+        post_extract = "file_zip"
     }
 )
 
@@ -157,6 +166,35 @@ foreach ($tool in $binaries) {
                     }
                 }
                 Write-Host "[link] 7z.exe -> 7zr.exe" -ForegroundColor Green
+            }
+            "file_zip" {
+                # nscaife/file-windows zip: file.exe + libgnurx-0.dll + libmagic-1.dll +
+                # magic.mgc + COPYING.file + COPYING.libgnurx (all at zip root).
+                # libmagic 依赖要求所有 dll + magic.mgc 必须跟 file.exe 在同目录,
+                # 所以整体 unzip 到 bindir.
+                Write-Host "[extract] $($tool.name) zip -> $BinDir ..." -NoNewline
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                $extract_dir = Join-Path $StageDir "$($tool.name)_extract"
+                if (Test-Path $extract_dir) { Remove-Item $extract_dir -Recurse -Force }
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($tmp, $extract_dir)
+                # 全部复制到 bindir (libmagic 依赖)
+                foreach ($f in @("file.exe", "libgnurx-0.dll", "libmagic-1.dll", "magic.mgc", "COPYING.file", "COPYING.libgnurx")) {
+                    $src = Join-Path $extract_dir $f
+                    if (Test-Path $src) {
+                        $dst = Join-Path $BinDir $f
+                        # 不强制 overwrite — existing sha256 已固定, idempotent
+                        if ((Test-Path $dst) -and (-not $Force)) {
+                            Write-Host "[skip] $($tool.name): $f already exists" -ForegroundColor Gray
+                        } else {
+                            Move-Item $src $dst -Force
+                        }
+                    } else {
+                        Write-Host "[warn] $($tool.name): $f missing in zip (libmagic 依赖可能损坏)" -ForegroundColor Yellow
+                    }
+                }
+                Remove-Item $extract_dir -Recurse -Force
+                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                Write-Host " OK" -ForegroundColor Green
             }
             default {
                 Move-Item $tmp $dest -Force
