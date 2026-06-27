@@ -73,3 +73,36 @@ def test_exiftool_handles_missing_file(tmp_path):
     a = ExiftoolAdapter()
     result = a.run(str(tmp_path / "does_not_exist_xyz"))
     assert not result.is_success
+
+
+def test_exiftool_chinese_exif_decodes_correctly(tmp_path):
+    """per v0.5-windows-tool-compat PR1: adapter 传 -charset utf8, 中文 EXIF 不乱码.
+
+    触发 bug: Win 上 exiftool 不传 -charset 时按 GBK code page 解码 EXIF Unicode
+    字段 (XP*/XMP/Description/Title), 中文 EXIF 全乱码 (e.g. "图穷flag见" →
+    "å›¾ç©·flagè§"). 修复: adapter cmd 强制 -charset utf8.
+
+    验证: 写入带中文 Title 的 PNG, exiftool 读回应保留中文.
+    """
+    from PIL import Image
+    src = tmp_path / "chinese.png"
+    Image.new("RGB", (8, 8), "red").save(src, "PNG")
+
+    # exiftool 写中文 Title (UTF-8 EXIF Unicode 字段)
+    chinese_title = "图穷flag见"  # per v0.5-train-013-meihuai-jpg.jpg
+    proc = subprocess.run(
+        ["exiftool", "-overwrite_original",
+         f"-Title={chinese_title}",
+         str(src)],
+        check=False, capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        pytest.skip(f"exiftool 不能写入 PNG EXIF (Win 上可能不支持): {proc.stderr}")
+
+    a = ExiftoolAdapter()
+    result = a.run(str(src))
+    assert result.is_success, f"stderr={result.stderr}"
+    # Title 字段必须保留中文, 不能是 GBK 错解码的乱码
+    assert chinese_title in result.stdout, (
+        f"中文 EXIF 乱码! 期望 '{chinese_title}' 在 stdout, 实际 stdout:\n{result.stdout}"
+    )
