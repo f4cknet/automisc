@@ -17,9 +17,20 @@ venv/
 .vscode/
 .idea/
 
-# extend_tools：外部 misc 工具源码 / 二进制（不纳入版本控制）
+# extend-tools：外部 misc 工具源码 / 二进制（不纳入版本控制）
+# v0.5-platform-extend-tools 治理变更 (2026-06-27): 旧 extend_tools/ (下划线) 废弃
 extend_tools/
-# 例外：保留 png_crc_check.py 作为 PR1 工具池候选参考
+extend-tools/bin/win-x64/*
+extend-tools/bin/macos/*
+# 例外：保留 extend-tools 目录结构 + manifest + install 脚本 + README 入 git
+!extend-tools/.gitignore
+!extend-tools/manifest.yaml
+!extend-tools/install.ps1
+!extend-tools/install.sh
+!extend-tools/README.md
+!extend-tools/bin/win-x64/.gitkeep
+!extend-tools/bin/macos/.gitkeep
+# 例外（旧版历史）: 保留 png_crc_check.py 作为 PR1 工具池候选参考
 !extend_tools/png_crc_check.py
 
 # 工具输出 (v0.5 chain 临时产物)

@@ -43,7 +43,8 @@ class ExiftoolAdapter(ToolAdapter):
     description = "提取文件元数据（EXIF / Office / PDF）"
 
     def run(self, file_path: str) -> ToolResult:
-        cmd = [self.binary_path or "exiftool", file_path]
+        from automisc.tools.paths import resolve_tool_binary
+        cmd = [self.binary_path or resolve_tool_binary("exiftool") or "exiftool", file_path]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []

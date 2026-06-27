@@ -1,6 +1,11 @@
-"""测试 tools/base.py — ToolAdapter 基类（subprocess 包装）。"""
+"""测试 tools/base.py — ToolAdapter 基类（subprocess 包装）。
+
+v0.5-platform-extend-tools: 4 个测试用 POSIX shell 命令 (echo / sleep), Windows 上
+这些命令不是 standalone binary (echo 是 cmd 内置), 跳过 Windows.
+"""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,6 +13,10 @@ import pytest
 
 from automisc.core.result import ToolResult
 from automisc.tools.base import ToolAdapter
+
+
+_IS_WINDOWS = sys.platform == "win32"
+_SKIP_WINDOWS = pytest.mark.skipif(_IS_WINDOWS, reason="POSIX shell command (echo/sleep), Windows has no such binary")
 
 
 class _MinimalAdapter(ToolAdapter):
@@ -22,6 +31,7 @@ class _MinimalAdapter(ToolAdapter):
         )
 
 
+@_SKIP_WINDOWS
 def test_check_available_returns_true_for_echo():
     class _EchoAdapter(ToolAdapter):
         name = "echo"
@@ -48,6 +58,7 @@ def test_check_available_returns_false_for_nonexistent():
     assert a.check_available() is False
 
 
+@_SKIP_WINDOWS
 def test_subprocess_returns_exit_code_and_output():
     a = _MinimalAdapter()
     ec, out, err, dur = a._run_subprocess(["echo", "hello"])
@@ -63,8 +74,12 @@ def test_subprocess_returns_127_for_missing_executable(tmp_path: Path):
     assert "not found" in err.lower()
 
 
+@_SKIP_WINDOWS
 def test_subprocess_includes_homebrew_in_path():
-    """确认 macOS subprocess 时显式追加 Homebrew 路径（per Architecture.md §4.3）。"""
+    """确认 macOS subprocess 时显式追加 Homebrew 路径（per Architecture.md §4.3）。
+
+    v0.5-platform-extend-tools: macOS only 测试, Windows skip (homebrew path 是 macOS 专属).
+    """
     a = _MinimalAdapter()
     with patch("os.environ", {"PATH": "/usr/bin:/bin"}):
         ec, out, err, dur = a._run_subprocess(["echo", "test"])
@@ -73,6 +88,7 @@ def test_subprocess_includes_homebrew_in_path():
         assert ec == 0
 
 
+@_SKIP_WINDOWS
 def test_subprocess_timeout_returns_124(tmp_path: Path):
     """timeout 返回 exit code 124（与 `timeout` CLI 工具一致）。"""
     class _SlowAdapter(ToolAdapter):
@@ -91,6 +107,7 @@ def test_subprocess_timeout_returns_124(tmp_path: Path):
     assert "timeout" in result.stderr.lower()
 
 
+@_SKIP_WINDOWS
 def test_adapter_run_returns_tool_result():
     a = _MinimalAdapter()
     result = a.run("/dev/null")

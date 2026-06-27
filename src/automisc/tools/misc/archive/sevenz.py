@@ -44,14 +44,17 @@ class SevenZipAdapter(ToolAdapter):
     default_timeout = 30.0
 
     def run(self, file_path: str) -> ToolResult:
+        from automisc.tools.paths import resolve_tool_binary
+        sevenz = self.binary_path or resolve_tool_binary("7z") or "7z"
+
         # 7z t: test mode（不解压但 CRC 校验 + 密码尝试）
         # 用空密码 -p""：如果文件标记加密且密码非空，会报 "Wrong password"（伪加密信号）
         # 如果是真加密 + 正确密码，list 阶段就够
         # 策略：先 list 看文件结构（拿到 file count），再 test 探伪加密
-        cmd_list = [self.binary_path or "7z", "l", file_path]
+        cmd_list = [sevenz, "l", file_path]
         ec_l, stdout_l, stderr_l, dur_l = self._run_subprocess(cmd_list)
 
-        cmd_test = [self.binary_path or "7z", "t", "-p", file_path]
+        cmd_test = [sevenz, "t", "-p", file_path]
         ec_t, stdout_t, stderr_t, dur_t = self._run_subprocess(cmd_test)
 
         # 合并两次输出做检测

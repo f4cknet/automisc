@@ -30,6 +30,7 @@ from automisc.core.result import ToolResult
 from automisc.core.suspicious import SuspiciousPoint, scan_output_for_suspicious
 from automisc.core.utils.output_path import extract_dir_for
 from automisc.tools.base import ToolAdapter
+from automisc.tools.paths import resolve_tool_binary
 
 
 # 7z x 报错的强信号: 加密 / 损坏 / 伪加密
@@ -85,7 +86,7 @@ class SevenZipExtractAdapter(ToolAdapter):
         #    -o<dir> 直接连, 无空格 (7z 风格)
         #    -y assume Yes (避免交互)
         cmd = [
-            self.binary_path or "7z",
+            self.binary_path or resolve_tool_binary("7z") or "7z",
             "x",
             "-y",
             f"-o{extract_dir}",

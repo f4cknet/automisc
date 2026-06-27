@@ -17,6 +17,7 @@ from automisc.core.result import ToolResult
 from automisc.core.suspicious import SuspiciousPoint
 from automisc.core.utils.output_path import extract_dir_for
 from automisc.tools.base import ToolAdapter
+from automisc.tools.paths import resolve_tool_binary
 
 
 # foremost 输出行格式: "Extract|<TYPE>|<OFFSET>|<LENGTH>|<PATH>"
@@ -46,7 +47,7 @@ class ForemostAdapter(ToolAdapter):
         outdir.mkdir(parents=True, exist_ok=True)
 
         cmd = [
-            self.binary_path or "foremost",
+            self.binary_path or resolve_tool_binary("foremost") or "foremost",
             "-t", "all",  # 全部类型
             "-i", file_path,
             "-o", str(outdir),

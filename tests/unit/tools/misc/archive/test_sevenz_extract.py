@@ -14,7 +14,7 @@ per Owner 2026-06-20 19:48 拍板:
 """
 from __future__ import annotations
 
-import subprocess
+import shutil
 
 import pytest
 
@@ -23,9 +23,9 @@ from automisc.core.utils.output_path import extract_dir_for
 from automisc.tools.misc.archive.sevenz_extract import SevenZipExtractAdapter
 
 
-# ---------- 是否有 7z CLI ----------
-HAS_7Z = subprocess.run(["which", "7z"], capture_output=True).returncode == 0
-SKIP_REASON = "7z CLI not installed (brew install p7zip)"
+# ---------- 是否装 7z CLI (跨平台, v0.5-platform-extend-tools) ----------
+HAS_7Z = shutil.which("7z") is not None
+SKIP_REASON = "7z CLI not installed (brew install p7zip / install.ps1 puts 7zr.exe in extend-tools/bin/win-x64/)"
 
 
 # ---------- 注册 ----------

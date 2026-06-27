@@ -1,0 +1,17 @@
+# extend-tools/.gitignore
+#
+# 设计原则：
+# - 入 git: 目录结构 (.gitkeep) + manifest + install 脚本 + README
+# - 不入 git: 实际二进制 (bin/win-x64/*.exe 等)，用 manifest.yaml 追溯
+
+# Windows binaries (不入 git，install.ps1 自动下)
+bin/win-x64/*
+!bin/win-x64/.gitkeep
+
+# macOS binaries (暂留空，v0.5+ 评估)
+bin/macos/*
+!bin/macos/.gitkeep
+
+# install 临时文件
+*.tmp
+*.download

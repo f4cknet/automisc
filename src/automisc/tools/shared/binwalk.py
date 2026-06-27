@@ -84,10 +84,24 @@ class BinwalkAdapter(ToolAdapter):
     default_timeout = 60.0  # 大文件扫描可能较慢
 
     def run(self, file_path: str) -> ToolResult:
-        binwalk = self.binary_path or "binwalk"
+        # v0.5-platform-extend-tools: binwalk 跨平台通过 `python -m binwalk` 调用
+        # (venv activate 不需要, system Python 也能跑)
+        # binary_path 显式设置时仍优先用 binary_path (向后兼容)
+        from automisc.tools.paths import resolve_tool_binary
+
+        if self.binary_path:
+            binwalk = self.binary_path
+        else:
+            # 跨平台统一: python -m binwalk
+            import sys as _sys
+            binwalk = f"{_sys.executable} -m binwalk"
 
         # Step 1: binwalk <file> 扫描（v0.5-philosophy-rethink: 不再自动 binwalk -e 提取）
-        cmd_scan = [binwalk, file_path]
+        if " " in binwalk:
+            # python -m binwalk → shell 拆分
+            cmd_scan = binwalk.split() + [file_path]
+        else:
+            cmd_scan = [binwalk, file_path]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd_scan)
 
         suspicious: list[SuspiciousPoint] = []

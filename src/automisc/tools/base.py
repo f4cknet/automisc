@@ -92,14 +92,19 @@ class ToolAdapter(ABC):
     # ---- 工具可达性 ----
 
     def check_available(self) -> bool:
-        """检查外部工具是否在 PATH 可用。
+        """检查外部工具是否在 PATH 或 extend-tools/ 可用。
 
-        - ``binary_path`` 非空：检查文件是否存在
-        - 否则走 ``shutil.which(self.name)``
+        v0.5-platform-extend-tools: 走 `paths.resolve_tool_binary` (PATH 优先 →
+        extend-tools/bin/<platform>/ fallback). 原 v0.5 仅查 shutil.which, Windows 上
+        装到 extend-tools/ 的 binary 会显示不可用.
+
+        - ``binary_path`` 显式设置: 检查文件是否存在 (覆盖默认)
+        - 否则走 `paths.resolve_tool_binary` (跨平台)
         """
         if self.binary_path:
             return Path(self.binary_path).exists()
-        return shutil.which(self.name) is not None
+        from automisc.tools.paths import resolve_tool_binary
+        return resolve_tool_binary(self.name) is not None
 
     # ---- 工具执行辅助 ----
 
@@ -109,7 +114,7 @@ class ToolAdapter(ABC):
         *,
         timeout: float | None = None,
     ) -> tuple[int, str, str, int]:
-        """subprocess 包装（macOS PATH 显式指定 + stderr 分离 + 超时）。
+        """subprocess 包装（跨平台 PATH + stderr 分离 + 超时）。
 
         Returns:
             ``(exit_code, stdout, stderr, duration_ms)``
@@ -117,18 +122,24 @@ class ToolAdapter(ABC):
         输出解码: 多编码 fallback (`_decode_output_bytes`), 默认 utf-8 + GBK/gb18030 兜底.
         per Owner 14:46 实测: GBK 中文 (e.g. "看到这个图片就是压缩包的密码")
         默认 utf-8 解码失败 → 全局 fallback 让中文正确显示, 不再 ⬛⬛⬛.
+
+        v0.5-platform-extend-tools (per Owner 2026-06-27 治理变更):
+            - macOS: 显式追加 Homebrew 路径 (Apple Silicon + Intel)
+            - Windows / Linux: 不动 (用系统 PATH + venv Scripts/ + extend-tools/bin/<platform>/)
         """
         effective_timeout = timeout if timeout is not None else self.default_timeout
         start = time.monotonic()
 
-        # per Architecture.md §4.3：macOS subprocess PATH 沙箱处理
-        # 显式追加 Homebrew 路径（Apple Silicon + Intel）
         import os
+        import sys as _sys
         env = os.environ.copy()
-        homebrew_paths = "/opt/homebrew/bin:/usr/local/bin"
-        current_path = env.get("PATH", "")
-        if homebrew_paths not in current_path:
-            env["PATH"] = f"{homebrew_paths}:{current_path}"
+        if _sys.platform == "darwin":
+            # macOS only: 显式追加 Homebrew 路径 (Apple Silicon + Intel)
+            # Windows 上 /opt/homebrew/bin 不存在, 不能加 (会破坏 PATH `:` 分隔符)
+            homebrew_paths = "/opt/homebrew/bin:/usr/local/bin"
+            current_path = env.get("PATH", "")
+            if homebrew_paths not in current_path:
+                env["PATH"] = f"{homebrew_paths}:{current_path}"
 
         try:
             # 不传 text=True → 拿 bytes, 手动 decode (避免默认 utf-8 strict 抛错)
@@ -173,11 +184,14 @@ class ToolAdapter(ABC):
         start = time.monotonic()
 
         import os
+        import sys as _sys
         env = os.environ.copy()
-        homebrew_paths = "/opt/homebrew/bin:/usr/local/bin"
-        current_path = env.get("PATH", "")
-        if homebrew_paths not in current_path:
-            env["PATH"] = f"{homebrew_paths}:{current_path}"
+        if _sys.platform == "darwin":
+            # macOS only (Windows / Linux 不加 homebrew 路径)
+            homebrew_paths = "/opt/homebrew/bin:/usr/local/bin"
+            current_path = env.get("PATH", "")
+            if homebrew_paths not in current_path:
+                env["PATH"] = f"{homebrew_paths}:{current_path}"
 
         try:
             # 不传 text=True → bytes mode

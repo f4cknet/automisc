@@ -98,7 +98,19 @@ automisc/
 │   └── decisions/                重要技术决策记录
 │       └── v0.1.0b-PR7-vol-environment.md
 │
-├── extend_tools/                 外部工具脚本 (per tools.md 模板)
+├── extend-tools/                  外部 binary + 自动下载脚本 (per v0.5-platform-extend-tools)
+│   ├── bin/
+│   │   ├── win-x64/               Windows binaries (不入 git, install.ps1 自动下)
+│   │   │   ├── binwalk.exe
+│   │   │   ├── exiftool.exe
+│   │   │   ├── 7zr.exe
+│   │   │   └── foremost.exe
+│   │   └── macos/                 macOS 暂留空 (brew 优先, v0.5+ 评估)
+│   ├── manifest.yaml              工具 URL + SHA256 + 版本 (入 git)
+│   ├── install.ps1                Windows 自动下载脚本
+│   ├── install.sh                 macOS 自动下载脚本 (暂留 stub)
+│   ├── README.md                  工具状态 + Windows 限制说明
+│   └── .gitignore                 bin/win-x64/* 不入 git
 └── tools.md                      外部工具清单 (deprecated 冗余, 待清理)
 ```
 
@@ -189,6 +201,60 @@ automisc/
 
 - **加 adapter** → `tools/<subpackage>/<name>.py` + `tools/<subpackage>/__init__.py` import + `tools/__init__.py` 双注册 + `menu_dock.TOOL_CATEGORIES` 加一行 + `ADAPTER_TOOLS` set 加 (per 双注册铁律)
 - **加 decoder** → `core/decoders/<name>.py` 定义 `DecoderSpec` 并 `register_decoder()` → GUI 自动从 registry 渲染 (无需改 menu_dock)
+
+---
+
+## 3.6 extend-tools/ 跨平台 binary 分发（per v0.5-platform-extend-tools 治理变更）
+
+> **背景**: macOS 上 Homebrew 装的 `binwalk` / `exiftool` / `7z` / `foremost` 全在 `/usr/local/bin`，subprocess 直接 `which` 命中。Windows 上没有 brew，4 个核心工具必须自带。
+>
+> **方案**: `extend-tools/` 目录 + 跨平台相对路径解析。
+
+### 目录职责
+
+| 子目录 / 文件 | 作用 | git |
+|---|---|---|
+| `bin/win-x64/` | Windows 二进制（binwalk.exe / exiftool.exe / 7zr.exe / foremost.exe） | ❌ **不入 git**（用 manifest 追溯） |
+| `bin/macos/` | macOS 二进制（v0.5+ 暂留空，brew 优先） | — |
+| `manifest.yaml` | 工具 URL + SHA256 + 版本（Owner 首次跑 install 时填 SHA256） | ✅ 入 git |
+| `install.ps1` | Windows 自动下载脚本（幂等，已下跳过） | ✅ 入 git |
+| `install.sh` | macOS 自动下载脚本（stub，brew 优先） | ✅ 入 git |
+| `README.md` | 工具状态 + Windows 限制说明 | ✅ 入 git |
+
+### 代码侧：`tools/paths.py`
+
+```python
+# 核心逻辑
+def resolve_tool_binary(name: str) -> str | None:
+    found = shutil.which(name)            # 1) PATH 优先
+    if found:
+        return found
+    plat = {"win32": "win-x64", "darwin": "macos"}[sys.platform]
+    candidate = EXTEND_TOOLS_BIN_DIR / plat / f"{name}{'.exe' if sys.platform == 'win32' else ''}"
+    return str(candidate) if candidate.exists() else None   # 2) extend-tools fallback
+```
+
+### Adapter 改造模式
+
+所有 adapter 把 `self.binary_path or "X"` 改成：
+```python
+from automisc.tools.paths import resolve_tool_binary
+cmd = [self.binary_path or resolve_tool_binary("X") or "X"]
+```
+
+**效果**：macOS 走 PATH 不变，Windows 走 extend-tools/bin/win-x64/。
+
+### 不可用工具
+
+steghide / zsteg / stegseek 在 Windows 上不可用：
+- GUI 菜单 marker = `✗`（v0.5-platform-extend-tools §3.4 增强）
+- 点击执行 → ToolResult stderr `"executable not found: steghide"`
+- zsteg **有自研替代** `lsb_detect` (per v0.5-lsb-detector)
+- steghide **无替代**（v0.5+ 评估 Cygwin 编译）
+
+### 完整设计
+
+详见 [`upgrade/v0.5-platform-extend-tools.md`](upgrade/v0.5-platform-extend-tools.md)。
 
 ---
 

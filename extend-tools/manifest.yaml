@@ -1,0 +1,86 @@
+# extend-tools/manifest.yaml
+#
+# AutoMisc 跨平台 binary 清单（per v0.5-platform-extend-tools 治理变更）
+#
+# 维护方式：
+# - 版本变化时改这里
+# - SHA256 由 install.ps1 首次下载后回填（也可以手工填）
+# - bin/win-x64/*.exe 不入 git，通过本文件追溯
+#
+# 字段：
+# - version: 工具版本（跟官方 release 对齐）
+# - url: 下载地址（直链）
+# - sha256: 64 字符 hex（首次下载后回填）
+# - post_extract: 解压后处理（zip 才有，rename / 解嵌套）
+# - available: false = 该平台暂无方案
+
+version: "1.0"
+# 最后更新: 2026-06-27 (per v0.5-platform-extend-tools PR1 治理+骨架)
+
+platforms:
+  win-x64:
+    description: "Windows 10/11 x64"
+    binaries:
+      # 3 binaries (downloaded by install.ps1)
+      exiftool:
+        version: "13.29"
+        # exiftool.org 主站 2026-06-27 临时挂了, SourceForge /download 返 HTML (mirror 选择页)
+        # 改用 ShareX 维护的 Windows prebuilt (GitHub release 直接发 zip asset)
+        url: "https://github.com/ShareX/ExifTool/releases/download/v13.29/exiftool-13.29-win64.zip"
+        sha256: "AE8E1FC95266AA5F2769E16CD940F88BF80FA408484AB10A8808895992E1CFB6"  # ShareX 官方 release notes 提供
+        available: true
+        notes: "exiftool(-k).exe zip, install 后 rename; ShareX 维护 (2025-05-07 release)"
+        post_extract:
+          zip_contains: "exiftool(-k).exe"
+          rename_to: "exiftool.exe"
+
+      7zr:
+        version: "24.07"
+        url: "https://www.7-zip.org/a/7zr.exe"
+        sha256: "56B8CC9F4971CEF253644FAFE54063ED7FDCA551D4DEE0F8C6BAA81B855ACD72"  # 2026-06-27 install.ps1 算出
+        available: true
+        notes: "7-Zip 独立版 (不需安装器), 单文件"
+        # adapter 用 '7z' 名 (兼容 macOS brew 装的 p7zip),
+        # extend-tools 里实际文件名是 '7zr.exe', install.ps1 会建 7z.exe hardlink
+
+      foremost:
+        version: "1.5.7"
+        url: "https://github.com/raddyfiy/foremost/raw/master/binary/foremost.exe"
+        sha256: "83BE6BFA4E83B2015BDC61DFD7059AE16EBBB0471D0F7F7D48B70BF97362C3A6"  # 2026-06-27 install.ps1 算出
+        available: true
+        notes: "第三方 fork (CTF 圈通用), 官方无 Windows 版"
+
+    pip_packages:
+      # 1 Python package (pip install by install.ps1)
+      binwalk:
+        pip_name: "binwalk"
+        version_spec: ""  # latest (v2.3.x Python 版, CTF 够用)
+        available: true
+        notes: |
+          binwalk v3 是 Rust 重写, ReFirmLabs 从未在 GitHub release 发 Windows prebuilt
+          (per 2026-06-27 API 查询, 所有 release assets 都空).
+          改用 pip install binwalk (v2.3.x Python 版, CTF 实战足够).
+          pyproject.toml 已声明此依赖, venv 激活后 binwalk.exe 在 PATH,
+          adapter 调 'binwalk' 命令即可, 不需要 extend-tools 路径.
+
+    # Windows 上不可用的工具（v0.5+ 评估替代方案）
+    unavailable:
+      steghide:
+        reason: "官方 steghide 0.5.1 后停止维护, 无 Windows 版"
+        alternatives: "v0.5+ 评估 Cygwin/MSYS2 编译; 无自研替代"
+      zsteg:
+        reason: "Ruby gem, Windows 上需装 RubyInstaller (~300MB)"
+        alternatives: "自研 lsb_detect (per v0.5-lsb-detector) 已在 auto-run 替代"
+      stegseek:
+        reason: "无官方 Windows 版 (steghide 替代品)"
+        alternatives: "跟 steghide 一起评估"
+
+  macos:
+    description: "macOS (Apple Silicon + Intel)"
+    binaries: {}  # Homebrew 优先, 不强制 extend-tools
+    pip_packages: {}
+
+  linux-x64:
+    description: "Linux x64"
+    binaries: {}  # 不在范围 (AGENTS.md §2.3 v0.5+ 评估 CI)
+    pip_packages: {}
