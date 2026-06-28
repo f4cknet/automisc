@@ -267,3 +267,103 @@ def _bytes_preview(byte_stream: bytes, limit: int = _BYTE_PREVIEW_LIMIT) -> str:
 
 def _perm_name(perm: tuple[int, int, int]) -> str:
     return ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR"][_PERMUTATIONS.index(perm)]
+
+
+# ============ 8 bit × 6 perm preview matrix (per v0.5-lsb-tool-bitplane-preview-matrix) ============
+
+
+_PREVIEW_KEYWORDS = (b"Hey", b"flag", b"key", b"PK", b"PNG", b"\x89PNG", b"flag{")
+
+
+def _ascii_preview(byte_stream: bytes, n_bytes: int = 32) -> str:
+    """字节流 → ASCII preview 字符串, 非 printable → '.'.
+
+    用于 _build_bit_plane_preview_matrix 渲染每行.
+    """
+    if not byte_stream:
+        return ""
+    out = []
+    for b in byte_stream[:n_bytes]:
+        out.append(chr(b) if 32 <= b < 127 else ".")
+    return "".join(out)
+
+
+def _build_bit_plane_preview_matrix(
+    img_array: np.ndarray,
+    n_bytes: int = 32,
+    scan_order: str = "row",
+    byte_bit_order: str = "msb",
+) -> list[tuple[int, str, str, bool]]:
+    """8 bit × 6 perm preview 矩阵 (Owner "超过随波逐流" 要求).
+
+    遍历 8 个 bit plane (b0=LSB ~ b7=MSB) × 6 个 RGB perm 排列, 每个 combo 抽前 N 字节字节流
+    转 ASCII preview + 命中关键字标注.
+
+    Args:
+        img_array: (H, W, 3 or 4) uint8 numpy array
+        n_bytes: 每个 combo preview 长度 (默认 32, per Owner 拍板)
+        scan_order: "row" / "col" (默认 row, zsteg 默认)
+        byte_bit_order: "msb" / "lsb" (默认 msb, zsteg 默认)
+
+    Returns:
+        list of (bit, perm_name, preview_str, has_keyword) tuples
+        长度 = 8 × 6 = 48
+    """
+    PERMS = [
+        ("RGB", ["R", "G", "B"]),
+        ("RBG", ["R", "B", "G"]),
+        ("GRB", ["G", "R", "B"]),
+        ("GBR", ["G", "B", "R"]),
+        ("BRG", ["B", "R", "G"]),
+        ("BGR", ["B", "G", "R"]),
+    ]
+    matrix: list[tuple[int, str, str, bool]] = []
+    for bit in range(8):
+        for perm_name, channels in PERMS:
+            byte_stream = _extract_lsb_byte_stream(
+                img_array, channels=channels, bit=bit,
+                scan_order=scan_order, byte_bit_order=byte_bit_order,
+            )
+            preview = _ascii_preview(byte_stream, n_bytes=n_bytes)
+            has_kw = any(kw in byte_stream[:n_bytes] for kw in _PREVIEW_KEYWORDS)
+            matrix.append((bit, perm_name, preview, has_kw))
+    return matrix
+
+
+def _format_matrix_for_journal(
+    matrix: list[tuple[int, str, str, bool]],
+    col_width: int = 32,
+) -> str:
+    """把 preview matrix 渲染成 journal 可读字符串.
+
+    行 = bit (b0~b7), 列 = perm (RGB~BGR).
+    """
+    if not matrix:
+        return ""
+    # 表头
+    perm_names = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR"]
+    header_cells = [f"{p:>{col_width}s}" for p in perm_names]
+    header = " " * 18 + "".join(header_cells)
+
+    # 按 bit 分组
+    lines = [header]
+    for bit in range(8):
+        label = f"bit={bit} ({'LSB' if bit == 0 else 'MSB' if bit == 7 else 'MSB'}):"
+        row_cells = []
+        for perm_name in perm_names:
+            entry = next(
+                (e for e in matrix if e[0] == bit and e[1] == perm_name),
+                None,
+            )
+            if entry is None:
+                row_cells.append(" " * col_width)
+                continue
+            _, _, preview, has_kw = entry
+            cell = preview.ljust(col_width)
+            if has_kw:
+                # 命中关键字: 行末加 " <==" 标记
+                cell = cell.rstrip() + " <=="
+                cell = cell.ljust(col_width + 4)
+            row_cells.append(cell)
+        lines.append(f"{label:18s}" + "".join(row_cells))
+    return "\n".join(lines)

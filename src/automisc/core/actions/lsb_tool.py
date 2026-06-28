@@ -44,10 +44,12 @@ from automisc.core.actions.lsb_tool_common import (
     _VALID_MODES,
     _VALID_PRESETS,
     _VALID_SCAN_ORDERS,
+    _build_bit_plane_preview_matrix,
     _channel_8bit_byte_stream,
     _bytes_preview,
     _detect_file_header_hex,
     _extract_lsb_byte_stream,
+    _format_matrix_for_journal,
     _is_printable_text,
     _parse_channels,
     _perm_name,
@@ -148,6 +150,11 @@ class LSBToolAction(Action):
         elif self.preset == "np":
             sps.extend(self._detect_np_mode(arr, file_path))
 
+        # per Owner "超过随波逐流" 拍板: 每张图都打 8 bit × 6 perm preview matrix
+        # (per v0.5-lsb-tool-bitplane-preview-matrix Commit 2)
+        matrix = _build_bit_plane_preview_matrix(arr, n_bytes=32)
+        matrix_text = _format_matrix_for_journal(matrix)
+
         return ActionResult(
             success=True,
             data={
@@ -171,7 +178,10 @@ class LSBToolAction(Action):
                 f"lsb_tool detect: preset={self.preset or 'single'}, "
                 f"命中 {len(sps)} SP "
                 f"({sum(1 for sp in sps if sp.severity == 5)} sev=5 真可疑, "
-                f"{sum(1 for sp in sps if sp.severity == 4)} sev=4 概率)"
+                f"{sum(1 for sp in sps if sp.severity == 4)} sev=4 概率)\n"
+                f"\n[bit-plane preview matrix 8 bit × 6 perm, 每行 32 字节 ASCII preview, "
+                f"<== 标 hit-keyword]\n"
+                f"{matrix_text}"
             ),
         )
 

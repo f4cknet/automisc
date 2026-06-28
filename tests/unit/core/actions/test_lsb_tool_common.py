@@ -9,7 +9,12 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from automisc.core.actions.lsb_tool_common import _extract_lsb_byte_stream
+from automisc.core.actions.lsb_tool_common import (
+    _ascii_preview,
+    _build_bit_plane_preview_matrix,
+    _extract_lsb_byte_stream,
+    _format_matrix_for_journal,
+)
 
 
 # ============ fixtures ============
@@ -213,3 +218,111 @@ class TestErrorHandling:
                 arr_2d, channels=["R"], bit=0,
                 scan_order="row", byte_bit_order="msb",
             )
+
+
+# ============ 8 bit × 6 perm preview matrix (per v0.5-lsb-tool-bitplane-preview-matrix Commit 2) ============
+
+
+class TestAsciiPreview:
+    """_ascii_preview: 字节流 → ASCII, 非 printable → '.'."""
+
+    def test_printable_bytes(self):
+        """纯 printable 字节保留."""
+        out = _ascii_preview(b"Hello World!", n_bytes=12)
+        assert out == "Hello World!"
+
+    def test_non_printable_dot(self):
+        """非 printable 字节 → '.'."""
+        out = _ascii_preview(b"H\x00\x01\x7f!", n_bytes=5)
+        # H, ., ., ., !
+        assert out == "H...!"
+
+    def test_empty(self):
+        """空字节流 → 空字符串."""
+        assert _ascii_preview(b"") == ""
+
+    def test_truncate(self):
+        """超过 n_bytes 截断."""
+        out = _ascii_preview(b"Hello World!", n_bytes=5)
+        assert out == "Hello"
+
+
+class TestBuildBitPlanePreviewMatrix:
+    """_build_bit_plane_preview_matrix: 8 bit × 6 perm = 48 组合."""
+
+    def test_returns_48_entries(self, synthetic_2x2):
+        """默认 8 bit × 6 perm = 48 个 (bit, perm, preview, has_kw) tuples."""
+        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
+        assert len(matrix) == 48
+
+    def test_all_perms_covered(self, synthetic_2x2):
+        """6 perm 全覆盖."""
+        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
+        perms_seen = {entry[1] for entry in matrix}
+        assert perms_seen == {"RGB", "RBG", "GRB", "GBR", "BRG", "BGR"}
+
+    def test_all_bits_covered(self, synthetic_2x2):
+        """8 bit 全覆盖 (b0=LSB ~ b7=MSB)."""
+        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
+        bits_seen = {entry[0] for entry in matrix}
+        assert bits_seen == set(range(8))
+
+    def test_n_bytes_respected(self, synthetic_2x2):
+        """preview 长度 = n_bytes (默认 32)."""
+        matrix = _build_bit_plane_preview_matrix(synthetic_2x2, n_bytes=16)
+        for _, _, preview, _ in matrix:
+            assert len(preview) <= 16
+
+    def test_steg_png_has_hit_keyword(self, steg_png_bytes):
+        """steg.png 实战: bit=0 RGB 应命中 'Hey' 关键字."""
+        matrix = _build_bit_plane_preview_matrix(steg_png_bytes)
+        # 找 (0, "RGB") entry
+        hit = [e for e in matrix if e[0] == 0 and e[1] == "RGB"]
+        assert len(hit) == 1
+        _, _, preview, has_kw = hit[0]
+        assert "Hey" in preview, f"expected 'Hey' in preview, got {preview[:40]!r}"
+        assert has_kw, "has_kw flag should be True for RGB bit 0 (contains 'Hey')"
+
+    def test_steg_png_bit1_no_hit(self, steg_png_bytes):
+        """steg.png 实战: bit=1 (MSB plane) 不应命中关键字 (per 8 bit × 7 perm 实测)."""
+        matrix = _build_bit_plane_preview_matrix(steg_png_bytes)
+        # bit=1 所有 perm 都应 has_kw=False
+        bit1_entries = [e for e in matrix if e[0] == 1]
+        for _, _, preview, has_kw in bit1_entries:
+            assert not has_kw, (
+                f"bit=1 不应命中关键字 (per 8 bit × 6 perm 验证), "
+                f"got preview={preview[:40]!r}"
+            )
+
+
+class TestFormatMatrixForJournal:
+    """_format_matrix_for_journal: matrix → journal 可读字符串."""
+
+    def test_basic_format(self, synthetic_2x2):
+        """matrix 渲染含表头 + 8 行 bit × 6 列 perm."""
+        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
+        text = _format_matrix_for_journal(matrix)
+        lines = text.split("\n")
+        # 1 表头 + 8 bit 行 = 9 行
+        assert len(lines) == 9
+        # 表头含 6 perm 名
+        assert "RGB" in lines[0]
+        assert "BGR" in lines[0]
+        # bit=0 行有 LSB 标记
+        assert "bit=0" in lines[1] and "LSB" in lines[1]
+        # bit=7 行有 MSB 标记
+        assert "bit=7" in lines[8] and "MSB" in lines[8]
+
+    def test_hit_keyword_marker(self, steg_png_bytes):
+        """steg.png 实战: bit=0 RGB 行应有 ' <==' 命中标记."""
+        matrix = _build_bit_plane_preview_matrix(steg_png_bytes)
+        text = _format_matrix_for_journal(matrix)
+        lines = text.split("\n")
+        # bit=0 行（第 2 行）应含 <== 标记
+        assert "<==" in lines[1], (
+            f"bit=0 行应有命中标记, got: {lines[1]!r}"
+        )
+
+    def test_empty_matrix(self):
+        """空 matrix 渲染空字符串."""
+        assert _format_matrix_for_journal([]) == ""
