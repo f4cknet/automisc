@@ -69,6 +69,16 @@ $binaries = @(
         url = "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
         target = "file.exe"
         post_extract = "file_zip"
+    },
+    @{
+        name = "evtx_dump"
+        version = "0.12.2"
+        # omerbenamram/evtx v0.12.2 (2026-06-13 release), Rust crate `evtx` 0.12.2.
+        # 单文件 Win x86_64 prebuilt (2.5MB, static link, 零运行时依赖).
+        # 旧版本 v0.8.2 (extend_tools/evtx_dump, macOS only) 已废弃.
+        url = "https://github.com/omerbenamram/evtx/releases/download/v0.12.2/evtx_dump-v0.12.2.exe"
+        target = "evtx_dump.exe"  # strip version suffix (源文件 evtx_dump-v0.12.2.exe)
+        post_extract = $null  # 单文件, no extract
     }
 )
 
@@ -109,8 +119,48 @@ Write-Host ""
 
 $results = @()
 
+# ---- Stage 0: Rust toolchain (optional, per v0.5-windows-evtx-dump) ----
+# 装 rustup + rustc + cargo, profile=minimal 跳过 docs 省 ~200MB.
+# 失败不阻塞后续 Stage (Rust 是 optional 加固, 不是 Stage 1/2 必需).
+Write-Host "--- Stage 0: Rust toolchain (optional) ---" -ForegroundColor Cyan
+
+$rust_installed = $false
+try {
+    $ver = & rustc --version 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[skip] rustc already installed: $ver" -ForegroundColor Gray
+        $rust_installed = $true
+    }
+} catch {}
+
+if (-not $rust_installed) {
+    try {
+        Write-Host "[download] rustup-init.exe ..." -NoNewline
+        $rustup = Join-Path $StageDir "rustup-init.exe"
+        Download-File -Url "https://win.rustup.rs/x86_64" -Out $rustup
+        Write-Host " OK" -ForegroundColor Green
+
+        Write-Host "[install] rustup-init -y --default-toolchain stable --profile minimal ..." -NoNewline
+        # rustup-init 输出很长, Out-Null 抑制, 仅在 $LASTEXITCODE 检查
+        & $rustup -y --default-toolchain stable --profile minimal | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "rustup-init exit $LASTEXITCODE" }
+        Write-Host " OK" -ForegroundColor Green
+
+        # Refresh PATH so cargo / rustc visible to subsequent Stages
+        $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
+        $cargo_bin = Join-Path $env:USERPROFILE ".cargo\bin"
+        Write-Host "[rust] cargo bin: $cargo_bin (PATH refreshed)" -ForegroundColor Gray
+    } catch {
+        Write-Host " FAILED" -ForegroundColor Yellow
+        Write-Host "         warning: $_" -ForegroundColor Yellow
+        Write-Host "         Rust not installed; install.ps1 will continue." -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+
 # ---- Stage 1: Download + extract binaries ----
-Write-Host "--- Stage 1: Binaries (3 tools) ---" -ForegroundColor Cyan
+Write-Host "--- Stage 1: Binaries (5 tools) ---" -ForegroundColor Cyan
 
 foreach ($tool in $binaries) {
     $dest = Join-Path $BinDir $tool.target
@@ -360,4 +410,4 @@ Write-Host "  cd $RepoRoot"
 Write-Host "  .venv\Scripts\Activate.ps1   # if venv not yet activated"
 Write-Host "  automisc-gui                  # or: python -m automisc gui"
 Write-Host ""
-Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost)"
+Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost / evtx_dump)"

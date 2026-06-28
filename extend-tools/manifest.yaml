@@ -14,16 +14,16 @@
 # - post_extract: 解压后处理（zip 才有, rename / 解嵌套）
 # - available: false = 该平台暂无方案
 
-version: "1.1"
-# 最后更新: 2026-06-28 (per v0.5-windows-tool-compat PR3 manifest 同步)
-# - 新增: steghide (Cygwin 构建), vim92 (Vim Win32 installer 整包)
+version: "1.2"
+# 最后更新: 2026-06-28 (per v0.5-windows-evtx-dump)
+# - 新增: evtx_dump v0.12.2 (omerbenamram/evtx Rust crate, Win x86_64 prebuilt)
 # - 备注: 7z.exe 是 7zr.exe 的 hardlink, manifest 仍只列 7zr
 
 platforms:
   win-x64:
     description: "Windows 10/11 x64"
     binaries:
-      # 7 binaries (downloaded by install.ps1 + manual extract)
+      # 8 binaries (downloaded by install.ps1 + manual extract)
       exiftool:
         version: "13.29"
         # exiftool.org 主站 2026-06-27 临时挂了, SourceForge /download 返 HTML (mirror 选择页)
@@ -64,6 +64,25 @@ platforms:
           CTF 社区常用, 下载 11 万次). 原生 Unix `file` CLI Win 不可用.
           zip 包含: file.exe + libgnurx-0.dll + libmagic-1.dll + magic.mgc (4.8MB) + 2 个 COPYING.
           install.ps1 全部部署到 extend-tools/bin/win-x64/ (libmagic 依赖要求同目录).
+
+      evtx_dump:
+        version: "0.12.2"
+        # omerbenamram/evtx v0.12.2 (2026-06-13 release), Rust crate `evtx` 0.12.2.
+        # 单文件 Win x86_64 prebuilt (2.5MB, static link, 零运行时依赖).
+        # 旧版本 v0.8.2 (extend_tools/evtx_dump, macOS only) 已废弃.
+        url: "https://github.com/omerbenamram/evtx/releases/download/v0.12.2/evtx_dump-v0.12.2.exe"
+        sha256: "fdc170115cbb84eadc4ef5ed66807be08d24aab7383324b562b78d8035f9f16a"  # 2026-06-28 GitHub API digest
+        available: true
+        notes: |
+          evtx_dump v0.12.2 (2026-06-13 release), Rust crate `evtx` 0.12.2
+          (omerbenamram/evtx, MIT).
+          Win x86_64 prebuilt 单文件 .exe (2.5MB, static link, 零运行时依赖).
+          旧版本 v0.8.2 (extend_tools/evtx_dump, macOS only Mach-O) 已废弃.
+          adapter 路径: extend-tools/bin/win-x64/evtx_dump.exe (per v0.5-windows-only 治理).
+          Rust toolchain 由 install.ps1 Stage 0 装, 备选 cargo install 兜底.
+          性能提升: v0.12.x 模板预编译 → JSON/XML 提速 2-3x, 多线程提速 2.2x (per release notes).
+          CLI 参数基本兼容 v0.8.x (<INPUT> / -o / -f / --no-confirm-overwrite / --events /
+          --ansi-codec / --validate-checksums 全保留).
 
       steghide:
         version: "0.5.1-cygwin"

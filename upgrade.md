@@ -5,13 +5,13 @@
 
 ---
 
-## 状态（snapshot · 2026-06-14 17:50 · v0.5-base-rot-decoders 完工）
+## 状态（snapshot · 2026-06-28 09:40 · v0.5-windows-evtx-dump 实施中）
 
 | 字段 | 值 |
 |---|---|
 | **当前 main HEAD** | `e2fe29c`（v0.5-session-summary，**未推新 commit**）|
-| **当前版本** | v0.5+（频繁迭代模式，已 13 迭代）|
-| **下一个 milestone** | **v0.5-base-rot-decoders**（PR1+PR2+PR3 全完工，**等 Owner 自审后 commit + push**）|
+| **当前版本** | v0.5+（频繁迭代模式，已 14 迭代）|
+| **下一个 milestone** | **v0.5-windows-evtx-dump**（本地部署 + smoke 全过，**等 Owner 自审后 commit + push**）|
 | **主分支** | main（per `AGENTS.md §2.4` 单 Owner 简化：直接 main commit）|
 | **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.4 v1.20 治理变更）|
 | **3 件套行数** | AGENTS 101 + prd 93 + STRUCTURE 186 = **380 行**（v3.0 治理）|
@@ -102,6 +102,7 @@
 | v0.5-windows-only | **治理变更 v3.3** (per Owner 2026-06-27 23:25 Y 拍板方向): v3.2 后 1 小时, Owner Win 端实测 `automisc-gui` 已启动成功 + `extend-tools/` 是 Windows `.exe` → **回退跨平台承诺**，`§2.3 multi-platform` → `Windows only`;**方案 Y · forward commit 收窄**（保留 v3.2 `extend-tools/` 骨架，删 darwin 代码路径 + 文档改写）;影响面 7 组 A-G：治理文档 (AGENTS.md §2.3/§4/§9/README/pyproject/tools.md) + Core 平台探测 (paths.py/base.py) + CLI/GUI 元数据 + extend-tools 平台无关化 + 12 adapter 描述 + Core 业务层 (output_path/stegseek/rar_chain) + 测试层;7 PR 拆解（PR1 治理+文档 ~150 / PR2 平台探测 ~80 / PR3 CLI/GUI ~30 / PR4 extend-tools ~50 / PR5 adapter ~200 / PR6 Core 业务 ~150 / PR7 测试 ~300） | 🔄 in-progress | (PR1 治理+文档 实施中, 改动 AGENTS.md §2.3/§4/§9 + README.md + pyproject.toml + tools.md + 提案 status 🔄;pytest baseline 不退步) | [`upgrade/v0.5-windows-only.md`](upgrade/v0.5-windows-only.md) |
 | v0.5-train-013-meihuai-jpg | **训练驱动第 13 篇** (per Owner 2026-06-27 23:44 实战 meihuai.jpg): `C:\Users\zmzsg\Downloads\梅花香之苦寒来\meihuai.jpg` (670KB, 467×289 JPEG, 2017-11-07) auto-run 命中 19 SP 但 sev=5 全是 `flag` 关键字元数据(非真 flag). **AI 兜底 6 步**: (1) exiftool -b -Padding 1974 bytes 全 0 (误判路径) (2) JPEG FFD9 @ 0x52f4 后追加 649566 bytes hex-encoded 坐标 (3) bytes.fromhex 解码 324783 bytes + re.findall `\d+,\d+` 35019 个 (x,y) (4) PIL 画 272×272 + 10px quiet zone QR (5) cv2.QRCodeDetector 解码 🎉 **`flag{40fc0a979f759c8892f4dc045e28b820}`** (6) scale x1/2/4/8 验证全命中. **暴露 3 个 Win 兼容 bug**: exiftool 中文乱码 (`-charset utf8` 缺失) + stegseek/file unavailable (Linux/Unix 工具) → **触发架构升级 `v0.5-windows-tool-compat`** (per §5.2 ≥3 道同类命中) | ✅ done | (AI 兜底解出 + 训练日志归档 + 架构升级 spec 起草, 待 Owner Y 签字开 PR1 exiftool fix) | [`upgrade/v0.5-train-013-meihuai-jpg.md`](upgrade/v0.5-train-013-meihuai-jpg.md) |
 | v0.5-windows-tool-compat | **架构升级** (per v0.5-train-013 触发): Win 工具链 3 个兼容 bug 合并修复 — **(1) exiftool 中文乱码**: adapter 加 `-charset utf8` 参数 (1 行, Win + 中文 EXIF 全局受益) / **(2) file Win 兼容**: 装 [magic-win](https://github.com/nscaife/file-windows) prebuilt `file.exe` 到 `extend-tools/bin/win-x64/` (跟 exiftool 风格一致) / **(3) stegseek/steghide unavailable**: GUI 菜单 `✗` marker + auto-run 白名单跳过 (sys.platform == "win32" + 名字 in `{stegseek, steghide, zsteg}`). 3 PR 拆解 (PR1 exiftool ~30 / PR2 file.exe ~50 / PR3 marker+白名单 ~150). §5.2 架构判定: Win + 中文 EXIF / Win 必然 unavailable ≥3 道同类, 升架构 ✅. 不动 binwalk / strings (hex-encoded 坐标数据不在标准 magic 范围, 实战命中 N<3) | ⏳ design | (待 Owner Y 签字开 PR1, exiftool 修复最小改动先验证流程) | [`upgrade/v0.5-windows-tool-compat.md`](upgrade/v0.5-windows-tool-compat.md) |
+| v0.5-windows-evtx-dump | **架构升级** (per Owner 2026-06-28 "修改extend-tools\install.ps1 代码，安装Rust，并且下载evtx_dump"): `install.ps1` 加 **Stage 0 Rust toolchain** 装 (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) + **Stage 1 加 evtx_dump 条目** (omerbenamram/evtx v0.12.2, 2026-06-13 release, Rust crate `evtx` 0.12.2, Win x86_64 prebuilt 单文件 2.5MB, 零运行时依赖, SHA256 已校验);`manifest.yaml` v1.1 → v1.2 加 evtx_dump 元信息;**部署实测** `extend-tools/bin/win-x64/evtx_dump.exe` 2,526,208 bytes + SHA256 匹配 GitHub API digest;smoke 9 测全过 (`--version` ✓ / `--help` ✓ 含 3 新子命令 + 1 新 flag / 真 evtx 4096-byte header + 65536-byte chunk XML/JSON/JSONL 三格式 exit 0 ✓ / 错误处理 graceful ✓);install.ps1 AST 解析无语法错误 + 6 个组件 check 全过;tools.md §3.4/§3.4.1/§3.4.3/§3.4.4/§4/§6.1#16 状态 ❌→✅ + 路径同步 `extend-tools/bin/win-x64/evtx_dump.exe`;§2 总表 18✅/36❌ → 19✅/35❌ (Forensics 2✅→3✅);§8 changelog 加 2.8 条目;Rust 装**不**自动跑（用户 invoke install.ps1 才触发 Stage 0，避免 AI Agent 不必要 heavyweight 操作） | 🔄 in-progress | (本地部署 + smoke 全过, 待 Owner 自审 commit) | [`upgrade/v0.5-windows-evtx-dump.md`](upgrade/v0.5-windows-evtx-dump.md) |
 
 ---
 
