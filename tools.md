@@ -76,17 +76,18 @@ MISC（根）
 
 | 一级分支 | 子分支数 | 工具总数（✅/⚠️/❌）| v0.1 P0 adapter |
 |---|---|---|---|
-| **Forensics** | 4 | 14（**2✅ / 0⚠️ / 12❌**）| 6 |
+| **Forensics** | 4 | 14（**3✅ / 0⚠️ / 11❌**）| 6 |
 | **Steganography** | 3 | 22（**4✅ / 0⚠️ / 18❌**）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
 | **Misc Others** | 3 | 10（**4✅ / 0⚠️ / 6❌**）| 3 |
 | **共享基础工具** | — | 8（**6✅ / 0⚠️ / 2❌**）| 5 |
-| **合计** | 14 | 54（**18✅ / 0⚠️ / 36❌**）| **22** |
+| **合计** | 14 | 54（**19✅ / 0⚠️ / 35❌**）| **22** |
 
-> **2026-06-28 更新（per §8 v2.6 + v2.7 + v2.8）**：
+> **2026-06-28 更新（per §8 v2.6 + v2.7 + v2.8 + v2.9 + v2.10）**：
 > - **v2.6 (PR3-prep)**: Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），§3 + §6.1 status 标 ✅；其他 ❌ pending
 > - **v2.7**: 新增 `strings.exe` + pip `binwalk 2.3.2`；`grep` → PowerShell `Select-String`（Win 内置）；§4 Python 包 11 个 ✅ + 8 个 ❌ pending；新增 `requirements.txt`
 > - **v2.8 (scope 收窄)**: `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — Rust 装**保留**（独立价值：未来 cargo install 兜底 / binwalk v3 备选 / ad-hoc 工具编写）；**Stage 1 evtx_dump CLI 撤回** (per Owner 2026-06-28 决策：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 + EventID scoring + 命令行关键字匹配, evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 grep 的便利；实战 ≥3 道同类命中再升架构 per AGENTS §5.2)。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)
+> - **v2.10 (本次)**: §3.4 python-evtx 状态 ❌→✅（per Owner 2026-06-28 "更新 python-evtx 在 tools.md 的状态"）；`requirements.txt` 第 12 行已有 `python-evtx==0.8.1`（v2.7 加的, 无需重复添加, Owner 二次确认时同步文档说明）；§2 总表 Forensics 2✅→3✅ / total 18✅/36❌ → 19✅/35❌
 > - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk）
 > - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），13 个 P0 工具 pending（v2.9 删 evtx_dump #16）
 
@@ -133,7 +134,7 @@ MISC（根）
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **Select-String** | ✅ | PowerShell 内置 | 日志关键字 + 异常分析 | P0 |
-| **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**adapter 走 python-evtx 路径**（src/automisc/tools/forensics/log/evtx_dump.py，结构化字段访问 + EventID scoring + 命令行关键字匹配）| .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
+| **python-evtx（Python 包）** | ✅ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK + `requirements.txt` 第 12 行 pinned）。**adapter 走 python-evtx 路径**（src/automisc/tools/forensics/log/evtx_dump.py，结构化字段访问 + EventID scoring + 命令行关键字匹配）| .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
 | **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
 
@@ -433,6 +434,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-28 | **2.10** | **§3.4 python-evtx ❌→✅ + requirements.txt 文档同步** (per Owner 2026-06-28 "更新 python-evtx 在 tools.md 的状态, 并且加入requirements.txt"): §3.4 python-evtx 行状态 ❌→✅ + 路径列加 `requirements.txt` 第 12 行 pinned 说明; §2 总表 Forensics 2✅/12❌ → 3✅/11❌ + 合计 18✅/36❌ → 19✅/35❌; §2 备注 header 加 v2.10 引用。**requirements.txt 不动**: `python-evtx==0.8.1` 已在 v2.7 commit (`b8e5241`) 加入第 12 行 + 注释 `>=0.8.1`, 无需重复添加（`pip show python-evtx` 验证 0.8.1 已装）。§6.1 P0 列表不动: python-evtx 是 Python 包不是外部工具, 不进 §6.1 P0 22→21 范围。详见 §3.4 + `requirements.txt`。 |
 | 2026-06-28 | **2.9** | **§3.4 evtx_dump 整段删除** (per Owner 2026-06-28 "是否可以删除 tools.md 中3.4 evtx_dump"): §3.4 表格删 evtx_dump 行（剩 Select-String + python-evtx + 7z + journalctl 4 项）+ 删 §3.4.1 (参数速查表 14 参数) + 删 §3.4.2 (典型调用 5 pattern) + 删 §3.4.3 (adapter 封装模板 + 决策点表); §3.4.4 (python-evtx Python 模块用法) → 重编号 §3.4.1 + 删 "CLI vs Python 路径分工" 段（CLI 文档全删, 这段成空头）; §5 subflow 表 Log Forensics 行 `Select-String + evtx_dump \| 7z + python-evtx` → `Select-String + python-evtx (adapter in-process) \| 7z`; §6.1 P0 #16 evtx_dump 行删除（21 个 P0 工具, 不是 22 个）; 5 处 "22 个" → "21 个" 同步 (§2 备注 / §6 header / §6.1 / §6.2 / §6 header); §3.4 表格底加 evtx_dump CLI 撤回说明脚注（指 upgrade/v0.5-windows-evtx-dump.md §6）。**不动**: python-evtx 行状态仍 ❌（虽然已装且 adapter 在用, Owner 未拍板 ✅ 切换; 留 §8 v2.10 跟进）。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
 | 2026-06-28 | **2.8** | **scope 收窄** (per Owner 2026-06-28 "既然python-evtx能代替 evtx-dump"): `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — **保留**（独立价值：未来 cargo install / binwalk v3 备选 / ad-hoc 工具）；**Stage 1 evtx_dump CLI 撤回** — 不加 evtx_dump 到 `$binaries` 数组。决策依据：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 (XPath `e:System/e:EventID` / `e:EventData/e:Data[@Name='CommandLine']`) + EventID scoring (4625/1102 → sev 5) + 命令行关键字匹配 (powershell/cmd/mimikatz/-enc), evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 `evtx_dump file.evtx | grep flag` 的便利 (可被 5 行 Python one-liner 替代); 实战 ≥3 道同类命中再升架构 per AGENTS §5.2 防单题打补丁。`extend-tools/manifest.yaml` v1.2 → v1.1 回滚 (evtx_dump 块删除); §3.4/§3.4.1/§3.4.3/§3.4.4/§4/§6.1#16 evtx_dump 路径全部回滚到 `extend_tools/evtx_dump` (legacy macOS 软链, 当前 Win 未生效); §2 总表 19✅/35❌ → 18✅/36❌ (Forensics 3✅→2✅)。原 commit `f54d859` 的 smoke 9 测 + SHA256 校验结果作为"已验证，待实战触发再启用"证据保留在 `upgrade/v0.5-windows-evtx-dump.md` §6 决策记录。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
 | 2026-06-28 | **2.7** | **§3 strings + binwalk + grep→Select-String + §4 Python 包同步** (per Owner 2026-06-28 指令): Owner 实装 `strings.exe` 到 `extend-tools/bin/win-x64/strings.exe` (370KB, 2026-06-27) + `pip install binwalk 2.3.2` 已在 venv (注意: pip freeze 显示从 `automisc/extend-tools/bin/win-x64/binwalk-2.3.2` 本地路径安装, 老目录残留, 需清); §3 strings/binwalk 标 ✅; §3 + §6.1 `grep` 替换为 PowerShell `Select-String` (Win 替代, awk/sed/sort/uniq 仍 pending); §4 Python 包: PIL/lxml/docx/numpy/scipy/python-magic/pycryptodome/zstandard/base65536/python-evtx 已装, 12+ 包仍 pending; 新增 `requirements.txt` (pinned 版本, 从 pip freeze 提取 + pyproject.toml 对齐); §2 统计刷新 (18✅ / 36❌ pending)。 |
