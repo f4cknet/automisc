@@ -144,16 +144,22 @@ class TestRealFixtureSmoke:
     """
 
     @pytest.fixture
-    def real_png_path(self):
-        """tests/fixtures/sample_qr_flag.png (330x330 grayscale QR)."""
+    def real_png_path(self, tmp_path):
+        """tests/fixtures/sample_qr_flag.png → 复制到 tmp_path (避免 LSB 副作用污染 tests/fixtures/).
+
+        真实 fixture (330x330 grayscale QR) + tmp_path 副本, 让 LsbToolAdapter 写 .bin 时不污染源目录。
+        """
+        import shutil
         from pathlib import Path
 
-        # pytest 跑在 repo root, fixture 路径相对
         repo_root = Path(__file__).resolve().parents[2]
-        png_path = repo_root / "tests" / "fixtures" / "sample_qr_flag.png"
-        if not png_path.exists():
-            pytest.skip(f"fixture not found: {png_path}")
-        return png_path
+        src = repo_root / "tests" / "fixtures" / "sample_qr_flag.png"
+        if not src.exists():
+            pytest.skip(f"fixture not found: {src}")
+        # 复制到 tmp_path 避免 LSB extract 副作用污染 tests/fixtures/
+        dst = tmp_path / "sample_qr_flag.png"
+        shutil.copy2(src, dst)
+        return dst
 
     def test_lsb_tool_adapter_runs_on_real_png(self, real_png_path):
         """LsbToolAdapter.run() on real PNG: success, 返回 SP list."""
@@ -211,15 +217,18 @@ class TestBackwardCompatSmoke:
         assert LSBBytesParamDialog is not None
 
     @pytest.fixture
-    def real_png_path_safe(self):
-        """tests/fixtures/sample_qr_flag.png (330x330 grayscale QR, safe for backward compat tests)."""
+    def real_png_path_safe(self, tmp_path):
+        """tests/fixtures/sample_qr_flag.png → 复制到 tmp_path (避免副作用污染)."""
+        import shutil
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parents[2]
-        png_path = repo_root / "tests" / "fixtures" / "sample_qr_flag.png"
-        if not png_path.exists():
-            pytest.skip(f"fixture not found: {png_path}")
-        return png_path
+        src = repo_root / "tests" / "fixtures" / "sample_qr_flag.png"
+        if not src.exists():
+            pytest.skip(f"fixture not found: {src}")
+        dst = tmp_path / "sample_qr_flag.png"
+        shutil.copy2(src, dst)
+        return dst
 
 
 # ============================================================
