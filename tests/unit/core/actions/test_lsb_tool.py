@@ -525,23 +525,29 @@ class TestLSBToolActionDetectNP:
 
 
 class TestLSBToolActionModeDispatch:
-    def test_extract_mode_phase_2b_stub(self, tmp_path):
-        """Phase 2a 暂未实现 extract mode → 返回失败 + Phase 2b 提示."""
+    def test_extract_mode_random_png_no_magic(self, tmp_path):
+        """extract mode: 随机图无 magic, 不写文件 (success=True, 0 SP)."""
         png = tmp_path / "test.png"
         _make_random_png(str(png))
         a = LSBToolAction(mode="extract")
         result = a.run({"file_path": str(png)})
-        assert result.success is False
-        assert "Phase 2b" in result.message
+        assert result.success is True
+        assert result.data["n_sps"] == 0
+        assert result.data["extracted_count"] == 0
 
-    def test_extract_bytes_mode_phase_2b_stub(self, tmp_path):
-        """Phase 2a 暂未实现 extract_bytes mode → 返回失败 + Phase 2b 提示."""
+    def test_extract_bytes_mode_single_combo(self, tmp_path):
+        """extract_bytes mode: 单组合 + 写文件 (即使没 magic, .bin)."""
         png = tmp_path / "test.png"
         _make_random_png(str(png))
-        a = LSBToolAction(mode="extract_bytes")
+        a = LSBToolAction(
+            mode="extract_bytes",
+            channels="g", bit=0, scan_order="row", byte_bit_order="msb",
+        )
         result = a.run({"file_path": str(png)})
-        assert result.success is False
-        assert "Phase 2b" in result.message
+        # 随机图写 .bin, magic 没命中, 但文件应写出
+        assert result.success is True
+        # extract_bytes 即使 magic 不命中也写 .bin (per LSBBytesExtractAction 行为)
+        assert len(result.data["extracted_files"]) == 1
 
 
 # ============ 实战 smoke test (per spec §1 铁律 4 关 4) ============

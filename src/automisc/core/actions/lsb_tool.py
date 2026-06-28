@@ -59,19 +59,11 @@ from automisc.core.suspicious import SuspiciousPoint
 
 
 class LSBToolAction(Action):
-    """统一 LSB 隐写工具 (per v0.5-lsb-tool-unify, Phase 2a 实现 detect mode).
+    """统一 LSB 隐写工具 (per v0.5-lsb-tool-unify).
 
-    **核心约束 (per AGENTS.md §1 铁律 7)**:
-    - **不写文件** (auto-run 纯探测, 字节流只进 SP.matched_pattern 截断 200 字符)
-    - **不触发下一步** (不调 extract / foremost / binwalk_extract 等)
-    - **不雕不修不爆**
-
-    **3 维检测** (per spec §3.6):
-    1. **text** 判定: 字节流前 1000 字节里含 ≥ text_min_len 字节连续 printable → sev=5
-    2. **file magic** 判定: 50+ hex magic 库 → sev=5
-    3. **entropy + unique count** 异常: Shannon entropy > entropy_threshold
-       + unique ≥ unique_threshold → sev=4 (仅 preset="all" / "np")
-    """
+    **核心约束 (per AGENTS.md §1 铁律 7)**: detect mode 不写文件 + 不触发下一步.
+    3 维检测: text (≥20 字节连续 printable → sev=5) / magic (50+ hex → sev=5)
+    / entropy + unique count (跨通道 → sev=4, 仅 preset="all"/"np")."""
 
     name = "lsb_tool"
 
@@ -136,11 +128,10 @@ class LSBToolAction(Action):
 
         if self.mode == "detect":
             return self._run_detect(arr, file_path)
-        # extract / extract_bytes: Phase 2b 实现
-        return ActionResult(
-            success=False,
-            message=f"lsb_tool mode={self.mode}: Phase 2b 实现 (尚未落地)",
-        )
+        if self.mode == "extract":
+            return self._run_extract(arr, file_path)
+        # extract_bytes
+        return self._run_extract_bytes(arr, file_path)
 
     # ----- detect mode (Phase 2a 完整实现) -----
 
@@ -149,7 +140,6 @@ class LSBToolAction(Action):
     ) -> ActionResult:
         """readonly 探测 (per AGENTS §1 铁律 7)."""
         sps: list[SuspiciousPoint] = []
-
         if self.preset is None:
             sps.extend(self._detect_single_combo(arr, file_path))
         elif self.preset == "all":
@@ -397,3 +387,15 @@ class LSBToolAction(Action):
             f"lsb {ch_str} bit={self.bit} "
             f"scan={self.scan_order} byte_bit_order={self.byte_bit_order}"
         )
+
+    # ----- extract / extract_bytes mode (Phase 2b, 走 lsb_tool_extract 模块) -----
+
+    def _run_extract(self, arr, file_path):
+        """extract mode: preset='all' 12 组合 + magic 命中写文件 (替代 zsteg subprocess)."""
+        from automisc.core.actions.lsb_tool_extract import run_extract_mode
+        return run_extract_mode(self, arr, file_path, self.bit, self.byte_bit_order)
+
+    def _run_extract_bytes(self, arr, file_path):
+        """extract_bytes mode: 单组合 + 写文件 (chain lsb-bytes 入口)."""
+        from automisc.core.actions.lsb_tool_extract import run_extract_bytes_mode
+        return run_extract_bytes_mode(self, arr, file_path)
