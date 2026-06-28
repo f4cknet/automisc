@@ -417,26 +417,25 @@ class MainWindow(QMainWindow):
         )
         chain_menu.addAction(bf_action)
 
-        # v0.5-steghide-GUI (per Owner 2026-06-20 13:48 拍板 "submenu" + 13:57 拍板
-        # "steghide 平替为 stegseek, menu 名也要换"):
-        # Stegseek 子菜单 — 3 模式入口 (原 "Steghide" 已重命名, 跟 stegseek 平替一致)
-        # 1) 自动检测 (空 wordlist) — 走 StegseekCrackAction + 空 wordlist
-        # 2) 暴力破解 (带 wordlist) — QFileDialog 收 wordlist → StegseekCrackAction
-        # 3) 指定密码提取 — QInputDialog 收 password → SteghideExtractAction (stegseek 优先)
-        # (左侧 ToolMenuDock 入口现已改为 "stegseek" (平替 steghide, per Owner 2026-06-20 13:57)
-        #  adapter name 已统一为 "stegseek", pool/router/menu_dock 也都改了)
-        stegseek_menu = chain_menu.addMenu("Stegseek")
-        auto_act = QAction("自动检测 (空 wordlist)", self)
+        # v0.5-stegseek-remove (per Owner 2026-06-28 16:03 拍板):
+        # Steghide 子菜单 — 3 模式入口 (跟原 Stegseek 菜单平级, 替代)
+        # 1) 自动检测 (空密码) — 走 SteghideAdapter auto_run 已含空密码探测 (CVE-2021-27211)
+        # 2) 字典暴力破解 — QFileDialog 收 wordlist → SteghideCrackAction
+        # 3) 指定密码提取 — QInputDialog 收 password → SteghideExtractAction
+        # (左侧 ToolMenuDock 入口现已改为 "steghide" (per v0.5-stegseek-remove 替代 stegseek)
+        #  adapter name 已统一为 "steghide", pool/router/menu_dock 也都改了)
+        steghide_menu = chain_menu.addMenu("Steghide")
+        auto_act = QAction("🔍 空密码探测 (CVE-2021-27211)", self)
         auto_act.triggered.connect(self._run_steghide_auto)
-        stegseek_menu.addAction(auto_act)
+        steghide_menu.addAction(auto_act)
 
-        crack_act = QAction("暴力破解 (带 wordlist)", self)
-        crack_act.triggered.connect(self._run_stegseek_crack)
-        stegseek_menu.addAction(crack_act)
+        crack_act = QAction("📖 字典暴力破解 (带 wordlist)", self)
+        crack_act.triggered.connect(self._run_steghide_crack)
+        steghide_menu.addAction(crack_act)
 
-        extract_act = QAction("指定密码提取", self)
+        extract_act = QAction("🔑 指定密码提取", self)
         extract_act.triggered.connect(self._run_steghide_extract)
-        stegseek_menu.addAction(extract_act)
+        steghide_menu.addAction(extract_act)
 
         # Tools menu (v0.5-decoder-menu): 解码器/转换器/提取器 (CLI -> GUI 同步)
         # 从 core.decoders.registry 动态生成菜单项
@@ -641,10 +640,11 @@ class MainWindow(QMainWindow):
         Args:
             chain_name: zip / zip-full / binwalk / foremost / lsb /
                         lsb_extract / lsb_tool / fix_pseudo_zip / bruteforce_zip / bruteforce_rar /
-                        stegseek_crack / steghide_extract (v0.5-steghide-GUI 新, v0.5-lsb-tool-unify Phase 4: 加 lsb_tool)
+                        steghide_crack / steghide_extract (v0.5-steghide-GUI 新, per v0.5-stegseek-remove
+                        stegseek_crack -> steghide_crack, v0.5-lsb-tool-unify Phase 4: 加 lsb_tool)
             bruteforce_limit: bruteforce 测试用 (e.g. 5000), 加速 CI/开发
             extra_context: 注入 context 的额外字段 (v0.5-steghide-GUI):
-                - __wordlist__: wordlist 路径 (stegseek_crack 用)
+                - __wordlist__: wordlist 路径 (steghide_crack 用)
                 - __password__: 密码 (steghide_extract 用)
         """
         if not self.current_file:
@@ -680,34 +680,35 @@ class MainWindow(QMainWindow):
         self._chain_runner.failed_with_error.connect(self._on_chain_failed)
         self._chain_runner.start()
 
-    # ---------- v0.5-steghide-GUI: Steghide 子菜单 3 模式入口 ----------
+    # ---------- v0.5-steghide-GUI: Steghide 子菜单 3 模式入口 (per v0.5-stegseek-remove 重构) ----------
     def _run_steghide_auto(self) -> None:
-        """Steghide 子菜单 1: 自动检测 (空密码) — 跟 auto_run 行为一致.
+        """Steghide 子菜单 1: 空密码探测 (CVE-2021-27211 兜底).
 
-        走 StegseekCrackAction + 空 wordlist (跟 ToolMenuDock 左侧 steghide 等价,
-        但走 ChainRunner 输出统一格式的 log).
+        走 SteghideAdapter auto_run (空密码 extract 兜底, per v0.5-stegseek-remove 重构).
+        跟 ToolMenuDock 左侧 steghide 等价, 但走 ChainRunner 输出统一格式的 log.
         """
-        # 不传 wordlist → StegseekCrackAction 用 ad-hoc 空 wordlist
-        self._run_chain("stegseek_crack")
+        # 不传 wordlist → SteghideCrackAction 用 mini wordlist 兜底 (含空字符串)
+        self._run_chain("steghide_crack")
 
-    def _run_stegseek_crack(self) -> None:
-        """Steghide 子菜单 2: 暴力破解 (带 wordlist) — QFileDialog 收 wordlist.
+    def _run_steghide_crack(self) -> None:
+        """Steghide 子菜单 2: 字典暴力破解 (带 wordlist) — QFileDialog 收 wordlist.
 
-        走 StegseekCrackAction + 用户选 wordlist (e.g. rockyou.txt).
+        走 SteghideCrackAction + 用户选 wordlist (e.g. rockyou.txt).
         per owner 决策 1 "GUI 工具栏可 bruteforce" (auto_run 不抢 flag).
+        v0.5-stegseek-remove: 替代原 stegseek 优先路径, 统一 steghide 循环.
         """
         from PySide6.QtWidgets import QFileDialog
         wordlist, _ = QFileDialog.getOpenFileName(
             self,
-            "选择 Wordlist (stegseek 暴力破解)",
+            "选择 Wordlist (steghide 字典暴力破解)",
             str(Path.home()),
             "Text files (*.txt);;All files (*)",
         )
         if not wordlist:
             self.statusBar().showMessage("取消 wordlist 选择")
             return
-        self.output_view.append_text(f"\n[Stegseek] wordlist: {wordlist}\n")
-        self._run_chain("stegseek_crack", extra_context={"__wordlist__": wordlist})
+        self.output_view.append_text(f"\n[Steghide] wordlist: {wordlist}\n")
+        self._run_chain("steghide_crack", extra_context={"__wordlist__": wordlist})
 
     def _run_steghide_extract(self) -> None:
         """Steghide 子菜单 3: 指定密码提取 — QInputDialog 收密码.

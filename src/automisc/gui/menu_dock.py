@@ -2,7 +2,7 @@
 
 分类（按 prd.md §4.1 + v0.5-cipher-decoders）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
-- Stego/Image (PR2) — stegseek (per v0.5-lsb-tool-bitplane-preview-matrix: zsteg 删除, lsb_tool 替代)
+- Stego/Image (PR2) — steghide (per v0.5-stegseek-remove 替代 stegseek, per v0.5-lsb-tool-bitplane-preview-matrix: zsteg 已删, lsb_tool 替代)
 - Forensics/Network (PR3) — tshark / tcpdump
 - Stego/Audio+Video (PR4) — ffmpeg_audio / ffprobe / ffmpeg_video / sox / steghide_audio
 - Misc/Archive (PR5) — sevenz_extract / unzip / john / zip_classify (sevenz 是探测类, GUI 不显示, per Owner 20:03)
