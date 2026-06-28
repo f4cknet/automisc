@@ -12,10 +12,10 @@ from PIL import Image
 from automisc.core.actions.lsb_tool_common import (
     _15_CHANNELS,
     _ascii_preview,
-    _build_bit_plane_preview_matrix,
+    _build_lsb_2segment_matrix,
     _extract_lsb_byte_stream,
     _extract_lsb_byte_stream_zero_aware,
-    _format_matrix_for_journal,
+    _format_lsb_2segment_for_journal,
 )
 
 
@@ -222,7 +222,7 @@ class TestErrorHandling:
             )
 
 
-# ============ 8 bit × 6 perm preview matrix (per v0.5-lsb-tool-bitplane-preview-matrix Commit 2) ============
+# ============ 2 段 LSB matrix (per v0.5-lsb-tool-15channel-matrix Commit 5, v4 实战修订) ============
 
 
 class TestAsciiPreview:
@@ -249,53 +249,46 @@ class TestAsciiPreview:
         assert out == "Hello"
 
 
-class TestBuildBitPlanePreviewMatrix:
-    """_build_bit_plane_preview_matrix: 8 bit × 15 channel = 120 组合 (per v0.5-lsb-tool-15channel-matrix 实战修订).
+class TestBuildLsb2SegmentMatrix:
+    """_build_lsb_2segment_matrix: 2 段 LSB matrix (per v0.5-lsb-tool-15channel-matrix v4 实战修订).
 
-    横向表头: 15 通道 (RGB/RBG/GRB/GBR/BRG/BGR + RG0/R0B/0GB/R00/0G0/00B + R/G/B)
-    纵向表头: bit (b0=LSB ~ b7=MSB)
+    段 1 "LSB 0 bit": 12 多通道 × bit 0 字节流 preview (RGB/BRG/RBG/BGR/GRB/GBR/RG0/R0B/0GB/R00/0G0/00B)
+    段 2 "单通道0-7bit": 3 单通道 × 完整 8 bit plane 字节流 preview (R/G/B)
     """
 
-    def test_returns_120_entries(self, synthetic_2x2):
-        """默认 8 bit × 15 channel = 120 个 (bit, channel, preview, has_kw) tuples."""
-        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
-        assert len(matrix) == 120, f"expected 120 entries, got {len(matrix)}"
+    def test_returns_2_segments(self, synthetic_2x2):
+        """返回 dict 含 lsb_0bit (12) + single_8bit (3) = 2 段."""
+        matrix = _build_lsb_2segment_matrix(synthetic_2x2)
+        assert "lsb_0bit" in matrix
+        assert "single_8bit" in matrix
+        assert len(matrix["lsb_0bit"]) == 12
+        assert len(matrix["single_8bit"]) == 3
 
-    def test_all_15_channels_covered(self, synthetic_2x2):
-        """15 通道全覆盖."""
-        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
-        channels_seen = {entry[1] for entry in matrix}
-        expected = {"RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
-                    "RG0", "R0B", "0GB", "R00", "0G0", "00B",
-                    "R", "G", "B"}
-        assert channels_seen == expected, (
-            f"missing: {expected - channels_seen}, extra: {channels_seen - expected}"
-        )
+    def test_lsb_0bit_12_channels_order(self, synthetic_2x2):
+        """12 多通道顺序: RGB/BRG/RBG/BGR/GRB/GBR + RG0/R0B/0GB/R00/0G0/00B."""
+        matrix = _build_lsb_2segment_matrix(synthetic_2x2)
+        labels = [entry[0] for entry in matrix["lsb_0bit"]]
+        expected = ["RGB", "BRG", "RBG", "BGR", "GRB", "GBR",
+                    "RG0", "R0B", "0GB", "R00", "0G0", "00B"]
+        assert labels == expected, f"got {labels}"
 
-    def test_all_bits_covered(self, synthetic_2x2):
-        """8 bit 全覆盖 (b0=LSB ~ b7=MSB)."""
-        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
-        bits_seen = {entry[0] for entry in matrix}
-        assert bits_seen == set(range(8))
+    def test_single_8bit_3_channels_order(self, synthetic_2x2):
+        """3 单通道顺序: R/G/B."""
+        matrix = _build_lsb_2segment_matrix(synthetic_2x2)
+        labels = [entry[0] for entry in matrix["single_8bit"]]
+        assert labels == ["R", "G", "B"]
 
     def test_n_bytes_respected(self, synthetic_2x2):
-        """preview 长度 = n_bytes (默认 16, 适配 15 列宽度)."""
-        matrix = _build_bit_plane_preview_matrix(synthetic_2x2, n_bytes=8)
-        for _, _, preview, _ in matrix:
-            assert len(preview) <= 8
+        """preview 长度 ≤ n_bytes (默认 50, per Owner Q4)."""
+        matrix = _build_lsb_2segment_matrix(synthetic_2x2, n_bytes=20)
+        for _, preview, _ in matrix["lsb_0bit"] + matrix["single_8bit"]:
+            assert len(preview) <= 20
 
-    def test_steg_png_has_hit_keyword(self, steg_png_bytes):
-        """steg.png 实战: bit=0 RGB 应命中 'Hey' 关键字 (per Owner 截图)."""
-        matrix = _build_bit_plane_preview_matrix(steg_png_bytes)
-        # 找 (0, "RGB") entry
-        hit = [e for e in matrix if e[0] == 0 and e[1] == "RGB"]
-        assert len(hit) == 1
-        _, _, preview, has_kw = hit[0]
-        assert "Hey" in preview, f"expected 'Hey' in preview, got {preview[:40]!r}"
-        assert has_kw, "has_kw flag should be True for RGB bit 0 (contains 'Hey')"
+    def test_synthetic_lsb_text_rgb_hit(self):
+        """synthetic RGB per-pixel interleaved LSB = 'Hey!' → RGB 行命中.
 
-    def test_synthetic_lsb_text_rgb_bit0_hit(self):
-        """synthetic RGB per-pixel interleaved LSB = 'Hey!' → bit=0 RGB 行命中."""
+        16x2 PNG, RGB LSB 嵌 'Hey!' (32 bits via per-pixel interleaved).
+        """
         payload = b"Hey!"
         bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
 
@@ -310,54 +303,88 @@ class TestBuildBitPlanePreviewMatrix:
                 break
             arr[y, x, ch_offset] = bit_val
 
-        matrix = _build_bit_plane_preview_matrix(arr, n_bytes=8)
-        # bit=0 RGB 行应命中 'Hey'
-        rgb_bit0 = next(e for e in matrix if e[0] == 0 and e[1] == "RGB")
-        _, _, preview, has_kw = rgb_bit0
-        assert preview.startswith("Hey"), f"got {preview[:8]!r}"
+        matrix = _build_lsb_2segment_matrix(arr, n_bytes=10)
+        # LSB 0 bit 段 RGB 行应命中 'Hey'
+        rgb = next(e for e in matrix["lsb_0bit"] if e[0] == "RGB")
+        _, preview, has_kw = rgb
+        assert preview.startswith("Hey"), f"got {preview[:10]!r}"
         assert has_kw
 
+    def test_keyword_markers(self):
+        """命中关键字 'Hey'/'flag'/'key'/'PK'/'PNG' 应 has_kw=True."""
+        payload = b"Hey!"
+        bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        for bit_pos, bit_val in enumerate(bits):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bit_val
 
-class TestFormatMatrixForJournal:
-    """_format_matrix_for_journal: matrix → journal 可读字符串.
+        matrix = _build_lsb_2segment_matrix(arr, n_bytes=20)
+        # LSB 0 bit 段 RGB 行 has_kw=True
+        rgb = next(e for e in matrix["lsb_0bit"] if e[0] == "RGB")
+        assert rgb[2] is True
+        # 单通道 8 bit 段 (G 通道所有 bit 都 0) 不应命中
+        single_g = next(e for e in matrix["single_8bit"] if e[0] == "G")
+        assert single_g[2] is False
 
-    8 bit × 15 channel 矩阵 (per v0.5-lsb-tool-15channel-matrix 实战修订).
-    """
+
+class TestFormatLsb2SegmentForJournal:
+    """_format_lsb_2segment_for_journal: 2 段 matrix → journal 字符串 (per Owner v4 实战期望)."""
 
     def test_basic_format(self, synthetic_2x2):
-        """matrix 渲染含表头 + 8 行 bit × 15 列 channel."""
-        matrix = _build_bit_plane_preview_matrix(synthetic_2x2)
-        text = _format_matrix_for_journal(matrix, col_width=16)
+        """输出格式: ===LSB_TOOL=== + LSB 0 bit 段 (12 行) + 单通道0-7bit 段 (3 行)."""
+        matrix = _build_lsb_2segment_matrix(synthetic_2x2)
+        text = _format_lsb_2segment_for_journal(matrix)
         lines = text.split("\n")
-        # 1 表头 + 8 bit 行 = 9 行
-        assert len(lines) == 9
-        # 表头含 15 通道名
-        for ch in ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
-                   "RG0", "R0B", "0GB", "R00", "0G0", "00B",
-                   "R", "G", "B"]:
-            assert ch in lines[0], f"header missing {ch}: {lines[0]!r}"
-        # bit=0 行有 LSB 标记
-        assert "bit=0" in lines[1] and "LSB" in lines[1]
-        # bit=7 行有 MSB 标记
-        assert "bit=7" in lines[8] and "MSB" in lines[8]
+        # ===LSB_TOOL=== + "" + LSB 0 bit + 12 通道 + "" + 单通道0-7bit + 3 通道 = 19 行
+        assert lines[0] == "===LSB_TOOL==="
+        assert lines[1] == ""
+        assert lines[2] == "LSB 0 bit"
+        # 段 1: 12 行通道 (lines[3] ~ lines[14])
+        lsb_section = lines[3:15]
+        lsb_labels = [ln.split(":")[0] for ln in lsb_section]
+        expected_lsb_labels = ["RGB", "BRG", "RBG", "BGR", "GRB", "GBR",
+                              "RG0", "R0B", "0GB", "R00", "0G0", "00B"]
+        assert lsb_labels == expected_lsb_labels, f"got {lsb_labels}"
+        # 段间隔
+        assert lines[15] == ""
+        assert lines[16] == "单通道0-7bit"
+        # 段 2: 3 行 (lines[17] ~ lines[19])
+        single_section = lines[17:20]
+        single_labels = [ln.split(":")[0] for ln in single_section]
+        assert single_labels == ["R", "G", "B"]
 
-    def test_hit_keyword_marker(self, steg_png_bytes):
-        """steg.png 实战: bit=0 RGB 行应有 ' <==' 命中标记."""
-        matrix = _build_bit_plane_preview_matrix(steg_png_bytes, n_bytes=16)
-        text = _format_matrix_for_journal(matrix, col_width=16)
-        lines = text.split("\n")
-        # bit=0 行（第 2 行）应含 <== 标记 (steg.png RGB bit 0 命中 'Hey')
-        assert "<==" in lines[1], (
-            f"bit=0 行应有命中标记, got: {lines[1]!r}"
-        )
+    def test_keyword_marker(self):
+        """命中关键字时行末有 '  <=='."""
+        payload = b"Hey!"
+        bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        for bit_pos, bit_val in enumerate(bits):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bit_val
+
+        matrix = _build_lsb_2segment_matrix(arr, n_bytes=20)
+        text = _format_lsb_2segment_for_journal(matrix)
+        # RGB 行 应含 <== 标记
+        rgb_line = [ln for ln in text.split("\n") if ln.startswith("RGB:")]
+        assert len(rgb_line) == 1
+        assert "<==" in rgb_line[0], f"RGB 行应有 <==, got {rgb_line[0]!r}"
 
     def test_empty_matrix(self):
         """空 matrix 渲染空字符串."""
-        assert _format_matrix_for_journal([]) == ""
-
-    def test_empty_matrix(self):
-        """空 matrix 渲染空字符串."""
-        assert _format_matrix_for_journal([]) == ""
+        assert _format_lsb_2segment_for_journal({}) == ""
 
 
 # ============ Zero-aware byte stream (per v0.5-lsb-tool-15channel-matrix Commit 1) ============

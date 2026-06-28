@@ -482,3 +482,116 @@ _15_CHANNELS: list[tuple[str, list[str]]] = [
     ("G", ["G"]),
     ("B", ["B"]),
 ]
+
+
+# 12 多通道 LSB 0 bit 段 (per Owner 2026-06-28 22:13 实战 v4 修订)
+# 顺序: RGB/BRG/RBG/BGR/GRB/GBR (6 full perm) + RG0/R0B/0GB/R00/0G0/00B (6 zero-padded)
+_LSB_12_CHANNELS: list[tuple[str, list[str]]] = [
+    ("RGB", ["R", "G", "B"]),
+    ("BRG", ["B", "R", "G"]),
+    ("RBG", ["R", "B", "G"]),
+    ("BGR", ["B", "G", "R"]),
+    ("GRB", ["G", "R", "B"]),
+    ("GBR", ["G", "B", "R"]),
+    ("RG0", ["R", "G", "0"]),
+    ("R0B", ["R", "0", "B"]),
+    ("0GB", ["0", "G", "B"]),
+    ("R00", ["R", "0", "0"]),
+    ("0G0", ["0", "G", "0"]),
+    ("00B", ["0", "0", "B"]),
+]
+
+# 3 单通道 (单通道段用, 显示完整 8 bit plane 字节流)
+_SINGLE_3_CHANNELS: list[str] = ["R", "G", "B"]
+
+
+def _build_lsb_2segment_matrix(
+    img_array: np.ndarray,
+    n_bytes: int = 50,
+    scan_order: str = "row",
+    byte_bit_order: str = "msb",
+) -> dict[str, list[tuple[str, str, bool]]]:
+    """2 段 LSB matrix (per Owner 2026-06-28 22:13 实战 v4 修订).
+
+    段 1: "LSB 0 bit" - 12 多通道 × bit 0 字节流 preview (per 随波逐流 风格)
+    段 2: "单通道0-7bit" - 3 单通道 × 完整 8 bit plane 字节流 preview (per v0.5-train-010 N=NP 模式)
+
+    Args:
+        img_array: (H, W, 3 or 4) uint8 numpy array
+        n_bytes: 每行 preview 长度 (默认 50, per Owner 期望)
+        scan_order: "row" (per 随波逐流 默认)
+        byte_bit_order: "msb" (per 随波逐流 默认)
+
+    Returns:
+        dict:
+          "lsb_0bit": [(label, preview_str, has_keyword), ...]  # 12 entries
+          "single_8bit": [(label, preview_str, has_keyword), ...]  # 3 entries
+    """
+    # 段 1: LSB 0 bit (12 多通道, bit=0 字节流)
+    lsb_0bit: list[tuple[str, str, bool]] = []
+    for label, channels in _LSB_12_CHANNELS:
+        try:
+            byte_stream = _extract_lsb_byte_stream_zero_aware(
+                img_array, channels=channels, bit=0,
+                scan_order=scan_order, byte_bit_order=byte_bit_order,
+            )
+        except ValueError:
+            byte_stream = b""
+        preview = _ascii_preview(byte_stream, n_bytes=n_bytes)
+        has_kw = any(kw in byte_stream[:n_bytes] for kw in _PREVIEW_KEYWORDS)
+        lsb_0bit.append((label, preview, has_kw))
+
+    # 段 2: 单通道 0-7 bit (3 单通道, 完整 8 bit plane 字节流)
+    single_8bit: list[tuple[str, str, bool]] = []
+    for label in _SINGLE_3_CHANNELS:
+        ch_idx = _channel_index(label)
+        if img_array.ndim < 3 or ch_idx >= img_array.shape[2]:
+            single_8bit.append((label, "", False))
+            continue
+        plane = img_array[:, :, ch_idx]
+        byte_stream = _channel_8bit_byte_stream(plane)
+        preview = _ascii_preview(byte_stream, n_bytes=n_bytes)
+        has_kw = any(kw in byte_stream[:n_bytes] for kw in _PREVIEW_KEYWORDS)
+        single_8bit.append((label, preview, has_kw))
+
+    return {"lsb_0bit": lsb_0bit, "single_8bit": single_8bit}
+
+
+def _format_lsb_2segment_for_journal(
+    matrix: dict[str, list[tuple[str, str, bool]]],
+) -> str:
+    """2 段 LSB matrix 渲染 (per Owner 2026-06-28 22:13 实战 v4 期望).
+
+    输出格式:
+        ===LSB_TOOL===
+
+        LSB 0 bit
+        RGB:Hey! I think we can write safely in this file witho  <==
+        BRG:$3..$..54<........{...y..3...4...5.;.4..2....?
+        ... (12 通道)
+        00B:...............................................
+
+        单通道0-7bit
+        R:.................................................
+        G:. ..
+        B:....
+    """
+    if not matrix:
+        return ""
+
+    lines: list[str] = ["===LSB_TOOL===", ""]
+
+    # 段 1: LSB 0 bit (12 多通道)
+    lines.append("LSB 0 bit")
+    for label, preview, has_kw in matrix.get("lsb_0bit", []):
+        marker = "  <==" if has_kw else ""
+        lines.append(f"{label}:{preview}{marker}")
+    lines.append("")
+
+    # 段 2: 单通道 0-7 bit (3 单通道, 完整 8 bit plane)
+    lines.append("单通道0-7bit")
+    for label, preview, has_kw in matrix.get("single_8bit", []):
+        marker = "  <==" if has_kw else ""
+        lines.append(f"{label}:{preview}{marker}")
+
+    return "\n".join(lines)

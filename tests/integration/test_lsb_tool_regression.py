@@ -185,13 +185,13 @@ class TestRealFixtureSmoke:
             # 不 crash 即可
             assert result.exit_code in (0, 1), f"mode={mode} failed: {result.stdout}"
 
-    def test_lsb_tool_detect_includes_15channel_matrix(self, real_png_path):
-        """lsb_tool detect mode 输出含 8 bit × 15 channel preview matrix (per v0.5-lsb-tool-15channel-matrix 实战修订).
+    def test_lsb_tool_detect_2segment_format(self, real_png_path):
+        """lsb_tool detect mode 输出含 2 段 LSB matrix (per v0.5-lsb-tool-15channel-matrix v4 实战修订).
 
         验证 journal 输出含:
-        - "[bit-plane preview matrix 8 bit × 15 channel]" 段标题
-        - 15 通道横向表头 (RGB/RBG/GRB/GBR/BRG/BGR/RG0/R0B/0GB/R00/0G0/00B/R/G/B)
-        - 8 bit 纵向表头 (bit=0 LSB ~ bit=7 MSB)
+        - "===LSB_TOOL===" 总标题
+        - "LSB 0 bit" 段标题 + 12 多通道 (RGB/BRG/RBG/BGR/GRB/GBR/RG0/R0B/0GB/R00/0G0/00B)
+        - "单通道0-7bit" 段标题 + 3 单通道 (R/G/B)
         """
         from automisc.tools.steganography.image.lsb_tool_adapter import LsbToolAdapter
 
@@ -199,29 +199,32 @@ class TestRealFixtureSmoke:
         result = adapter.run(str(real_png_path))
 
         stdout = result.stdout or ""
-        # 段标题存在
-        assert "[bit-plane preview matrix 8 bit × 15 channel" in stdout, (
-            f"stdout 应含 8 bit × 15 channel 标题, got first 500 chars:\n{stdout[:500]!r}"
+        # 总标题 + 2 段标题
+        assert "===LSB_TOOL===" in stdout, (
+            f"stdout 应含 '===LSB_TOOL===' 标题, got:\n{stdout[:500]!r}"
+        )
+        assert "LSB 0 bit" in stdout, (
+            f"stdout 应含 'LSB 0 bit' 段标题, got:\n{stdout[:500]!r}"
+        )
+        assert "单通道0-7bit" in stdout, (
+            f"stdout 应含 '单通道0-7bit' 段标题, got:\n{stdout[:500]!r}"
         )
 
-        # 15 通道 label 全在表头行 (per Owner 列表)
-        # stdout 结构:
-        #   line 0: "lsb_tool detect: ..."
-        #   line 1: "" (空)
-        #   line 2: "[bit-plane preview matrix 8 bit × 15 channel, ...]"
-        #   line 3: 横向表头 (15 通道名)
-        expected_labels = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
-                           "RG0", "R0B", "0GB", "R00", "0G0", "00B",
-                           "R", "G", "B"]
-        all_lines = stdout.split("\n")
-        header_line = all_lines[3] if len(all_lines) > 3 else ""
-        for label in expected_labels:
-            assert label in header_line, (
-                f"表头应含 {label!r}, got header line:\n{header_line!r}"
+        # 12 多通道顺序
+        lsb_labels = ["RGB", "BRG", "RBG", "BGR", "GRB", "GBR",
+                      "RG0", "R0B", "0GB", "R00", "0G0", "00B"]
+        for label in lsb_labels:
+            assert f"{label}:" in stdout, (
+                f"stdout 应含 '{label}:' 通道行, got:\n{stdout[:1500]!r}"
+            )
+        # 3 单通道
+        for label in ["R:", "G:", "B:"]:
+            assert label in stdout, (
+                f"stdout 应含 '{label}' 单通道行, got:\n{stdout[:1500]!r}"
             )
 
-    def test_lsb_tool_detect_synthetic_15ch_keyword(self, tmp_path):
-        """synthetic: RGB per-pixel interleaved LSB 嵌 'Hey' → 8 bit × 15 channel 矩阵 bit=0 RGB 行 <==.
+    def test_lsb_tool_detect_synthetic_2segment_keyword(self, tmp_path):
+        """synthetic: RGB per-pixel interleaved LSB 嵌 'Hey' → 2 段 LSB 段 RGB 行 <==.
 
         端到端验证: 写 PNG → LsbToolAdapter detect → result.stdout 应含 'Hey' 命中 + <== 标记.
         """
@@ -243,15 +246,17 @@ class TestRealFixtureSmoke:
                 break
             arr[y, x, ch_offset] = bit_val
 
-        png_path = tmp_path / "lsb_15ch_synthetic.png"
+        png_path = tmp_path / "lsb_2segment_synthetic.png"
         Image.fromarray(arr).save(png_path, "PNG")
 
         adapter = LsbToolAdapter(mode="detect")
         result = adapter.run(str(png_path))
         stdout = result.stdout or ""
 
-        # 8 bit × 15 channel 矩阵 bit=0 RGB 行应含 'Hey' 命中 + <== 标记
-        assert "bit=0" in stdout
+        # 2 段结构 + 命中 'Hey'
+        assert "===LSB_TOOL===" in stdout
+        assert "LSB 0 bit" in stdout
+        assert "单通道0-7bit" in stdout
         assert "Hey" in stdout, f"stdout 应含 'Hey' 命中, got:\n{stdout[:1500]!r}"
         assert "<==" in stdout, f"stdout 应含 '<==' 命中标记, got:\n{stdout[:1500]!r}"
 

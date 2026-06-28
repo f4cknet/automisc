@@ -44,12 +44,12 @@ from automisc.core.actions.lsb_tool_common import (
     _VALID_MODES,
     _VALID_PRESETS,
     _VALID_SCAN_ORDERS,
-    _build_bit_plane_preview_matrix,
+    _build_lsb_2segment_matrix,
     _channel_8bit_byte_stream,
     _bytes_preview,
     _detect_file_header_hex,
     _extract_lsb_byte_stream,
-    _format_matrix_for_journal,
+    _format_lsb_2segment_for_journal,
     _is_printable_text,
     _parse_channels,
     _perm_name,
@@ -150,15 +150,14 @@ class LSBToolAction(Action):
         elif self.preset == "np":
             sps.extend(self._detect_np_mode(arr, file_path))
 
-        # per Owner 2026-06-28 18:13 实战修订: 每张图都打 8 bit × 15 channel preview matrix
-        # (per v0.5-lsb-tool-15channel-matrix §3.2 实战修订)
-        # - 横向表头: 15 通道 (RGB/RBG/GRB/GBR/BRG/BGR + RG0/R0B/0GB/R00/0G0/00B + R/G/B)
-        # - 纵向表头: bit (b0=LSB ~ b7=MSB)
-        # - 总 cells: 8 × 15 = 120
-        # - 实战价值: bit=0 LSB + bit=7 MSB (Owner "LSB+MSB 增强") + bit=1~6 (实战 mid-bit 信息)
-        #             都覆盖在矩阵不同行, 一眼锁定出明文的 (bit, channel) 组合
-        matrix = _build_bit_plane_preview_matrix(arr, n_bytes=16)
-        matrix_text = _format_matrix_for_journal(matrix, col_width=16)
+        # per Owner 2026-06-28 22:13 实战 v4 修订: 2 段 LSB matrix (12 多通道 bit 0 + 3 单通道 8 bit)
+        # - 段 1 "LSB 0 bit": 12 多通道 × bit 0 字节流 preview (per 随波逐流 风格)
+        # - 段 2 "单通道0-7bit": 3 单通道 × 完整 8 bit plane 字节流 preview (per v0.5-train-010 N=NP)
+        # - 不显示 bit 1~7 mid-bit (per Owner "1-7bit 位忽略")
+        # - `<==` 关键字命中标记保留 (per Owner Q4)
+        # - preview 50 byte (per Owner Q4)
+        matrix = _build_lsb_2segment_matrix(arr, n_bytes=50)
+        matrix_text = _format_lsb_2segment_for_journal(matrix)
 
         return ActionResult(
             success=True,
@@ -179,15 +178,7 @@ class LSBToolAction(Action):
                 "scan_order": self.scan_order,
                 "byte_bit_order": self.byte_bit_order,
             },
-            message=(
-                f"lsb_tool detect: preset={self.preset or 'single'}, "
-                f"命中 {len(sps)} SP "
-                f"({sum(1 for sp in sps if sp.severity == 5)} sev=5 真可疑, "
-                f"{sum(1 for sp in sps if sp.severity == 4)} sev=4 概率)\n"
-                f"\n[bit-plane preview matrix 8 bit × 15 channel, 每格 16 字节 ASCII preview, "
-                f"<== 标 hit-keyword]\n"
-                f"{matrix_text}"
-            ),
+            message=matrix_text,
         )
 
     def _detect_single_combo(
