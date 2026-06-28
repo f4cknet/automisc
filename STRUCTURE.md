@@ -28,8 +28,8 @@ automisc/
 ├── prd.md                        🟡 frozen — 历史需求 (v0.1 已交付, 不再更新)
 ├── upgrade.md                    迭代索引 (v0.5+ 主入口)
 ├── upgrade/                      每次迭代 1 个 .md (永久保留)
-├── fix.md                        修复记录索引
-├── fix_<bug_name>.md             单 fix 详细记录
+├── upgrade/fix_<bug_name>.md     单 fix 详细记录 (per 2026-06-28 治理: 在 upgrade/ 子目录, 跟迭代 spec 同级)
+├── fix.md                        修复记录索引 (指向 upgrade/fix_*.md)
 │
 ├── Challenge/                    真实 CTF 题目 (per topic, owner 提供)
 ├── tests/fixtures/               测试 fixture (伪加密 zip, 文本样本等)
@@ -308,7 +308,7 @@ GUI: Run → Chain → Run lsb-bytes chain (4 params) → 弹 `LSBBytesParamDial
 | `AGENTS.md` | session 启动必读 (治理 + Git 流程) | 每次 |
 | `STRUCTURE.md` | ← 本文件 (查模块作用) | 经常 |
 | `upgrade.md` + `upgrade/<id>.md` | 每次新迭代必读 | 每次迭代 |
-| `fix.md` + `fix_<bug>.md` | 修 bug 前查 | 偶尔 |
+| `fix.md` + `upgrade/fix_<bug>.md` | 修 bug 前查 | 偶尔 |
 | `prd.md` | 🟡 frozen (历史, 不读) | 不读 |
 | `Architecture.md` | ❌ 已删 | 不读 |
 

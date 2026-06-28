@@ -115,7 +115,7 @@ AI Agent session 启动**按序读** 4 文件（其他不读）：
 |---|---|
 | 项目结构 + 模块作用 | `STRUCTURE.md` |
 | 当前迭代 | `upgrade.md` 索引 + `upgrade/<id>.md` 详细 |
-| 修复记录 | `fix.md` 索引 + `fix_<bug_name>.md` 详细 |
+| 修复记录 | `fix.md` 索引 + `upgrade/fix_<bug_name>.md` 详细（per 2026-06-28 治理澄清：`fix_<bug>.md` 在 `upgrade/` 子目录，不在项目根）|
 | 历史需求 | `prd.md`（🟡 frozen，仅参考）|
 | **训练驱动 / 训练日志 / 架构判定** | `AGENTS.md` §5 |
 | 治理 / 铁律 / Git 流程 | `AGENTS.md`（本文件）|
