@@ -52,10 +52,10 @@ class RouteResult:
 # extension → 推荐工具 + 理由 + 默认 score
 EXTENSION_ROUTES: dict[str, list[tuple[str, str, int]]] = {
     # 图片 (Stego)
-    ".png": [("lsb_tool", "PNG LSB 隐写 (per v0.5-lsb-tool-unify + v0.5-lsb-tool-bitplane-preview-matrix, 替代 zsteg)", 12), ("stegseek", "PNG/BMP 隐写 (v0.5 平替 steghide)", 8), ("exiftool", "EXIF metadata", 6), ("binwalk", "PNG 内嵌文件检测", 5), ("strings", "可疑字符串 (rule_scanner)", 3)],
-    ".bmp": [("stegseek", "BMP 隐写 (v0.5 平替 steghide)", 10), ("exiftool", "BMP metadata", 6)],
-    ".jpg": [("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5), ("strings", "可疑字符串 (rule_scanner)", 4)],
-    ".jpeg": [("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5)],
+    ".png": [("lsb_tool", "PNG LSB 隐写 (per v0.5-lsb-tool-unify + v0.5-lsb-tool-bitplane-preview-matrix, 替代 zsteg)", 12), ("steghide", "JPEG/BMP 隐写 (v0.5-stegseek-remove 重构, 替代 stegseek)", 8), ("exiftool", "EXIF metadata", 6), ("binwalk", "PNG 内嵌文件检测", 5), ("strings", "可疑字符串 (rule_scanner)", 3)],
+    ".bmp": [("steghide", "BMP 隐写 (v0.5-stegseek-remove 重构, 替代 stegseek)", 10), ("exiftool", "BMP metadata", 6)],
+    ".jpg": [("steghide", "JPEG 隐写 (v0.5-stegseek-remove 重构, 替代 stegseek)", 10), ("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5), ("strings", "可疑字符串 (rule_scanner)", 4)],
+    ".jpeg": [("steghide", "JPEG 隐写 (v0.5-stegseek-remove 重构, 替代 stegseek)", 10), ("exiftool", "JPEG EXIF", 8), ("binwalk", "JPEG 内嵌文件", 5)],
     ".gif": [("exiftool", "GIF metadata", 6), ("binwalk", "GIF 内嵌", 5)],
     # 音视频 (Stego)
     ".wav": [("sox", "WAV metadata + 频谱", 10), ("ffmpeg_audio", "音频元数据", 8), ("steghide_audio", "WAV/AU 隐写", 8), ("ffprobe", "流信息", 5)],

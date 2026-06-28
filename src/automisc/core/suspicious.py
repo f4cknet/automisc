@@ -83,13 +83,13 @@ KEYWORDS: list[str] = [
     "ctf",
     # 工具名（per v0.5-相关历史决策 — 命中表示含该工具的处理痕迹）
     "steghide",
-    "stegseek",
     "outguess",
     "stegdetect",
     "jsteg",
-    "zsteg",
+    "zsteg",  # 历史保留 (per v0.5-lsb-tool-bitplane-preview-matrix 删 zsteg adapter, 但 keyword 仍可命中含 zsteg 输出文件)
     "binwalk",
     "foremost",
+    # 注: "stegseek" 关键字已删 (per v0.5-stegseek-remove 2026-06-28, stegseek tool 全删)
 ]
 
 # category → (severity, suggested_action) 映射

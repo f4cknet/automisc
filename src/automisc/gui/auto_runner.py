@@ -58,7 +58,7 @@ SHORT_CIRCUIT_SEVERITY = 99
 # - binwalk adapter 默认探测模式 (跑 `binwalk <file>` 不带 -e), 写 SP 到 journal — OK
 FIND_SUSPICIOUS_PICTURE_TOOLS = [
     "lsb_tool",     # v0.5-lsb-tool-unify: 3 mode 统一 LSB 工具 (detect/extract/extract_bytes), 替代 lsb_detect + lsb_extract + lsb_bytes_extract
-    "stegseek",     # JPEG/BMP 隐写 info (无密码, 纯探测; PNG/GIF 不支持会 fail, v0.5 平替 steghide)
+    "steghide",     # v0.5-stegseek-remove (2026-06-28): 替代 stegseek, 统一 steghide (info + 空密码 extract 兜底 CVE-2021-27211, 5s timeout)
     "exiftool",     # EXIF metadata
     "binwalk",      # 探测 (不 -e)
     "strings",      # rule_scanner 可疑字符串
@@ -158,7 +158,7 @@ _SUGGEST_MAP: dict[str, tuple[str, str]] = {
         "🔑 命中疑似密码/flag 关键词, 配合 zip/rar bruteforce 或直接用",
     ),
     # future candidates (per v0.5-auto-run-suggest spec §4.2 OUT):
-    # - stegseek:steghide (JPEG 隐写命中)
+    # - steghide (v0.5-stegseek-remove 重构, 替代 stegseek): JPEG 隐写命中
     # - exiftool:suspicious (EXIF metadata 可疑)
     # - binwalk:file_header_elf / exe / macho (Linux/Windows/Mac 可执行)
 }
