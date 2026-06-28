@@ -13,6 +13,7 @@ from automisc.core.actions.lsb_tool_common import (
     _ascii_preview,
     _build_bit_plane_preview_matrix,
     _extract_lsb_byte_stream,
+    _extract_lsb_byte_stream_zero_aware,
     _format_matrix_for_journal,
 )
 
@@ -326,3 +327,182 @@ class TestFormatMatrixForJournal:
     def test_empty_matrix(self):
         """空 matrix 渲染空字符串."""
         assert _format_matrix_for_journal([]) == ""
+
+
+# ============ Zero-aware byte stream (per v0.5-lsb-tool-15channel-matrix Commit 1) ============
+
+
+class TestExtractZeroAwareByteStream:
+    """_extract_lsb_byte_stream_zero_aware: 支持 '0' 通道占位的 byte stream 提取.
+
+    **核心不变量**:
+    - 3 通道场景等价 `_extract_lsb_byte_stream` (不破坏老路径)
+    - RG0 ≠ RG (zero padding bit 占 byte 流位置, 改变 byte 对齐)
+    - RG0 == R00 (数学等价, 0 bits 等价)
+    """
+
+    def test_three_channel_equals_standard(self, synthetic_2x2):
+        """3 通道场景: zero_aware 跟 standard 输出完全一致."""
+        bs_zero = _extract_lsb_byte_stream_zero_aware(
+            synthetic_2x2, channels=["R", "G", "B"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_std = _extract_lsb_byte_stream(
+            synthetic_2x2, channels=["R", "G", "B"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        assert bs_zero == bs_std, (
+            f"zero_aware 跟 standard 输出应一致, "
+            f"zero={bs_zero.hex()}, std={bs_std.hex()}"
+        )
+
+    def test_RG0_differs_from_RG(self):
+        """RG0 ≠ RG: '0' 通道 positional zero (占 byte 流位置), 改变 bit 密度.
+
+        4x1 像素 PNG:
+        arr[0,0] = R=1, G=1, B=0
+        arr[0,1] = R=1, G=0, B=0
+        arr[0,2] = R=0, G=1, B=0
+        arr[0,3] = R=0, G=0, B=0
+
+        RG (2 通道, no 0 padding):
+            bits per pixel = 2, per-pixel bit sequence: [R0,G0], [R1,G1], ...
+            pixel 0: [1,1] pixel 1: [1,0] pixel 2: [0,1] pixel 3: [0,0]
+            bits = [1,1,1,0,0,1,0,0] = 8 bits → byte 1 = 11100100 = 0xE4
+
+        RG0 (3 通道 with positional zero, 跟 随波逐流 一致):
+            bits per pixel = 3, per-pixel bit sequence: [R0,G0,0], [R1,G1,0], ...
+            pixel 0: [1,1,0] pixel 1: [1,0,0] pixel 2: [0,1,0] pixel 3: [0,0,0]
+            bits = [1,1,0,1,0,0,0,1,0,0,0,0] = 12 bits → 1 字节
+            byte 1 (MSB first, 8 bits) = 11010001 = 0xD1
+            (后 4 bits = 0000 被截断)
+        """
+        arr = np.zeros((1, 4, 3), dtype=np.uint8)
+        arr[0, 0] = [1, 1, 0]  # R=1 G=1 B=0
+        arr[0, 1] = [1, 0, 0]
+        arr[0, 2] = [0, 1, 0]
+        arr[0, 3] = [0, 0, 0]
+
+        bs_RG = _extract_lsb_byte_stream(
+            arr, channels=["R", "G"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_RG0 = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "G", "0"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        # RG0 跟 RG byte stream 必须不同 (因为 0 占 byte 流位置)
+        assert bs_RG != bs_RG0, (
+            f"RG0 应跟 RG 不同 (positional zero, 0 占位), "
+            f"RG={bs_RG.hex()}, RG0={bs_RG0.hex()}"
+        )
+        # 验证具体值
+        assert bs_RG == bytes([0xE4]), f"RG expected 0xE4, got {bs_RG.hex()}"
+        assert bs_RG0 == bytes([0xD1]), f"RG0 expected 0xD1, got {bs_RG0.hex()}"
+
+    def test_RG0_equals_R00_when_G_zero(self):
+        """RG0 == R00: 当 G bit 全 0 时 positional zero 数学等价 (per Owner 截图).
+
+        Owner 实战截图 RG0 == R00 (随波逐流 输出), 根因是该 stego 图 G 通道 LSB 全 0.
+        验证: 用 G=0 测试图, RG0 (R,G,0) bit 序列 跟 R00 (R,0,0) bit 序列数学相同.
+        """
+        arr = np.zeros((1, 4, 3), dtype=np.uint8)
+        arr[0, 0] = [1, 0, 0]  # G=0
+        arr[0, 1] = [1, 0, 0]
+        arr[0, 2] = [0, 0, 0]
+        arr[0, 3] = [0, 0, 0]
+
+        bs_RG0 = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "G", "0"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_R00 = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "0", "0"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        # G=0 时: RG0 per pixel [R,0,0] == R00 per pixel [R,0,0]
+        assert bs_RG0 == bs_R00, (
+            f"RG0 应跟 R00 等价 (G bit 全 0 时), "
+            f"RG0={bs_RG0.hex()}, R00={bs_R00.hex()}"
+        )
+
+    def test_single_channel_equals_standard(self, synthetic_2x2):
+        """单通道场景: zero_aware 跟 standard 一致 (无 '0' 通道)."""
+        bs_zero = _extract_lsb_byte_stream_zero_aware(
+            synthetic_2x2, channels=["G"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_std = _extract_lsb_byte_stream(
+            synthetic_2x2, channels=["G"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        assert bs_zero == bs_std
+
+    def test_all_zero_channels_returns_empty(self):
+        """全 '0' 通道 → 空字节流 (防御性兜底)."""
+        arr = np.zeros((4, 4, 3), dtype=np.uint8)
+        bs = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["0", "0", "0"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        assert bs == b""
+
+    def test_invalid_channel_raises(self, synthetic_2x2):
+        """无效通道 'X' → ValueError (zero_aware 校验)."""
+        with pytest.raises(ValueError, match=r"invalid channel"):
+            _extract_lsb_byte_stream_zero_aware(
+                synthetic_2x2, channels=["X"], bit=0,
+                scan_order="row", byte_bit_order="msb",
+            )
+
+    def test_empty_channels_raises(self, synthetic_2x2):
+        """空 channels → ValueError."""
+        with pytest.raises(ValueError, match=r"at least one channel"):
+            _extract_lsb_byte_stream_zero_aware(
+                synthetic_2x2, channels=[], bit=0,
+                scan_order="row", byte_bit_order="msb",
+            )
+
+    def test_byte_count_RG0_more_than_RG(self):
+        """总 byte 数: positional zero 下 RG0 (3 bits/pixel) byte 数 > RG (2 bits/pixel).
+
+        4x4 像素:
+        RG: 16 pixels × 2 bits = 32 bits → 4 bytes
+        RG0 (positional zero): 16 pixels × 3 bits = 48 bits → 6 bytes
+        """
+        arr = np.zeros((4, 4, 3), dtype=np.uint8)
+        # R 通道全 bit 1, G 通道全 bit 0
+        arr[:, :, 0] = 0x01
+        arr[:, :, 1] = 0x00
+
+        bs_RG = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "G"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_RG0 = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "G", "0"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        assert len(bs_RG) == 4, f"RG: expected 4 bytes, got {len(bs_RG)}"
+        assert len(bs_RG0) == 6, f"RG0: expected 6 bytes (3 bits/pixel), got {len(bs_RG0)}"
+
+    def test_col_scan_zero_aware(self):
+        """col scan + zero_aware 也能工作 (per v0.5-lsb-tool-bitplane-preview-matrix row/col 兼容)."""
+        arr = np.zeros((2, 2, 3), dtype=np.uint8)
+        arr[0, 0] = [1, 0, 0]
+        arr[1, 0] = [0, 1, 0]
+        arr[0, 1] = [1, 1, 0]
+        arr[1, 1] = [0, 0, 0]
+
+        bs_row = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "0", "G"], bit=0,
+            scan_order="row", byte_bit_order="msb",
+        )
+        bs_col = _extract_lsb_byte_stream_zero_aware(
+            arr, channels=["R", "0", "G"], bit=0,
+            scan_order="col", byte_bit_order="msb",
+        )
+        # row vs col 应不同 (跟现有 _extract_lsb_byte_stream 行为一致)
+        assert bs_row != bs_col, (
+            f"row vs col 应不同, row={bs_row.hex()}, col={bs_col.hex()}"
+        )

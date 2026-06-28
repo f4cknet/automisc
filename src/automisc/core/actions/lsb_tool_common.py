@@ -31,11 +31,14 @@ ByteBitOrder = Literal["msb", "lsb"]
 Mode = Literal["detect", "extract", "extract_bytes"]
 Preset = Literal["all", "np"]
 
-_VALID_CHANNELS = {"R", "G", "B", "A"}
+_VALID_CHANNELS = {"R", "G", "B", "A"}  # 真实像素通道 (不含 '0', '0' 仅 zero_aware 内部用)
 _VALID_SCAN_ORDERS = {"row", "col"}
 _VALID_BYTE_BIT_ORDERS = {"msb", "lsb"}
 _VALID_MODES = {"detect", "extract", "extract_bytes"}
 _VALID_PRESETS = {None, "all", "np"}
+
+# zero_aware 专用 (含 '0' 占位, per v0.5-lsb-tool-15channel-matrix)
+_VALID_CHANNELS_ZERO_AWARE = {"R", "G", "B", "A", "0"}
 
 # RGB 全排列 (PIL convert('RGB') 顺序: 0=R, 1=G, 2=B)
 _PERMUTATIONS: list[tuple[int, int, int]] = [
@@ -190,6 +193,86 @@ def _extract_lsb_byte_stream(
     if byte_bit_order == "msb":
         return np.packbits(bits_trimmed).tobytes()
     # lsb: 字节内 bit 反序 (zsteg 兼容)
+    bits_2d = bits_trimmed.reshape(-1, 8)[:, ::-1].flatten()
+    return np.packbits(bits_2d).tobytes()
+
+
+# ============ Zero-aware byte stream (per v0.5-lsb-tool-15channel-matrix) ============
+
+
+def _extract_lsb_byte_stream_zero_aware(
+    img_array: np.ndarray,
+    channels: list[str],
+    bit: int,
+    scan_order: str,
+    byte_bit_order: str,
+) -> bytes:
+    """支持 '0' 通道的 byte stream 提取 (per v0.5-lsb-tool-15channel-matrix).
+
+    **'0' 通道语义** (per Owner 截图验证, 跟 随波逐流 一致):
+    - '0' 表示 **positional zero**: 占 byte 流位置, 贡献固定 0 bit
+    - per pixel: [R_bit, G_bit, 0_bit] 跟 [R_bit, 0_bit, B_bit] 产生不同 byte stream
+    - 但当 G_bit 全 0 时, RG0 跟 R00 byte stream 等价 (Owner 截图验证)
+
+    **vs `_extract_lsb_byte_stream`**:
+    - channels 可含 '0' 字符 (e.g. ``["R", "G", "0"]``)
+    - '0' 通道不抽像素 bit,贡献固定 0 bit,但占 byte 流位置
+    - 用于 15 通道矩阵 zero-padded 组合 (RG0/R0B/0GB/R00/0G0/00B)
+
+    **数学约束**:
+    - ``_extract_lsb_byte_stream_zero_aware(arr, ["R","G","B"], ...) ==
+       _extract_lsb_byte_stream(arr, ["R","G","B"], ...)`` (无 zero 场景等价)
+    - ``len(_extract_lsb_byte_stream_zero_aware(arr, ["R","G","0"], ...)) ==
+       len(_extract_lsb_byte_stream(arr, ["R","G"], ...))`` (zero 占位置, total_bits 数 = 实际通道数)
+
+    Examples:
+        channels=["R","G","B"] / row / bit=0 / MSB: 等价于 _extract_lsb_byte_stream (经典 3 通道)
+        channels=["R","G","0"] / row / bit=0 / MSB: R bit + G bit + 0 bit per pixel (positional zero)
+        channels=["G"] / col / bit=0 / MSB: G bit per pixel (N=NP 模式)
+    """
+    if not channels:
+        raise ValueError("at least one channel required")
+    for c in channels:
+        if c not in _VALID_CHANNELS_ZERO_AWARE:
+            raise ValueError(f"invalid channel: {c}, valid: {sorted(_VALID_CHANNELS_ZERO_AWARE)}")
+
+    n_ch = len(channels)
+    real_channels = [c for c in channels if c != "0"]
+    real_positions = [i for i, c in enumerate(channels) if c != "0"]
+
+    if not real_channels:
+        # 全 '0' 通道 → 空字节流 (理论上不会发生, 防御性兜底)
+        return b""
+
+    ch_indices = [_channel_index(c) for c in real_channels]
+
+    if img_array.ndim < 3 or max(ch_indices) >= img_array.shape[2]:
+        raise ValueError(
+            f"image has no channel {real_channels} (shape={img_array.shape})"
+        )
+
+    # 抽真实通道的像素值 → (H, W, n_real)
+    plane = img_array[:, :, ch_indices]
+
+    if scan_order == "row":
+        flat_real = plane.reshape(-1, len(real_channels))
+    else:  # col
+        flat_real = plane.transpose(1, 0, 2).reshape(-1, len(real_channels))
+
+    # 抽 bit 位 → (H*W, n_real)
+    real_bits = ((flat_real >> bit) & 1).astype(np.uint8)
+
+    # 还原每像素 n_ch 位 (插入 '0' 通道占位) → (H*W, n_ch)
+    pixel_bits = np.zeros((flat_real.shape[0], n_ch), dtype=np.uint8)
+    for pos, real_idx in zip(real_positions, range(len(real_channels))):
+        pixel_bits[:, pos] = real_bits[:, real_idx]
+
+    bits = pixel_bits.flatten(order="C")
+    n_bytes = len(bits) // 8
+    bits_trimmed = bits[: n_bytes * 8]
+
+    if byte_bit_order == "msb":
+        return np.packbits(bits_trimmed).tobytes()
     bits_2d = bits_trimmed.reshape(-1, 8)[:, ::-1].flatten()
     return np.packbits(bits_2d).tobytes()
 
