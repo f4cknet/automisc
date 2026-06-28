@@ -43,15 +43,13 @@ def register_action(name: str, action: Action) -> None:
 
 
 def _ensure_action_registry() -> None:
-    """懒加载 v0.5 快捷 action 6 个 (4 老 + 2 v0.5-stegseek 新)."""
+    """懒加载 v0.5 快捷 action 6 个 (4 老 + 2 v0.5-steghide-c 新, per v0.5-stegseek-remove)."""
     if _ACTION_REGISTRY:
         return
     from automisc.core.actions.lsb_extract import LSBExtractAction
     from automisc.core.actions.rar_chain import BruteforceRarAction
-    from automisc.core.actions.stegseek import (
-        StegseekCrackAction,
-        SteghideExtractAction,
-    )
+    from automisc.core.actions.steghide_crack import SteghideCrackAction
+    from automisc.core.actions.steghide_extract import SteghideExtractAction
     from automisc.core.actions.zip_chain import (
         BruteforceZipAction,
         FixPseudoEncryptionAction,
@@ -61,11 +59,11 @@ def _ensure_action_registry() -> None:
     register_action("fix_pseudo_zip", FixPseudoEncryptionAction())
     register_action("bruteforce_zip", BruteforceZipAction())
     register_action("bruteforce_rar", BruteforceRarAction())
-    # v0.5-philosophy-rethink: GUI 工具栏 stegseek 3 模式 (Owner 2026-06-20 13:48 拍板)
-    # - stegseek_crack: bruteforce with wordlist (Chain 菜单入口)
-    # - steghide_extract: user-provided password (Chain 菜单入口)
+    # v0.5-stegseek-remove (2026-06-28 per Owner): 删 stegseek, 统一走 steghide
+    # - steghide_crack: bruteforce with wordlist (Chain 菜单入口) - 替代原 stegseek_crack
+    # - steghide_extract: user-provided password (Chain 菜单入口) - 不变
     # - 空密码模式: 走 SteghideAdapter (auto_run + ToolMenuDock 共用, 不需 action)
-    register_action("stegseek_crack", StegseekCrackAction())
+    register_action("steghide_crack", SteghideCrackAction())
     register_action("steghide_extract", SteghideExtractAction())
 
 
@@ -81,10 +79,10 @@ class ChainRunner(QThread):
 
     链模式: chain_name in {"zip","zip-full","binwalk","foremost","lsb"}
     action 模式: chain_name in {"lsb_extract","fix_pseudo_zip","bruteforce_zip","bruteforce_rar",
-                                "stegseek_crack","steghide_extract"}  # v0.5-steghide-GUI 新增
+                                "steghide_crack","steghide_extract"}  # v0.5-steghide-GUI 新增
 
     extra_context 用途 (v0.5-steghide-GUI):
-    - {"__wordlist__": path} → StegseekCrackAction 用
+    - {"__wordlist__": path} → SteghideCrackAction 用
     - {"__password__": pw} → SteghideExtractAction 用
     """
 
