@@ -265,7 +265,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **file** | ✅ | `extend-tools/bin/win-x64/file.exe` | magic 识别压缩类型 | P0 |
 | **john** | ❌ | `brew install john-jumbo` | 4-6 位数字爆破（zip/rar） | P0 · v0.1 必须装 |
 | **hashcat** | ❌ | `brew install hashcat` | GPU 加速破解（zip/rar 哈希） | v0.5 安装 |
-| **zipcrack.py** | ❌ | `misc/zipcrack.py`（未软链） | 纯 Python zip 4-6 位爆破 | v0.1 作为 john 缺失的 fallback |
+| **bruteforce_zip (自研)** | ✅ | `core/actions/zip_chain.py:BruteforceZipAction` + `_generate_passwords` | 纯 Python 字典爆破 zip 4-6 位数字 + 4 位字母（≈ 8.4M 组合） | v0.5 自研替代未实现的 zipcrack.py；per [`upgrade/v0.5-zipcrack-doc-update.md`](./upgrade/v0.5-zipcrack-doc-update.md) |
 | **rar / unrar** | ❌ | `brew install rar` | rar 创建 / 解压（区别于 unrar-only） | v0.5 安装 |
 
 ### 3.10 Misc Others / Office（文档分析）
@@ -345,7 +345,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **Audio Stego** | ffmpeg（频谱）| sox / audacity / DeepSound / MP3Stego |
 | **Video Stego** | ffmpeg + ffprobe（多 stream 提取）| vlc（视觉验证）/ MP4Box / mediainfo |
 | **Encoding** | （**内置实现**）`core/encoders/base.py` + `classical.py` + `custom.py` | 全部内置，无外部依赖 |
-| **Archive** | 7z + unzip + file | john（爆破）/ hashcat（GPU 爆破）/ zipcrack.py |
+| **Archive** | 7z + unzip + file + bruteforce_zip（自研 Python 字典爆破）| john（爆破）/ hashcat（GPU 爆破）|
 | **Office** | exiftool + binwalk + python-docx | pdftotext / mutool |
 | **Brainteaser** | Python 标准库 + z3-solver + Pillow | 全部脑洞题通用 base |
 | **未知二进制** | file + strings + binwalk + foremost + xxd | exiftool / scalpel / hexdump |
@@ -355,9 +355,9 @@ with Evtx.Evtx("file.evtx") as log:
 ## 6. P0 工具优先级（v0.1 必须有 adapter）
 
 > **依据** [`prd.md §4.1 v0.1.6`](./prd.md)：v0.1 必须落地 **≥5 个 adapter**。
-> **当前实际 P0 工具数：21 个**（覆盖全部 11 个 subflow；v2.9 删 evtx_dump #16）。
+> **当前实际 P0 工具数：23 个**（覆盖全部 11 个 subflow；v2.9 删 evtx_dump #16；v0.5-zipcrack-doc-update 加 bruteforce_zip 自研 #13a）。
 
-### 6.1 P0 工具清单（21 个 · 按 subflow 排列）
+### 6.1 P0 工具清单（23 个 · 按 subflow 排列）
 
 | # | 工具 | 分支 / 子分支 | 安装依赖 |
 |---|---|---|---|
@@ -374,10 +374,11 @@ with Evtx.Evtx("file.evtx") as log:
 | 11 | **ffmpeg** | Stego/Audio + Stego/Video | ❌ pending |
 | 12 | **ffprobe** | Stego/Video | ❌ pending |
 | 13 | **unzip** | Misc/Archive | ❌ pending（Win 可走 7z / Python `zipfile` 替代）|
+| 13a | **bruteforce_zip (自研)** | Misc/Archive | ✅ 已装（`core/actions/zip_chain.py:BruteforceZipAction` + `_generate_passwords`，纯 stdlib `itertools.product`，8.4M 字典；per [`upgrade/v0.5-zipcrack-doc-update.md`](./upgrade/v0.5-zipcrack-doc-update.md)，Owner 2026-06-28 实战命中 password='7639' tried 7640/8421616）|
 | 14 | **xxd** | 通用 | ✅ 已装（`extend-tools/bin/win-x64/vim92/xxd.exe`）|
 | 15 | **Select-String** | Forensics/Log + 通用 | ✅ 已装（PowerShell 内置）|
 | 16 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
-| 18 | **john** | Misc/Archive | ❌ pending（Win 可用 `hashcat` / `zipcrack.py` 替代）|
+| 18 | **john** | Misc/Archive | ❌ pending（Win 用自研 `BruteforceZipAction` Python 字典爆破替代，per [`upgrade/v0.5-zipcrack-doc-update.md`](./upgrade/v0.5-zipcrack-doc-update.md)）|
 | 19 | **zbar** | Misc/Brainteaser（QR）| ❌ pending |
 | 20 | **sox** | Stego/Audio | ❌ pending |
 | 21 | **python-magic-bin** | 通用（file 类型识别 Python）| ❌ pending（pip install 待装）|
