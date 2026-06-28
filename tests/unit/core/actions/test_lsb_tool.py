@@ -175,9 +175,14 @@ class TestExtractLsbByteStream:
         bs = _extract_lsb_byte_stream(
             arr, channels=["R", "G", "B"], bit=7, scan_order="row", byte_bit_order="msb"
         )
-        # 4 像素 × 3 通道 = 12 bit, 第 1 个 byte 是 [R0=1, R1=0, R2=0, R3=0, G0=0, G1=0, G2=0, G3=0]
-        # MSB first: 1_0_0_0_0_0_0_0 = 0x80
-        assert bs[0] == 0x80
+        # 4 像素 × 3 通道 = 12 bit, per-pixel RGB bit 7 序列:
+        # pixel[0,0]: R=1, G=0, B=1 → bits 1,0,1
+        # pixel[0,1]: R=0, G=0, B=0 → bits 0,0,0
+        # pixel[1,0]: R=0, G=0, B=0 → bits 0,0,0
+        # pixel[1,1]: R=0, G=0, B=0 → bits 0,0,0
+        # = [1,0,1,0,0,0, 0,0,0, 0,0,0]
+        # 前 8 bit (MSB first): 10100000 = 0xA0
+        assert bs[0] == 0xA0
 
     def test_invalid_channel_raises(self):
         arr = self._make_test_image()

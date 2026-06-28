@@ -138,43 +138,58 @@ def _extract_lsb_byte_stream(
     scan_order: str,
     byte_bit_order: str,
 ) -> bytes:
-    """单组合字节流提取 (HWC interleaved, 公共函数 3 mode 复用).
+    """单组合字节流提取 (zsteg-compatible per-pixel interleaved, 公共函数 3 mode 复用).
 
-    字节流同源 (修复 v0.5-train-012 bug).
+    字节流同源 (修复 v0.5-train-012 bug + v0.5-train-014 回归).
+
+    **per-pixel interleaved**: 每个像素的指定通道 (按 channels 顺序) 拼成一段 bit 流,
+    再按 8 bit 拼 byte. **跟 zsteg `b<bit>,<channels>,<byte_bit_order>,<scan>` 完全等价**.
+
+    例如 channels=['R','G','B'] / row / msb:
+        bits = [R0_比特bit, G0_比特bit, B0_比特bit, R1_比特bit, G1_比特bit, B1_比特bit, ...]
+        每 8 bit 一字节, MSB first (zsteg 默认)
 
     Args:
         img_array: (H, W, 3 or 4) uint8 numpy array
         channels: e.g. ["G"] 或 ["R", "G", "B"]
         bit: 0-7
-        scan_order: "row" (xy) / "col" (yx)
+        scan_order: "row" (xy) / "col" (yx, = 转置后 row-major)
         byte_bit_order: "msb" / "lsb"
 
     Returns:
         bytes (长度 = total_bits // 8)
+
+    历史:
+        - v0.5-lsb-tool-unify Phase 2a 实现 plane-separated (整 R + 整 G + 整 B), **错**
+        - v0.5-train-014 暴露: steg.png 实战命中 0 SP, 根因 plane-separated 跟 zsteg 不一致
+        - v0.5-lsb-tool-bitplane-preview-matrix Commit 1 修复为 per-pixel interleaved
     """
-    bits_list = []
-    for ch in channels:
-        idx = _channel_index(ch)
-        if idx >= img_array.shape[2]:
-            raise ValueError(
-                f"image has no channel {ch} (shape={img_array.shape})"
-            )
-        channel_data = img_array[:, :, idx]
-        bits = ((channel_data >> bit) & 1).astype(np.uint8)
-        if scan_order == "row":
-            bits = bits.flatten()
-        else:
-            bits = bits.T.flatten()
-        bits_list.append(bits)
+    ch_indices = [_channel_index(c) for c in channels]
+    if img_array.ndim < 3 or max(ch_indices) >= img_array.shape[2]:
+        raise ValueError(
+            f"image has no channel {channels} (shape={img_array.shape})"
+        )
+    n_ch = len(ch_indices)
 
-    all_bits = np.concatenate(bits_list) if len(bits_list) > 1 else bits_list[0]
+    # 提取指定通道 → (H, W, n_ch)
+    plane = img_array[:, :, ch_indices]
 
-    n_bytes = len(all_bits) // 8
-    bits_trimmed = all_bits[: n_bytes * 8]
+    if scan_order == "row":
+        # row-major: per pixel (R0 G0 B0) → next pixel (R1 G1 B1)
+        flat = plane.reshape(-1, n_ch)  # (H*W, n_ch)
+    else:  # col
+        # col-major: 先转置成 (W, H, n_ch), 再 flatten → per pixel (W0 H0 W0 H0) = (col0_x0, col0_x1, ...)
+        flat = plane.transpose(1, 0, 2).reshape(-1, n_ch)  # (W*H, n_ch)
+
+    # 抽 bit 位 → flatten C-order → 每像素按 channels 顺序拼接
+    bits = ((flat >> bit) & 1).astype(np.uint8).flatten(order="C")
+
+    n_bytes = len(bits) // 8
+    bits_trimmed = bits[: n_bytes * 8]
 
     if byte_bit_order == "msb":
         return np.packbits(bits_trimmed).tobytes()
-    # lsb: 字节内 bit 反序
+    # lsb: 字节内 bit 反序 (zsteg 兼容)
     bits_2d = bits_trimmed.reshape(-1, 8)[:, ::-1].flatten()
     return np.packbits(bits_2d).tobytes()
 
