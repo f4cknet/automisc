@@ -48,8 +48,8 @@ class TestFindSuspiciousPictureTools:
         )
 
     def test_pool_six_specific_tools(self):
-        """池 6 工具具体: lsb_tool / stegseek / exiftool / binwalk / strings / file."""
-        expected = {"lsb_tool", "stegseek", "exiftool", "binwalk", "strings", "file"}
+        """池 6 工具具体: lsb_tool / steghide / exiftool / binwalk / strings / file."""
+        expected = {"lsb_tool", "steghide", "exiftool", "binwalk", "strings", "file"}
         actual = set(FIND_SUSPICIOUS_PICTURE_TOOLS)
         assert actual == expected, (
             f"pool mismatch, expected {expected}, got {actual}"

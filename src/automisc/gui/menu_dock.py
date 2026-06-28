@@ -33,7 +33,7 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 # v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
-    "Stego/Image (PR2)": ["stegseek"],  # v0.5-lsb-tool-bitplane-preview-matrix: zsteg 删除, lsb_tool 替代
+    "Stego/Image (PR2)": ["steghide"],  # v0.5-stegseek-remove: stegseek 删, 改 steghide (v0.5-lsb-tool-bitplane-preview-matrix: zsteg 已删, lsb_tool 替代)
     "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
         "ffmpeg_audio",
@@ -161,8 +161,8 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
     # v0.5-lsb-tool-bitplane-preview-matrix: zsteg 从 ADAPTER_TOOLS 删除
-    # (但 adapter 文件保留 Commit 4 才删, CLI `python -m automisc run <file>` 仍可显式调用)
-    "stegseek",
+    # v0.5-stegseek-remove: stegseek 删, 改 steghide
+    "steghide",
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
     "sevenz", "sevenz_extract", "unzip", "john", "zip_classify",

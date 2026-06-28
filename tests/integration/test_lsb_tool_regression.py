@@ -260,8 +260,8 @@ class TestAutoRunPipeline:
         from automisc.gui.auto_runner import FIND_SUSPICIOUS_PICTURE_TOOLS
 
         pool = FIND_SUSPICIOUS_PICTURE_TOOLS
-        # spec §3.9: 6 tools = lsb_tool + stegseek + exiftool + binwalk + strings + file
-        expected = {"lsb_tool", "stegseek", "exiftool", "binwalk", "strings", "file"}
+        # spec §3.9: 6 tools = lsb_tool + steghide + exiftool + binwalk + strings + file
+        expected = {"lsb_tool", "steghide", "exiftool", "binwalk", "strings", "file"}
         assert expected.issubset(set(pool)), (
             f"missing tools: {expected - set(pool)}, actual: {pool}"
         )

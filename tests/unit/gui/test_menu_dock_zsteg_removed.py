@@ -31,8 +31,8 @@ class TestGuiMenuNoZsteg:
             f"zsteg should NOT be in Stego/Image menu (per v0.5-lsb-tool-bitplane-preview-matrix), "
             f"got: {stego_tools}"
         )
-        # stegseek 仍保留 (per v0.5-windows-tool-compat, Win unavailable but GUI menu 仍标)
-        assert "stegseek" in stego_tools
+        # steghide 替代 stegseek (per v0.5-stegseek-remove 2026-06-28, Win 端用)
+        assert "steghide" in stego_tools
 
     def test_adapter_tools_no_zsteg(self):
         """ADAPTER_TOOLS 不含 zsteg (GUI 工具栏不再列出 zsteg)."""

@@ -48,8 +48,8 @@ class TestFileRouter:
         r = router.route(png)
         assert r.detected_extension == ".png"
         assert r.detected_magic == "PNG image"
-        assert any(rec.tool_name == "zsteg" for rec in r.recommendations)
-        assert any(rec.tool_name == "stegseek" for rec in r.recommendations)
+        assert any(rec.tool_name == "zsteg" for rec in r.recommendations)  # v0.5-lsb-tool-bitplane-preview-matrix: zsteg 删, 此 test 待跟进
+        assert any(rec.tool_name == "steghide" for rec in r.recommendations)  # v0.5-stegseek-remove: 替代 stegseek
 
     def test_route_pcap(self, tmp_path):
         pcap = tmp_path / "test.pcap"

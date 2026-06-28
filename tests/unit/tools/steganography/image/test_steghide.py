@@ -1,31 +1,62 @@
-"""测试 tools/steganography/image/steghide.py
+"""测试 tools/steganography/image/steghide.py (v0.5-stegseek-remove 重构)
 
-v0.1.0b-PR2 范围：steghide adapter 仅调 ``steghide info``（无密码）。
-无需 embed/extract 测试（GUI 触发 + 用户输入密码）。
+v0.5-stegseek-remove (2026-06-28) 重构:
+- name: 'stegseek' -> 'steghide'
+- 删 stegseek 优先逻辑 (Win 端不可用, Owner 拍板删)
+- 新 _try_empty_password_extract 兜底 (CVE-2021-27211)
+
+测试策略:
+- 元数据 / 注册测试不依赖 binary, 一直跑
+- 真实 binary 调用的测试用 @pytest.mark.skipif 守护
+- Mock 测试 (resolve_tool_binary patch) 不依赖 binary, 一直跑
 """
 from __future__ import annotations
 
 import shutil
+import subprocess
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from automisc.core.registry import get_tool
+from automisc.tools.paths import resolve_tool_binary
 from automisc.tools.steganography.image.steghide import SteghideAdapter
 
 
-@pytest.fixture(autouse=True)
-def require_steghide():
-    if shutil.which("steghide") is None:
-        pytest.skip("steghide not in PATH")
+def _steghide_available() -> bool:
+    """Check steghide binary via PATH or extend-tools fallback (per v0.5-platform-extend-tools)."""
+    if shutil.which("steghide"):
+        return True
+    if resolve_tool_binary("steghide"):
+        return True
+    return False
 
+
+require_steghide_binary = pytest.mark.skipif(
+    not _steghide_available(),
+    reason="steghide not in PATH nor extend-tools/bin/win-x64/",
+)
+
+
+# ---------- 不依赖 binary 的元数据 / 注册测试 ----------
 
 def test_steghide_adapter_is_registered():
-    a = get_tool("stegseek")
+    """v0.5-stegseek-remove: adapter name='steghide' (从 'stegseek' 改)."""
+    a = get_tool("steghide")
     assert isinstance(a, SteghideAdapter)
-    assert a.name == "stegseek"
+    assert a.name == "steghide"
     assert a.category == "steganography_image"
 
 
+def test_steghide_adapter_metadata():
+    """adapter 元数据正确."""
+    a = SteghideAdapter()
+    assert a.description
+    assert a.default_timeout > 0
+
+
+@require_steghide_binary
 def test_steghide_handles_missing_file(tmp_path):
     a = SteghideAdapter()
     try:
@@ -36,30 +67,9 @@ def test_steghide_handles_missing_file(tmp_path):
     assert result.exit_code != 0
 
 
-def test_steghide_unavailable_format_jpg(tmp_path):
-    """macOS 默认 steghide 编译未启用 JPEG → 应触发 steghide_unavailable 可疑点。"""
-    from PIL import Image
-    img = Image.new("RGB", (32, 32), "red")
-    p = tmp_path / "test.jpg"
-    img.save(p, "JPEG")
-
-    a = SteghideAdapter()
-    try:
-        result = a.run(str(p))
-    except Exception as e:
-        pytest.fail(f"SteghideAdapter crashed: {e}")
-
-    # macOS 自带 steghide 对 JPEG 输出 "can not read input file. steghide has been compiled without support for jpeg files"
-    unavailable_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_unavailable"]
-    # 注意：如果 steghide 是 brew 装的 --with-jpeg，则不会触发这个
-    # 在我们的 macOS 环境实测会触发
-    if "jpeg" in (result.stdout + result.stderr).lower() and "compiled without" in (result.stdout + result.stderr).lower():
-        assert len(unavailable_sp) == 1
-        assert "编译未启用" in unavailable_sp[0].matched_pattern
-
-
+@require_steghide_binary
 def test_steghide_capacity_info_on_bmp(tmp_path):
-    """BMP 是 steghide 支持的格式 → 应输出 capacity 信息。"""
+    """BMP 是 steghide 支持的格式 → 应输出 capacity 信息."""
     from PIL import Image
     img = Image.new("RGB", (32, 32), "green")
     p = tmp_path / "test.bmp"
@@ -67,15 +77,12 @@ def test_steghide_capacity_info_on_bmp(tmp_path):
 
     a = SteghideAdapter()
     result = a.run(str(p))
-    # BMP 是 steghide 原生支持格式；如果没嵌入数据，output 应有 capacity 信息
-    # 如果 macOS steghide 编译未启 BMP 也可能不可用——只测 "不 crash"
     assert result is not None
-    # 可能的情况：capacity 解析命中 / unavailable 命中 / 都没命中
-    # 主要验证：不 crash + 至少给 1 个 suspicious point 或明确 0 个（合法）
 
 
+@require_steghide_binary
 def test_steghide_no_data_clean_bmp(tmp_path):
-    """干净的 BMP（无嵌入数据）应输出 "the file does not contain any steghide data"。"""
+    """干净的 BMP（无嵌入数据）→ 不应触发 steghide_embedded 信号."""
     from PIL import Image
     img = Image.new("RGB", (32, 32), "blue")
     p = tmp_path / "clean.bmp"
@@ -83,161 +90,108 @@ def test_steghide_no_data_clean_bmp(tmp_path):
 
     a = SteghideAdapter()
     result = a.run(str(p))
-    # 关键断言：result 合法返回（不 crash）
-    assert result is not None
-    # 不应该触发 steghide_embedded 信号（干净文件）
     embedded_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_embedded"]
     assert len(embedded_sp) == 0
 
 
-def test_steghide_adapter_metadata():
-    """adapter 元数据正确。"""
-    a = SteghideAdapter()
-    assert a.description
-    assert a.default_timeout > 0
+# ---------- v0.5-stegseek-remove: 空密码 extract 兜底 (CVE-2021-27211) ----------
 
+class TestEmptyPasswordExtract:
+    """`_try_empty_password_extract` 是 Win 端 silent miss 的修复核心.
 
-# ---------- v0.5-philosophy-rethink: stegseek 平替 (macOS 友好) ----------
+    之前 steghide info 命中但 extract 没自动跑, Owner 实战 123456cry.jpg /
+    meihuai.jpg 都是空密码, 之前 Win 端漏报. v0.5-stegseek-remove 加这一步.
 
-# 这些测试只在装了 stegseek 时跑 (per v0.5 设计, macOS 装 stegseek 后会激活)
-require_stegseek = pytest.mark.skipif(
-    shutil.which("stegseek") is None,
-    reason="stegseek not installed (v0.5+ 推荐安装)",
-)
-
-
-@require_stegseek
-def test_steghide_uses_stegseek_when_available(tmp_path, monkeypatch):
-    """v0.5: stegseek 在 PATH 时 adapter 优先用 stegseek (macOS 现代 fork, JPEG 支持).
-
-    验证方式: mock shutil.which 强制返回 stegseek 路径, 然后验证 run() 走 _run_stegseek.
+    这些测试 mock _run_subprocess / resolve_tool_binary, 不需要真实 binary.
     """
-    from automisc.tools.steganography.image import steghide as steghide_mod
 
-    # 强制 stegseek "可用"
-    fake_stegseek = "/fake/path/to/stegseek"
-    monkeypatch.setattr(steghide_mod.shutil, "which", lambda x: fake_stegseek if x == "stegseek" else None)
+    def test_empty_pw_extract_success_writes_sev5_sp(self, tmp_path):
+        """空密码 extract 成功 → 写 steghide_extracted SP severity=5."""
+        from PIL import Image
+        img = Image.new("RGB", (32, 32), "red")
+        p = tmp_path / "test.jpg"
+        img.save(p, "JPEG")
 
-    a = SteghideAdapter()
-    # mock _run_stegseek 看是否被调
-    called = {"yes": False}
+        fake_content = b"qwe.zip password: bV1g6t5wZDJif^J7\n"
 
-    def fake_run_stegseek(file_path):
-        called["yes"] = True
-        from automisc.core.result import ToolResult
-        return ToolResult(
-            tool_name=a.name, exit_code=0, stdout="", stderr="", duration_ms=0,
+        a = SteghideAdapter()
+
+        def fake_subprocess_run(cmd, *args, **kwargs):
+            if "info" in cmd:
+                return subprocess.CompletedProcess(
+                    cmd, 0,
+                    b"", b"capacity: 1.0KB\nembeds: 1 files",
+                )
+            out_idx = cmd.index("-xf") + 1
+            out_path = cmd[out_idx]
+            Path(out_path).write_bytes(fake_content)
+            return subprocess.CompletedProcess(cmd, 0, b"", b"wrote extracted data")
+
+        with patch("automisc.tools.steganography.image.steghide.resolve_tool_binary", return_value="/fake/steghide"), \
+             patch("automisc.tools.steganography.image.steghide.subprocess.run", side_effect=fake_subprocess_run):
+            result = a.run(str(p))
+
+        extracted_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_extracted"]
+        assert len(extracted_sp) == 1
+        sp = extracted_sp[0]
+        assert sp.severity == 5
+        assert "空密码" in sp.matched_pattern
+        assert "bV1g6t5wZDJif^J7" in sp.matched_pattern
+
+    def test_empty_pw_extract_wrong_password_no_sp(self, tmp_path):
+        """空密码 extract 失败 (错密码) → 不写 SP (避免 noise)."""
+        from PIL import Image
+        img = Image.new("RGB", (32, 32), "red")
+        p = tmp_path / "test.jpg"
+        img.save(p, "JPEG")
+
+        a = SteghideAdapter()
+
+        def fake_subprocess_run(cmd, *args, **kwargs):
+            if "info" in cmd:
+                return subprocess.CompletedProcess(
+                    cmd, 0,
+                    b"", b"capacity: 1.0KB\nembeds: 1 files",
+                )
+            return subprocess.CompletedProcess(
+                cmd, 1, b"", b"could not extract any data with that passphrase!",
+            )
+
+        with patch("automisc.tools.steganography.image.steghide.resolve_tool_binary", return_value="/fake/steghide"), \
+             patch("automisc.tools.steganography.image.steghide.subprocess.run", side_effect=fake_subprocess_run):
+            result = a.run(str(p))
+
+        extracted_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_extracted"]
+        assert len(extracted_sp) == 0, (
+            f"空密码失败时不该写 steghide_extracted SP: {result.suspicious_points}"
         )
 
-    monkeypatch.setattr(a, "_run_stegseek", fake_run_stegseek)
+    def test_empty_pw_extract_no_steghide_binary(self, tmp_path):
+        """steghide binary 不存在 → graceful return (不 crash, 写 unavailable SP)."""
+        from PIL import Image
+        img = Image.new("RGB", (32, 32), "red")
+        p = tmp_path / "test.jpg"
+        img.save(p, "JPEG")
 
-    a.run("/tmp/fake.jpg")
-    assert called["yes"], "stegseek 在 PATH 时必须走 _run_stegseek 路径"
+        a = SteghideAdapter()
 
+        with patch("automisc.tools.steganography.image.steghide.resolve_tool_binary", return_value=None):
+            result = a.run(str(p))
 
-def test_steghide_falls_back_to_steghide_when_no_stegseek(monkeypatch):
-    """v0.5: stegseek 不在 PATH 时 adapter fallback 到 steghide (Linux/Windows)."""
-    from automisc.tools.steganography.image import steghide as steghide_mod
+        assert result is not None
+        unavailable_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_unavailable"]
+        assert len(unavailable_sp) == 1
 
-    # 强制 stegseek "不可用"
-    def fake_which(name):
-        if name == "stegseek":
-            return None
-        # 其他 (steghide 等) 走真实 which
-        import shutil as real_shutil
-        return real_shutil.which(name)
+    def test_steghide_binary_uses_resolve_tool_binary(self, tmp_path):
+        """v0.5-platform-extend-tools: adapter 走 resolve_tool_binary (PATH 优先 → extend-tools fallback)."""
+        from PIL import Image
+        img = Image.new("RGB", (32, 32), "red")
+        p = tmp_path / "test.jpg"
+        img.save(p, "JPEG")
 
-    monkeypatch.setattr(steghide_mod.shutil, "which", fake_which)
+        a = SteghideAdapter()
 
-    a = SteghideAdapter()
-    called = {"yes": False}
-
-    def fake_fallback(file_path):
-        called["yes"] = True
-        from automisc.core.result import ToolResult
-        return ToolResult(
-            tool_name=a.name, exit_code=0, stdout="", stderr="", duration_ms=0,
-        )
-
-    monkeypatch.setattr(a, "_run_steghide_fallback", fake_fallback)
-    a.run("/tmp/fake.jpg")
-    assert called["yes"], "stegseek 不在 PATH 时必须走 _run_steghide_fallback"
-
-
-@require_stegseek
-def test_steghide_extracts_empty_password_steg(tmp_path):
-    """v0.5: stegseek 抓到空密码 → 写 steghide_extracted SP (severity=5).
-
-    模拟: stegseek --crack 输出 "Found passphrase" + "Original filename" + 提取内容.
-    """
-    import re
-    from automisc.core.result import ToolResult
-    from automisc.core.suspicious import SuspiciousPoint
-
-    # 准备 mock 输出 + 提取内容
-    fake_stdout = ""
-    fake_stderr = (
-        'StegSeek 0.6\n\n'
-        '[i] Found passphrase: ""\n'
-        '[i] Original filename: "ko.txt".\n'
-        '[i] Extracting to "/tmp/fake_out.bin".\n'
-    )
-    fake_content = b"compressed password: secret123\n"
-
-    a = SteghideAdapter()
-
-    # mock subprocess 返回值 + 写 temp 内容到 out_path
-    import tempfile, os
-    from pathlib import Path
-
-    out_path = None
-    def fake_run_subprocess(cmd, *args, **kwargs):
-        nonlocal out_path
-        # 找 cmd 里的 out_path (最后一个位置参数)
-        out_path = cmd[-1]
-        Path(out_path).write_bytes(fake_content)
-        return (0, fake_stdout, fake_stderr, 100)
-
-    monkeypatch = pytest.MonkeyPatch()
-    try:
-        monkeypatch.setattr(a, "_run_subprocess", fake_run_subprocess)
-
-        result = a.run("/tmp/fake.jpg")
-    finally:
-        monkeypatch.undo()
-        if out_path and Path(out_path).exists():
-            Path(out_path).unlink()
-
-    # 验证 SP
-    extracted_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_extracted"]
-    assert len(extracted_sp) == 1
-    sp = extracted_sp[0]
-    assert sp.severity == 5
-    assert "Found passphrase" not in sp.matched_pattern  # 不暴露内部命令
-    assert "secret123" in sp.matched_pattern or "secret123" in sp.suggested_action
-    # 验证密码 + 文件名 + 内容
-    assert re.search(r'密码', sp.matched_pattern)
-    assert "ko.txt" in sp.matched_pattern
-
-
-@require_stegseek
-def test_steghide_no_match_clean_bmp_no_sp(monkeypatch):
-    """v0.5: stegseek "Could not find a valid passphrase" → 不写 SP (避免 clean 文件误报).
-
-    原因: stegseek 在 clean 文件和"需要大 wordlist"文件上报告同样的错误 (二义性).
-    写 steghide_embedded SP 会让所有 clean 文件被误报 — 用户烦.
-    """
-    a = SteghideAdapter()
-
-    def fake_run_subprocess(cmd, *args, **kwargs):
-        # 模拟 stegseek 在干净 BMP 上的输出
-        return (1, "", "[!] error: Could not find a valid passphrase.\n", 50)
-
-    monkeypatch.setattr(a, "_run_subprocess", fake_run_subprocess)
-    result = a.run("/tmp/fake_clean.bmp")
-
-    # 关键断言: 干净文件 + 二义性错误 → 0 SP
-    embedded_sp = [sp for sp in result.suspicious_points if sp.category == "steghide_embedded"]
-    assert len(embedded_sp) == 0, (
-        f"clean 文件不该有 steghide_embedded SP (避免误报): {result.suspicious_points}"
-    )
+        with patch("automisc.tools.steganography.image.steghide.resolve_tool_binary") as mock_rtb:
+            mock_rtb.return_value = None
+            a.run(str(p))
+            assert mock_rtb.called, "必须走 resolve_tool_binary (extend-tools fallback)"

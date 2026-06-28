@@ -153,7 +153,7 @@ class TestDecodeOutputBytes:
         assert "\ufffd" not in text
 
     def test_owner_real_sample_ko_txt(self):
-        """Owner 真实样本 stegseek 抓 ko.txt GBK 内容.
+        """Owner 真实样本 steghide 抓 ko.txt GBK 内容 (v0.5-stegseek-remove 改 steghide, 实际逻辑不变).
 
         per Owner 14:46 截图: 之前显示成 '⬛⬛⬛⬛⬛⬛⬛⬛eT⬛⬛⬛⬛⬛⬛⬛oy⬛⬛⬛⬛⬛⬛ 蛋',
         字节实际 GBK '看到这个图片就是压缩包的密码：\\r\\nbV1g6t5wZDJif^J7'.
@@ -202,7 +202,7 @@ def test_run_subprocess_handles_non_utf8_bytes(tmp_path: Path):
 
 
 def test_run_subprocess_handles_gbk_output(tmp_path: Path):
-    """真 subprocess 跑 GBK 中文输出 (e.g. stegseek 抓 ko.txt).
+    """真 subprocess 跑 GBK 中文输出 (e.g. steghide 抓 ko.txt, per v0.5-stegseek-remove 改 steghide).
 
     模拟: python3 脚本写 GBK 中文到 stdout → _decode_output_bytes 走 gbk, 0 U+FFFD.
     """
