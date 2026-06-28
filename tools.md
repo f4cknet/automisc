@@ -159,10 +159,10 @@ with Evtx.Evtx("file.evtx") as log:
 | **binwalk** | ✅ | `python -m binwalk` 嵌入文件检测 + 提取 | P0 |
 | **zsteg** | ❌ | `/usr/local/bin/zsteg`（**Ruby gem**，不是 Python 包） | PNG/BMP LSB 全通道检测 | P0 |
 | **lsb_tool** | ✅ | `src/automisc/core/actions/lsb_tool.py`（自研 Python, **3 mode 统一 LSB 工具**） | PNG LSB 隐写检测 (detect) + 字节流提取 (extract / extract_bytes) | P0 · v0.5-lsb-tool-unify 替代 zsteg + lsb_detect + lsb_extract + lsb_bytes_extract |
-| **steghide** | ✅ | `extend-tools/bin/win-x64/steghide/steghide.exe` | JPEG/BMP/WAV/AU 隐写（口令） | P0 |
+| **steghide** | ✅ | `extend-tools/bin/win-x64/steghide/steghide.exe` | JPEG/BMP/WAV/AU 隐写（口令） — v0.5-stegseek-remove 加**空密码 extract 兜底** (CVE-2021-27211, auto_run 跑) | P0 |
 | **outguess** | ❌ | `/usr/local/bin/outguess` | JPEG 隐写 | P1 · v0.5 候选 |
 | **stegdetect** | ❌ | `~/.local/bin/stegdetect` | JPEG 隐写检测（jsteg/OutGuess/F5/AppendX） | P1 · v0.5 候选 |
-| **stegseek** | ❌ | `~/.local/bin/stegseek` | steghide 高速口令爆破 | P1 · v0.5 候选 |
+| ~~**stegseek**~~ | ❌ 已删 | `~/.local/bin/stegseek` | ~~steghide 高速口令爆破~~ — **v0.5-stegseek-remove (2026-06-28) 删, Win 端不可用 + 项目 Windows only**;改用 `steghide` + 自研 `SteghideCrackAction` (字典循环 ~5h/14M) + `mini wordlist 100 常用密码` 兜底 (CTF 命中率 >50%) | ~~P1 · v0.5 候选~~ |
 | **pngcheck** | ❌ | `/usr/local/bin/pngcheck` | PNG chunk 结构验证 + IDAT / tEXt 分析 | P1 · v0.5 候选 |
 | **foremost** | ✅ | `extend-tools/bin/win-x64/foremost.exe` | 图片嵌入文件雕刻 | P0 |
 | **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | EXIF 元数据（GPS / Make / Model / Software） | P0 |
@@ -341,7 +341,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **Disk Forensics** | 7z（解 VMDK/OVA）+ photorec + testdisk | sleuthkit（fls/icat）/ veracrypt |
 | **Network Forensics** | tshark + tcpdump + file | wireshark（GUI 辅助）/ pcapfix / scapy |
 | **Log Forensics** | Select-String（PowerShell）+ python-evtx（adapter in-process）| 7z（解压 .evtx.bz2）|
-| **Image Stego** | exiftool + zsteg + foremost + binwalk | steghide / outguess / stegdetect / stegseek / F5 |
+| **Image Stego** | exiftool + zsteg + foremost + binwalk | steghide / outguess / stegdetect / F5 (stegseek v0.5-stegseek-remove 已删) |
 | **Audio Stego** | ffmpeg（频谱）| sox / audacity / DeepSound / MP3Stego |
 | **Video Stego** | ffmpeg + ffprobe（多 stream 提取）| vlc（视觉验证）/ MP4Box / mediainfo |
 | **Encoding** | （**内置实现**）`core/encoders/base.py` + `classical.py` + `custom.py` | 全部内置，无外部依赖 |
@@ -418,7 +418,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 ### 7.1 v0.5（per [`prd.md §10.2`](./prd.md)）
 
-- P1 工具批量追加：outguess / stegdetect / stegseek / pngcheck / sleuthkit / pcapfix / aircrack-ng / multimon-ng / scapy / impacket / hashcat / mutool / python-evtx / sox / audacity / sonic-visualiser / vlc / MP4Box / mediainfo / zbar / qrencode / apngdis / scalpel
+- P1 工具批量追加：outguess / stegdetect / pngcheck / sleuthkit / pcapfix / aircrack-ng / multimon-ng / scapy / impacket / hashcat / mutool / python-evtx / sox / audacity / sonic-visualiser / vlc / MP4Box / mediainfo / zbar / qrencode / apngdis / scalpel (stegseek v0.5-stegseek-remove 2026-06-28 已删, Win 端不可用 + 项目 Windows only)
 - Python 包补齐：numpy / requests / matplotlib / scipy / python-magic-bin / dnslib / pycryptodome / pikepdf / zstandard / mutagen / base65536 / z3-solver / segno / pyzbar / qrcode / stegano / stegolsb / stegcracker
 
 ### 7.2 v1.0（per [`prd.md §10.3`](./prd.md)）
