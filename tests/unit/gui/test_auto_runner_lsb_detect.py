@@ -1,11 +1,13 @@
-"""Tests for auto_runner + lsb_detect integration (per v0.5-lsb-detector spec §6 ②'' ③).
+"""Tests for auto_runner + lsb_tool integration (per v0.5-lsb-tool-unify spec §3.9).
 
-auto_run 池 (FIND_SUSPICIOUS_PICTURE_TOOLS) 删 zsteg 加 lsb_detect 后的整合测试:
-- 池里含 lsb_detect 不含 zsteg (per Q1=A 拍板)
-- 池大小仍 6 tools (per 铁律 7 '不抢下一步' 隐含: 池不扩张)
-- lsb_detect adapter 已双注册 (per automisc-tool-registration 铁律)
+auto_run 池 (FIND_SUSPICIOUS_PICTURE_TOOLS) lsb_detect → lsb_tool 后的整合测试:
+- 池里含 lsb_tool 不含 lsb_detect (per spec §3.9)
+- 池大小仍 6 tools (per 铁律 7 auto-run 池不扩张)
+- lsb_tool adapter 已双注册 (per automisc-tool-registration 铁律)
 - .png 后缀走 picture pool (per EXTENSION_TO_POOL)
-- pool 跟 lsb_detect 集成 (run 6 tools 含 lsb_detect)
+- pool 跟 lsb_tool 集成 (run 6 tools 含 lsb_tool)
+- zsteg adapter 保留 (per AGENTS §5.2 + v0.5-windows-tool-compat, 供未来手工调用)
+- 老 lsb_detect adapter 仍 get_tool('lsb_detect') 可访问 (Phase 6 deprecated 但未删)
 """
 from __future__ import annotations
 
@@ -19,16 +21,22 @@ from automisc.gui.auto_runner import (
 
 
 class TestFindSuspiciousPictureTools:
-    """FIND_SUSPICIOUS_PICTURE_TOOLS 6 tools 池整合 (per spec §3.1 ③ ④)."""
+    """FIND_SUSPICIOUS_PICTURE_TOOLS 6 tools 池整合 (per spec §3.9)."""
 
-    def test_pool_contains_lsb_detect(self):
-        """池里含 lsb_detect (per Q1=A 替代 zsteg)."""
-        assert "lsb_detect" in FIND_SUSPICIOUS_PICTURE_TOOLS, (
-            f"lsb_detect should be in pool, got: {FIND_SUSPICIOUS_PICTURE_TOOLS}"
+    def test_pool_contains_lsb_tool(self):
+        """池里含 lsb_tool (per spec §3.9 替代 lsb_detect)."""
+        assert "lsb_tool" in FIND_SUSPICIOUS_PICTURE_TOOLS, (
+            f"lsb_tool should be in pool, got: {FIND_SUSPICIOUS_PICTURE_TOOLS}"
+        )
+
+    def test_pool_not_contain_lsb_detect(self):
+        """池里**不**含 lsb_detect (per spec §3.9 替代)."""
+        assert "lsb_detect" not in FIND_SUSPICIOUS_PICTURE_TOOLS, (
+            f"lsb_detect should NOT be in pool, got: {FIND_SUSPICIOUS_PICTURE_TOOLS}"
         )
 
     def test_pool_not_contain_zsteg(self):
-        """池里**不**含 zsteg (per Q1=A 替代)."""
+        """池里**不**含 zsteg (per Q1=A 历史替代, 保留文件但不上 auto-run)."""
         assert "zsteg" not in FIND_SUSPICIOUS_PICTURE_TOOLS, (
             f"zsteg should NOT be in pool, got: {FIND_SUSPICIOUS_PICTURE_TOOLS}"
         )
@@ -40,55 +48,61 @@ class TestFindSuspiciousPictureTools:
         )
 
     def test_pool_six_specific_tools(self):
-        """池 6 工具具体: lsb_detect / stegseek / exiftool / binwalk / strings / file."""
-        expected = {"lsb_detect", "stegseek", "exiftool", "binwalk", "strings", "file"}
+        """池 6 工具具体: lsb_tool / stegseek / exiftool / binwalk / strings / file."""
+        expected = {"lsb_tool", "stegseek", "exiftool", "binwalk", "strings", "file"}
         actual = set(FIND_SUSPICIOUS_PICTURE_TOOLS)
         assert actual == expected, (
             f"pool mismatch, expected {expected}, got {actual}"
         )
 
 
-class TestLsbDetectAdapterRegistered:
-    """lsb_detect adapter 双注册 verify (per automisc-tool-registration 铁律)."""
+class TestLsbToolAdapterRegistered:
+    """lsb_tool adapter 双注册 verify (per automisc-tool-registration 铁律)."""
 
-    def test_get_tool_lsb_detect(self):
-        """get_tool('lsb_detect') 不报 ToolNotFoundError."""
-        tool = get_tool("lsb_detect")
+    def test_get_tool_lsb_tool(self):
+        """get_tool('lsb_tool') 不报 ToolNotFoundError."""
+        tool = get_tool("lsb_tool")
         assert tool is not None
-        assert tool.name == "lsb_detect"
+        assert tool.name == "lsb_tool"
 
-    def test_lsb_detect_in_list_tools(self):
-        """list_tools() 含 lsb_detect (双注册触发链验证)."""
+    def test_lsb_tool_in_list_tools(self):
+        """list_tools() 含 lsb_tool (双注册触发链验证)."""
         tools = list_tools()
-        assert "lsb_detect" in tools, (
-            f"lsb_detect should be in list_tools, got: {[t for t in tools if 'lsb' in t.lower()]}"
+        assert "lsb_tool" in tools, (
+            f"lsb_tool should be in list_tools, got: {[t for t in tools if 'lsb' in t.lower()]}"
         )
 
-    def test_lsb_detect_category(self):
-        """lsb_detect category = 'steganography_image' (跟 zsteg 同类)."""
-        tool = get_tool("lsb_detect")
+    def test_lsb_tool_category(self):
+        """lsb_tool category = 'steganography_image' (跟 zsteg 同类)."""
+        tool = get_tool("lsb_tool")
         assert tool.category == "steganography_image"
 
-    def test_lsb_detect_description_mentions_alternative(self):
-        """lsb_detect description 含 '替代 zsteg' (per spec §3.1)."""
-        tool = get_tool("lsb_detect")
-        assert "替代" in tool.description or "zsteg" in tool.description.lower()
+    def test_lsb_tool_description_mentions_alternative(self):
+        """lsb_tool description 含 '替代 lsb_detect' (per spec §3.9)."""
+        tool = get_tool("lsb_tool")
+        assert "替代" in tool.description or "lsb_detect" in tool.description.lower()
+
+    def test_lsb_tool_default_mode_is_detect(self):
+        """lsb_tool 默认 mode='detect' (per spec §3.1 readonly 优先)."""
+        tool = get_tool("lsb_tool")
+        # adapter 内部 _action.mode 默认是 'detect'
+        assert tool._action.mode == "detect"
 
 
 class TestPickSuspiciousPool:
-    """pick_suspicious_pool 按扩展名选 pool + 跟 lsb_detect 集成."""
+    """pick_suspicious_pool 按扩展名选 pool + 跟 lsb_tool 集成."""
 
-    def test_png_picks_picture_pool_with_lsb_detect(self):
-        """PNG 后缀 → picture pool + 含 lsb_detect."""
+    def test_png_picks_picture_pool_with_lsb_tool(self):
+        """PNG 后缀 → picture pool + 含 lsb_tool."""
         pool_name, tools = pick_suspicious_pool("test.png")
         assert pool_name == "picture"
-        assert "lsb_detect" in tools
+        assert "lsb_tool" in tools
 
-    def test_jpg_picks_picture_pool_with_lsb_detect(self):
-        """JPG 后缀 → picture pool + 含 lsb_detect."""
+    def test_jpg_picks_picture_pool_with_lsb_tool(self):
+        """JPG 后缀 → picture pool + 含 lsb_tool."""
         pool_name, tools = pick_suspicious_pool("test.jpg")
         assert pool_name == "picture"
-        assert "lsb_detect" in tools
+        assert "lsb_tool" in tools
 
     def test_picture_pool_size_six(self):
         """picture pool 仍 6 tools (per 铁律 7)."""
@@ -96,38 +110,47 @@ class TestPickSuspiciousPool:
         assert len(tools) == 6
 
     def test_non_picture_picks_other_pool(self):
-        """非图片扩展名 → 走其他 pool (traffic/archive/binary), 不含 lsb_detect."""
-        # .pcap → traffic
+        """非图片扩展名 → 走其他 pool (traffic/archive/binary), 不含 lsb_tool."""
         pool_name, tools = pick_suspicious_pool("test.pcap")
         assert pool_name == "traffic"
-        assert "lsb_detect" not in tools
+        assert "lsb_tool" not in tools
 
-        # .zip → archive
         pool_name, tools = pick_suspicious_pool("test.zip")
         assert pool_name == "archive"
-        assert "lsb_detect" not in tools
+        assert "lsb_tool" not in tools
 
-        # .bin → binary
         pool_name, tools = pick_suspicious_pool("test.bin")
         assert pool_name == "binary"
-        assert "lsb_detect" not in tools
+        assert "lsb_tool" not in tools
 
 
-class TestZstegStillAvailableForManualUse:
-    """zsteg adapter 文件保留 (per spec §4.1 IN), 供未来手工调用或复活用.
+class TestBackwardCompatLegacyTools:
+    """老 LSB 工具 (lsb_detect / zsteg) 仍可访问 (per Phase 6 deprecated 但未删).
 
-    不在 auto-run 池 (per Q1=A), 但 list_tools() / get_tool() 仍能找到.
+    zsteg: 保留 (per AGENTS §5.2 + v0.5-windows-tool-compat)
+    lsb_detect: Phase 6 后删, 当前保留 backward compat
     """
 
     def test_zsteg_still_in_list_tools(self):
         """zsteg adapter 文件保留, list_tools() 仍含 zsteg."""
         tools = list_tools()
-        assert "zsteg" in tools, (
-            f"zsteg should still be available for manual use, got: {[t for t in tools if 'z' in t.lower()]}"
-        )
+        assert "zsteg" in tools
 
     def test_get_tool_zsteg_still_works(self):
         """get_tool('zsteg') 仍能找到 (供未来手工调用)."""
         tool = get_tool("zsteg")
         assert tool is not None
         assert tool.name == "zsteg"
+
+    def test_lsb_detect_still_in_list_tools(self):
+        """lsb_detect adapter Phase 6 deprecated 但未删, list_tools() 仍含."""
+        tools = list_tools()
+        assert "lsb_detect" in tools, (
+            "lsb_detect adapter deprecated but not deleted (Phase 6 留 backward compat)"
+        )
+
+    def test_get_tool_lsb_detect_still_works(self):
+        """get_tool('lsb_detect') 仍能找到 (Phase 6 deprecated 但未删)."""
+        tool = get_tool("lsb_detect")
+        assert tool is not None
+        assert tool.name == "lsb_detect"
