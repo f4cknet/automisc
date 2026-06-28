@@ -47,7 +47,8 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     "快捷工具 (v0.5 Actions)": [
         "fix_pseudo_zip",  # zip 伪加密破解 (FixPseudoEncryptionAction)
         "bruteforce_zip",  # zip 暴力破解 (BruteforceZipAction)
-        "lsb_extract",  # PNG LSB 抽出 (LSBExtractAction)
+        "lsb_extract",  # PNG LSB 抽出 (LSBExtractAction, zsteg subprocess, Win 不可用, Phase 6 deprecated)
+        "lsb_tool",  # v0.5-lsb-tool-unify Phase 4: 统一 LSB 工具 (detect/extract/extract_bytes, 替代 lsb_extract + lsb_bytes)
         "bruteforce_rar",  # rar 暴力破解 (BruteforceRarAction)
     ],
     "🔓 解码工具 (v0.5+ Decoders)": [
@@ -103,7 +104,8 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
 ACTION_DISPLAY_NAMES: dict[str, str] = {
     "fix_pseudo_zip": "🔓 修复 Zip 伪加密",
     "bruteforce_zip": "🔨 Zip 暴力破解 (4-6 位)",
-    "lsb_extract": "🎨 PNG LSB 智能提取",
+    "lsb_extract": "🎨 PNG LSB 智能提取",  # 保留 backward compat, Phase 6 deprecated
+    "lsb_tool": "🎨 PNG LSB 隐写分析",  # v0.5-lsb-tool-unify Phase 4: 3 mode 统一入口 (替代 lsb_extract + lsb_bytes)
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
     "sevenz_extract": "📦 7z 解压",  # v0.5-sevenz-extract Owner 2026-06-20 19:48
     "decoder:base64-image": "🔓 Base64 → 图片",
@@ -294,7 +296,7 @@ class ToolMenuDock(QDockWidget):
             kind = "decoder"
             name = tool_name[len("decoder:"):]
         elif tool_name in ADAPTER_TOOLS:
-            kind = "action" if tool_name in ("fix_pseudo_zip", "bruteforce_zip", "lsb_extract", "bruteforce_rar") else "adapter"
+            kind = "action" if tool_name in ("fix_pseudo_zip", "bruteforce_zip", "lsb_extract", "lsb_tool", "bruteforce_rar") else "adapter"  # v0.5-lsb-tool-unify Phase 4: 加 lsb_tool
             name = tool_name
         else:
             kind = "action"

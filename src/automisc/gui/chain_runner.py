@@ -154,6 +154,32 @@ class ChainRunner(QThread):
                 else:
                     dag: DAG = chain_builders[self.chain_name]()
                 context = dag.execute(context)
+            # v0.5-lsb-tool-unify Phase 4: lsb_tool action (GUI 工具栏入口)
+            # 跟 lsb-bytes 一样从 extra_context 抽 9 个 __lsb_* 参数 → LSBToolAction(**kwargs)
+            elif self.chain_name == "lsb_tool":
+                from automisc.core.actions.lsb_tool import LSBToolAction
+                lsb_kwargs = {
+                    "mode": self.extra_context.get("__lsb_mode__", "detect"),
+                    "preset": self.extra_context.get("__lsb_preset__"),
+                    "channels": self.extra_context.get("__lsb_channels__", "RGB"),
+                    "bit": int(self.extra_context.get("__lsb_bit__", 0)),
+                    "scan_order": self.extra_context.get("__lsb_scan_order__", "row"),
+                    "byte_bit_order": self.extra_context.get("__lsb_byte_bit_order__", "MSB"),
+                    "text_min_len": int(self.extra_context.get("__lsb_text_min_len__", 20)),
+                    "entropy_threshold": float(self.extra_context.get("__lsb_entropy_threshold__", 5.0)),
+                    "unique_threshold": int(self.extra_context.get("__lsb_unique_threshold__", 200)),
+                }
+                lsb_action = LSBToolAction(**lsb_kwargs)
+                result: ActionResult = lsb_action.run(context)
+                context["__log__"] = [
+                    {
+                        "step": 1,
+                        "node": lsb_action.name,
+                        "success": result.success,
+                        "message": result.message,
+                    }
+                ]
+                context["__last_result__"] = result
             # 模式 2: 4 快捷 action (单 Action)
             elif self.chain_name in _ACTION_REGISTRY:
                 action = _ACTION_REGISTRY[self.chain_name]

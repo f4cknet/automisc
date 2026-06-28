@@ -57,7 +57,8 @@ from .auto_runner import (
 from .chain_runner import ChainRunner
 from .decode_runner import DecodeRunner
 from .journal_panel import JournalPanel
-from .lsb_bytes_dialog import LSBBytesParamDialog  # v0.5-lsb-bytes-gui
+from .lsb_bytes_dialog import LSBBytesParamDialog  # v0.5-lsb-bytes-gui (Phase 6 deprecated by lsb_tool_dialog)
+from .lsb_tool_dialog import LSBToolParamDialog  # v0.5-lsb-tool-unify Phase 4
 from .menu_dock import ToolMenuDock
 from .output_view import OutputView
 from .runner import ToolRunner
@@ -391,16 +392,22 @@ class MainWindow(QMainWindow):
             chain_menu.addAction(action)
         chain_menu.addSeparator()
         # v0.5 快捷 action (Owner GUI 工具栏需求)
+        # v0.5-lsb-tool-unify Phase 4: 加 lsb_tool (替代 lsb_extract 入口)
         for action_name, display in (
             ("fix_pseudo_zip", "Fix Zip 伪加密"),
             ("bruteforce_zip", "Zip 暴力破解 (4-6 位)"),
-            ("lsb_extract", "PNG LSB 智能提取"),
+            ("lsb_extract", "PNG LSB 智能提取"),  # 保留 backward compat, Phase 6 deprecated
+            ("lsb_tool", "PNG LSB 隐写分析"),  # v0.5-lsb-tool-unify Phase 4: 3 mode 统一入口
             ("bruteforce_rar", "RAR 暴力破解 (4-6 位)"),
         ):
             act = QAction(f"Run {display}", self)
-            act.triggered.connect(
-                lambda checked=False, name=action_name: self._run_chain(name)
-            )
+            # lsb_tool 弹 dialog 收 9 参数 (per LSBToolParamDialog), 其他直接 _run_chain
+            if action_name == "lsb_tool":
+                act.triggered.connect(self._run_lsb_tool_action)
+            else:
+                act.triggered.connect(
+                    lambda checked=False, name=action_name: self._run_chain(name)
+                )
             chain_menu.addAction(act)
         chain_menu.addSeparator()
         # bruteforce 限制 (testing)
@@ -550,7 +557,7 @@ class MainWindow(QMainWindow):
 
         kind:
         - "adapter": 22 个 core.adapter 工具 (subprocess + parse)
-        - "action": v0.5+ 4 快捷 action (fix_pseudo_zip / bruteforce_zip / lsb_extract / bruteforce_rar)
+        - "action": v0.5+ 5 快捷 action (fix_pseudo_zip / bruteforce_zip / lsb_extract / lsb_tool / bruteforce_rar)  # v0.5-lsb-tool-unify Phase 4: 加 lsb_tool
         - "decoder": v0.5+ decoder (base64-image / hex-ascii)
 
         v0.5-action-dispatch-fix (per Owner 15:43):
@@ -633,8 +640,8 @@ class MainWindow(QMainWindow):
 
         Args:
             chain_name: zip / zip-full / binwalk / foremost / lsb /
-                        lsb_extract / fix_pseudo_zip / bruteforce_zip / bruteforce_rar /
-                        stegseek_crack / steghide_extract (v0.5-steghide-GUI 新)
+                        lsb_extract / lsb_tool / fix_pseudo_zip / bruteforce_zip / bruteforce_rar /
+                        stegseek_crack / steghide_extract (v0.5-steghide-GUI 新, v0.5-lsb-tool-unify Phase 4: 加 lsb_tool)
             bruteforce_limit: bruteforce 测试用 (e.g. 5000), 加速 CI/开发
             extra_context: 注入 context 的额外字段 (v0.5-steghide-GUI):
                 - __wordlist__: wordlist 路径 (stegseek_crack 用)
@@ -720,6 +727,36 @@ class MainWindow(QMainWindow):
             return
         self.output_view.append_text("\n[Steghide] 用户密码已输入 (隐藏)\n")
         self._run_chain("steghide_extract", extra_context={"__password__": password})
+
+    # ---------- v0.5-lsb-tool-unify Phase 4: lsb_tool action 入口 (弹 9 参数 dialog) ----------
+    def _run_lsb_tool_action(self) -> None:
+        """lsb_tool action GUI 入口 (per v0.5-lsb-tool-unify Phase 4).
+
+        弹 LSBToolParamDialog 收 9 参数 (mode/channels/bit/scan_order/byte_bit_order/
+        preset/text_min_len/entropy_threshold/unique_threshold)
+        → _run_chain("lsb_tool", extra_context={__lsb_*}).
+
+        跟 _run_lsb_bytes_chain 风格一致, 但参数更多 (9 vs 4),
+        覆盖 detect / extract / extract_bytes 3 mode.
+
+        chain_runner.py 在 "lsb_tool" 分支从 extra_context 抽 9 个参数
+        → 现场构造 LSBToolAction(**kwargs) → action.run(context).
+        """
+        dialog = LSBToolParamDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            self.statusBar().showMessage("取消 lsb_tool 参数输入")
+            return
+        kwargs = dialog.get_kwargs()
+        self.output_view.append_text(
+            f"\n[lsb_tool] mode={kwargs['__lsb_mode__']} "
+            f"channels={kwargs['__lsb_channels__']} "
+            f"bit={kwargs['__lsb_bit__']} "
+            f"scan={kwargs['__lsb_scan_order__']} "
+            f"bbo={kwargs['__lsb_byte_bit_order__']}"
+            + (f" preset={kwargs['__lsb_preset__']}" if kwargs['__lsb_preset__'] else "")
+            + "\n"
+        )
+        self._run_chain("lsb_tool", extra_context=kwargs)
 
     # ---------- v0.5-lsb-bytes-gui: lsb-bytes chain 入口 (弹 4 参数 dialog) ----------
     def _run_lsb_bytes_chain(self) -> None:
