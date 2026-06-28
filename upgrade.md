@@ -5,20 +5,19 @@
 
 ---
 
-## 状态（snapshot · 2026-06-28 10:42 · v0.5-lsb-tool-unify spec 设计）
+## 状态（snapshot · 2026-06-29 11:50 · v0.5-lsb-tool-unify Phase 1-4 完成 + Phase 5 docs 同步中）
 
 | 字段 | 值 |
 |---|---|
-| **当前 main HEAD** | `b2db223`（v0.5-windows-evtx-dump 全闭环 + python-evtx 状态同步，**未推新 commit**）|
-| **当前版本** | v0.5+（频繁迭代模式，已 16 迭代）|
-| **下一个 milestone** | **v0.5-lsb-tool-unify**（spec 起草完，per Owner "3 合 1 + lsb_tool ≈ zsteg"，待 Owner 自审 10 决策点后走 Phase 2-7 实施）|
+| **当前 main HEAD** | `2904a3b`（v0.5-lsb-tool-unify Phase 1+2a+2b+3+4 全部落地；待 Phase 5 commit + Phase 6 deprecated 标记 + Phase 7 实战 regression + Phase 8 push）|
+| **当前版本** | v0.5+（频繁迭代模式，已 17 迭代）|
+| **下一个 milestone** | **v0.5-lsb-tool-unify Phase 5-8**（Phase 5 docs 同步进行中 → Phase 6 老 action deprecated 标记 → Phase 7 实战 regression 跑 N=NP/steg.png/meihuai.jpg → Phase 8 push 等 Owner）|
 | **主分支** | main（per `AGENTS.md §2.4` 单 Owner 简化：直接 main commit）|
 | **Owner 授权** | "完全信任 AI"（per AGENTS.md §2.4 v1.20 治理变更）|
 | **3 件套行数** | AGENTS 101 + prd 93 + STRUCTURE 186 = **380 行**（v3.0 治理）|
-| **测试** | **592 passed**（v0.5-base-rot-decoders +24 单测：PR1 算法库 37 + PR2 base64 stego 15 + PR3 decoder+GUI 24）— 4 failed 跟本次无关（Challenge 文件缺失 + 包安装）|
-| **真 flag 数** | **4**（QR + steg + KEY + meihuai）|
-| **今晚 commit 数** | 8 (4b4af51 → b9226c1) |
-| **真 flag 命中** | 2 (Challenge/QR_code.png `CTF{vjpw_wnoei}` + Challenge/steg.png `st3g0_saurus_wr3cks`) |
+| **测试** | **737 passed**（Phase 2a 66 + Phase 2b 16 + Phase 3 18 + Phase 4 38 + 老 LSB/GUI 599）— 0 回归（baseline failures 跟本次无关）|
+| **v0.5-lsb-tool-unify 进度** | **Phase 1 ✅ spec + Phase 2a ✅ detect + Phase 2b ✅ extract + Phase 3 ✅ adapter + Phase 4 ✅ GUI dialog → Phase 5 🔄 docs → Phase 6 ⏳ deprecated → Phase 7 ⏳ regression → Phase 8 ⏳ push**（8 阶段, 4/8 完成）|
+| **今晚 commit 数** | 5 (b7b212c → 2f6825d → d5de9ed → 5cba63a → 2904a3b)，per AGENTS §2.4 等 Owner 拍 push |
 
 ---
 
@@ -103,7 +102,7 @@
 | v0.5-train-013-meihuai-jpg | **训练驱动第 13 篇** (per Owner 2026-06-27 23:44 实战 meihuai.jpg): `C:\Users\zmzsg\Downloads\梅花香之苦寒来\meihuai.jpg` (670KB, 467×289 JPEG, 2017-11-07) auto-run 命中 19 SP 但 sev=5 全是 `flag` 关键字元数据(非真 flag). **AI 兜底 6 步**: (1) exiftool -b -Padding 1974 bytes 全 0 (误判路径) (2) JPEG FFD9 @ 0x52f4 后追加 649566 bytes hex-encoded 坐标 (3) bytes.fromhex 解码 324783 bytes + re.findall `\d+,\d+` 35019 个 (x,y) (4) PIL 画 272×272 + 10px quiet zone QR (5) cv2.QRCodeDetector 解码 🎉 **`flag{40fc0a979f759c8892f4dc045e28b820}`** (6) scale x1/2/4/8 验证全命中. **暴露 3 个 Win 兼容 bug**: exiftool 中文乱码 (`-charset utf8` 缺失) + stegseek/file unavailable (Linux/Unix 工具) → **触发架构升级 `v0.5-windows-tool-compat`** (per §5.2 ≥3 道同类命中) | ✅ done | (AI 兜底解出 + 训练日志归档 + 架构升级 spec 起草, 待 Owner Y 签字开 PR1 exiftool fix) | [`upgrade/v0.5-train-013-meihuai-jpg.md`](upgrade/v0.5-train-013-meihuai-jpg.md) |
 | v0.5-windows-tool-compat | **架构升级** (per v0.5-train-013 触发): Win 工具链 3 个兼容 bug 合并修复 — **(1) exiftool 中文乱码**: adapter 加 `-charset utf8` 参数 (1 行, Win + 中文 EXIF 全局受益) / **(2) file Win 兼容**: 装 [magic-win](https://github.com/nscaife/file-windows) prebuilt `file.exe` 到 `extend-tools/bin/win-x64/` (跟 exiftool 风格一致) / **(3) stegseek/steghide unavailable**: GUI 菜单 `✗` marker + auto-run 白名单跳过 (sys.platform == "win32" + 名字 in `{stegseek, steghide, zsteg}`). 3 PR 拆解 (PR1 exiftool ~30 / PR2 file.exe ~50 / PR3 marker+白名单 ~150). §5.2 架构判定: Win + 中文 EXIF / Win 必然 unavailable ≥3 道同类, 升架构 ✅. 不动 binwalk / strings (hex-encoded 坐标数据不在标准 magic 范围, 实战命中 N<3) | ⏳ design | (待 Owner Y 签字开 PR1, exiftool 修复最小改动先验证流程) | [`upgrade/v0.5-windows-tool-compat.md`](upgrade/v0.5-windows-tool-compat.md) |
 | v0.5-windows-evtx-dump | **scope 收窄** (per Owner 2026-06-28 "既然python-evtx能代替 evtx-dump" + AGENTS §5.2 防单题打补丁): `install.ps1` 加 **Stage 0 Rust toolchain** 装 (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — **保留** (独立价值: 未来 cargo install 兜底 / binwalk v3 备选 / ad-hoc 工具编写);**Stage 1 evtx_dump CLI 撤回** (per Owner 决策 + AGENTS §5.2): adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 (XPath `e:System/e:EventID` / `e:EventData/e:Data[@Name='CommandLine']`) + EventID scoring (4625/1102 → sev 5) + 命令行关键字匹配, evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 `evtx_dump file.evtx \| grep flag` 便利 (可被 5 行 Python one-liner 替代);实战 ≥3 道同类命中再升架构 per AGENTS §5.2。`manifest.yaml` v1.2 → v1.1 回滚 (evtx_dump 块删除);tools.md §3.4/§3.4.1/§3.4.3/§3.4.4/§4/§6.1#16 状态/路径全部回滚到 `extend_tools/evtx_dump` (legacy macOS);§2 总表 19✅/35❌ → 18✅/36❌ (Forensics 3✅→2✅)。原 commit `f54d859` 的 smoke 9 测 + SHA256 校验结果保留在 spec §5 作为"已验证待实战触发再启用"证据。 | 🔄 in-progress | (本地 2 笔 commit — `f54d859` 实施 + 下一笔 scope 收窄回滚, 待 Owner 自审) | [`upgrade/v0.5-windows-evtx-dump.md`](upgrade/v0.5-windows-evtx-dump.md) |
-| v0.5-lsb-tool-unify | **架构升级** (per Owner 2026-06-28 "把lsb_detect和lsb_extract合并成lsb_tool, auto_run走lsb_detect, 自研lsb_tool做成约等于zsteg能力"): **3 个 LSB action 合并为 1** (LSBDetectAction 494 LOC + LSBExtractAction 356 LOC + LSBBytesExtractAction 312 LOC → LSBToolAction 600 LOC); 4 参数化 (channels/bit/scan_order/byte_bit_order 兼容 zsteg `-c/-b/-o/--lsb/--msb`); 3 mode (detect/extract/extract_bytes); preset (None/"all"/"np" N=NP 模式); 公共字节流函数 `_extract_lsb_byte_stream` (修复 v0.5-train-012 两路径不同源 bug); 能力 ≈ zsteg + 3 维检测 (text + magic + entropy); zsteg adapter 文件保留 (per AGENTS §5.2 + v0.5-windows-tool-compat); auto-run 池 lsb_detect → lsb_tool (仍 6 tools per §1 铁律 7); GUI 工具栏 2 按钮合并 1 "PNG LSB 隐写分析" + 4 参数 dialog 复用. 8 commit 拆分 (Phase 2a+2b + 3 + 4 + 5 + 6 + 实战 regression + push). 实战必跑 3 道题 (N=NP/steg.png/meihuai.jpg per §1 铁律 4 关 4). 不实现 zsteg `--shift/--step/--invert/--pixel-align` (per AGENTS §5.2 v1.x 评估). | 🟡 design | (spec 起草完, 等 Owner 拍 §7 10 决策点后走 Phase 2-7 实施) | [`upgrade/v0.5-lsb-tool-unify.md`](upgrade/v0.5-lsb-tool-unify.md) |
+| v0.5-lsb-tool-unify | **架构升级** (per Owner 2026-06-28 "把lsb_detect和lsb_extract合并成lsb_tool, auto_run走lsb_detect, 自研lsb_tool做成约等于zsteg能力"): **3 个 LSB action 合并为 1** (LSBDetectAction 494 LOC + LSBExtractAction 356 LOC + LSBBytesExtractAction 312 LOC → LSBToolAction 401 LOC + lsb_tool_common 254 LOC + lsb_tool_extract 345 LOC = 1000 LOC 拆 3 文件 per AGENTS §2.1 ≤400 行/文件); 4 参数化 (channels/bit/scan_order/byte_bit_order 兼容 zsteg `-c/-b/-o/--lsb/--msb`); 3 mode (detect/extract/extract_bytes); preset (None/"all"/"np" N=NP 模式); 公共字节流函数 `_extract_lsb_byte_stream` (修复 v0.5-train-012 两路径不同源 bug); 能力 ≈ zsteg + 3 维检测 (text + magic + entropy); zsteg adapter 文件保留 (per AGENTS §5.2 + v0.5-windows-tool-compat); auto-run 池 lsb_detect → lsb_tool (仍 6 tools per §1 铁律 7); GUI 工具栏 2 按钮合并 1 "PNG LSB 隐写分析" + 9 参数 dialog `lsb_tool_dialog.py` 合并 `lsb_bytes_dialog.py`. **进度 5/8**: Phase 1 spec ✅ (b7b212c) + Phase 2a detect ✅ (2f6825d) + Phase 2b extract/extract_bytes ✅ (d5de9ed) + Phase 3 adapter + auto-run 池切换 ✅ (5cba63a) + Phase 4 GUI dialog 合并 ✅ (2904a3b) → Phase 5 docs 同步进行中 → Phase 6 老 action deprecated 标记 → Phase 7 实战 regression 跑 N=NP/steg.png/meihuai.jpg → Phase 8 push 等 Owner. 实战必跑 3 道题 (per §1 铁律 4 关 4). 不实现 zsteg `--shift/--step/--invert/--pixel-align` (per AGENTS §5.2 v1.x 评估). 测试 145 LSB+GUI (Phase 2a 66 + 2b 16 + 3 18 + 4 27 unit + 11 integration + 7 backward compat) → 145 passed (0.52s). | 🟢 active | (Phase 1-4 ✅, Phase 5 docs 进行中, 6-8 待办) | [`upgrade/v0.5-lsb-tool-unify.md`](upgrade/v0.5-lsb-tool-unify.md) |
 
 ---
 
