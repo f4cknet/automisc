@@ -10,10 +10,13 @@ import pytest
 from PIL import Image
 
 from automisc.core.actions.lsb_tool_common import (
+    _15_CHANNELS,
     _ascii_preview,
+    _build_15channel_preview_matrix,
     _build_bit_plane_preview_matrix,
     _extract_lsb_byte_stream,
     _extract_lsb_byte_stream_zero_aware,
+    _format_15channel_matrix_for_journal,
     _format_matrix_for_journal,
 )
 
@@ -506,3 +509,208 @@ class TestExtractZeroAwareByteStream:
         assert bs_row != bs_col, (
             f"row vs col 应不同, row={bs_row.hex()}, col={bs_col.hex()}"
         )
+
+
+# ============ 15 通道 × LSB+MSB preview matrix (per v0.5-lsb-tool-15channel-matrix Commit 2) ============
+
+
+class TestBuild15ChannelPreviewMatrix:
+    """_build_15channel_preview_matrix: 15 channels × 2 bit modes = 30 entries."""
+
+    def test_returns_30_entries(self, synthetic_2x2):
+        """默认 15 channels × 2 bit modes = 30 个 (label, bit, preview, has_kw) tuples."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        assert len(matrix) == 30, f"expected 30 entries, got {len(matrix)}"
+
+    def test_all_15_channels_covered(self, synthetic_2x2):
+        """15 通道全覆盖 (per Owner 列表)."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        labels_seen = {entry[0] for entry in matrix}
+        expected_labels = {"RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
+                           "RG0", "R0B", "0GB", "R00", "0G0", "00B",
+                           "R", "G", "B"}
+        assert labels_seen == expected_labels, (
+            f"missing labels: {expected_labels - labels_seen}, "
+            f"extra: {labels_seen - expected_labels}"
+        )
+
+    def test_each_label_has_lsb_and_msb(self, synthetic_2x2):
+        """每 label 出现 2 次 (bit 0 + bit 7)."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        for label, _ in _15_CHANNELS:
+            entries = [e for e in matrix if e[0] == label]
+            bits = {e[1] for e in entries}
+            assert bits == {0, 7}, f"{label} 应有 bit 0 和 bit 7, got {bits}"
+
+    def test_n_bytes_respected(self, synthetic_2x2):
+        """preview 长度 ≤ n_bytes."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2, n_bytes=20)
+        for _, _, preview, _ in matrix:
+            assert len(preview) <= 20
+
+    def test_synthetic_lsb_text_keyword_hit(self):
+        """synthetic LSB 隐写验证: RGB per-pixel interleaved LSB 嵌入 'Hey!' → RGB 行命中.
+
+        关键: embedding 必须按 per-pixel interleaved 顺序 (pixel 0 R+G+B bits, pixel 1 R+G+B bits, ...),
+        否则提取顺序跟嵌入顺序不匹配, byte stream 不等于 payload.
+        """
+        payload = b"Hey!"
+        # 展开 payload → bit 序列 (MSB first)
+        bits = []
+        for byte in payload:
+            for i in range(8):
+                bits.append((byte >> (7 - i)) & 1)
+
+        # 32 bits / 3 bits per pixel ≈ 11 pixels → 用 16x2 (32 pixels) 足够
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+
+        # 按 per-pixel interleaved 顺序嵌入 (pixel 0 R+G+B, pixel 1 R+G+B, ...)
+        for bit_pos in range(len(bits)):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3  # 0=R, 1=G, 2=B
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bits[bit_pos]
+
+        matrix = _build_15channel_preview_matrix(arr, n_bytes=10)
+
+        # LSB RGB 行应命中 'Hey' 关键字
+        lsb_rgb = next(e for e in matrix if e[0] == "RGB" and e[1] == 0)
+        _, _, preview, has_kw = lsb_rgb
+        assert preview.startswith("Hey"), (
+            f"LSB RGB preview 应以 'Hey' 开头, got {preview[:10]!r}"
+        )
+        assert has_kw, "LSB RGB has_kw 应 True (含 'Hey')"
+
+    def test_single_channel_steg_n_np(self):
+        """synthetic N=NP 模式: G 通道 LSB 嵌入 ASCII → 15 通道矩阵 G 行命中 (单通道 N=NP 模式).
+
+        8x8 RGB PNG (64 pixels), G 通道 LSB 行扫描嵌入 8 字节 'flag{key' (64 bits → 64 pixels 刚好).
+        """
+        payload = b"flag{key"  # 8 bytes = 64 bits, 不含 '}' 避免花括号误判
+        width, height = 8, 8
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        # G 通道 LSB 嵌入 (单通道, 1 bit/pixel, row scan, MSB byte order)
+        for bit_pos, bit_val in enumerate(
+            [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+        ):
+            y = bit_pos // width
+            x = bit_pos % width
+            arr[y, x, 1] = (arr[y, x, 1] & 0xFE) | bit_val
+
+        matrix = _build_15channel_preview_matrix(arr, n_bytes=10)
+        # 单通道 G 行 (LSB) 应命中 'flag'
+        lsb_g = next(e for e in matrix if e[0] == "G" and e[1] == 0)
+        _, _, preview, has_kw = lsb_g
+        assert "flag" in preview[:10], f"LSB G preview 应含 'flag', got {preview[:10]!r}"
+        assert has_kw, "LSB G has_kw 应 True (含 'flag')"
+
+    def test_keyword_markers(self):
+        """命中关键字 'Hey'/'flag'/'key'/'PK'/'PNG' 应 has_kw=True.
+
+        用 per-pixel interleaved 嵌入 RGB LSB = 'Hey!'.
+        """
+        payload = b"Hey!"
+        bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        for bit_pos, bit_val in enumerate(bits):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bit_val
+
+        matrix = _build_15channel_preview_matrix(arr, n_bytes=20)
+        # RGB LSB 应 has_kw=True (含 'Hey')
+        rgb_lsb = next(e for e in matrix if e[0] == "RGB" and e[1] == 0)
+        assert rgb_lsb[3] is True, f"RGB LSB has_kw 应 True, preview={rgb_lsb[2][:20]!r}"
+        # MSB RGB 不应命中 (MSB 全 0 = 0x00 字节, 不在 keyword 列表)
+        rgb_msb = next(e for e in matrix if e[0] == "RGB" and e[1] == 7)
+        assert rgb_msb[3] is False, f"RGB MSB has_kw 应 False, preview={rgb_msb[2][:20]!r}"
+
+    def test_label_order_matches_suibozhuliu(self, synthetic_2x2):
+        """label 顺序跟 随波逐流 一致: RGB/RBG/GRB/GBR/BRG/BGR/RG0/R0B/0GB/R00/0G0/00B/R/G/B."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        # 取每个 label 的第一个出现位置 (bit 0)
+        label_order: list[str] = []
+        for entry in matrix:
+            if entry[0] not in label_order:
+                label_order.append(entry[0])
+        expected_order = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
+                          "RG0", "R0B", "0GB", "R00", "0G0", "00B",
+                          "R", "G", "B"]
+        assert label_order == expected_order
+
+
+class TestFormat15ChannelMatrix:
+    """_format_15channel_matrix_for_journal: matrix → journal 友好字符串."""
+
+    def test_basic_format(self, synthetic_2x2):
+        """matrix 渲染含 LSB 段 + MSB 段, 每段 15 行 (6 full + 6 zero + 3 single)."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        text = _format_15channel_matrix_for_journal(matrix)
+        lines = text.split("\n")
+        # 2 段 × (1 标题 + 1 preview 行 + 15 数据行 + 1 空行) = 36 行 (最后 1 空行 rstrip 去掉)
+        # 实际: [标题 LSB][空] [标题 MSB] = 2 标题 + 2 preview + 30 数据 + 段间空行 = 36
+        assert len(lines) >= 30, f"expected ≥30 lines, got {len(lines)}"
+
+    def test_lsb_section_before_msb(self, synthetic_2x2):
+        """LSB 段在 MSB 段前."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        text = _format_15channel_matrix_for_journal(matrix)
+        lsb_idx = text.find("LSB")
+        msb_idx = text.find("MSB")
+        assert lsb_idx >= 0 and msb_idx >= 0, "should contain both LSB and MSB sections"
+        assert lsb_idx < msb_idx, "LSB section should appear before MSB"
+
+    def test_15_rows_per_section(self, synthetic_2x2):
+        """每段 15 行数据 (6 full + 6 zero-padded + 3 single)."""
+        matrix = _build_15channel_preview_matrix(synthetic_2x2)
+        text = _format_15channel_matrix_for_journal(matrix)
+        # 找 LSB 段: 从 "LSB" 到下一个空行 / MSB
+        lsb_section = text.split("[15 通道 MSB")[0]
+        # 跳过标题行 + preview header 行, 数数据行
+        lsb_lines = lsb_section.split("\n")
+        data_lines = [ln for ln in lsb_lines if ":" in ln and not ln.startswith("[")]
+        # 第一行是 "    preview (50 bytes):" 含 ":", 跳过
+        data_rows = [ln for ln in data_lines if ln.startswith(("RGB:", "RBG:", "GRB:", "GBR:", "BRG:", "BGR:",
+                                                              "RG0:", "R0B:", "0GB:", "R00:", "0G0:", "00B:",
+                                                              "R:", "G:", "B:"))]
+        assert len(data_rows) == 15, f"LSB 段应 15 行数据, got {len(data_rows)}"
+
+    def test_keyword_marker_in_output(self):
+        """命中关键字时行末有 '  <=='."""
+        # synthetic PNG with 'Hey' in RGB per-pixel interleaved LSB
+        payload = b"Hey!"
+        bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        for bit_pos, bit_val in enumerate(bits):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bit_val
+
+        matrix = _build_15channel_preview_matrix(arr, n_bytes=20)
+        text = _format_15channel_matrix_for_journal(matrix)
+        # RGB 行 (LSB 段) 应含 <== 标记
+        assert "RGB:" in text
+        # RGB 行 + LSB 段 + <== 标记
+        lsb_section = text.split("[15 通道 MSB")[0]
+        rgb_line = [ln for ln in lsb_section.split("\n") if ln.startswith("RGB:")]
+        assert len(rgb_line) == 1
+        assert "<==" in rgb_line[0], f"RGB 行应有 <== 标记, got {rgb_line[0]!r}"
+
+    def test_empty_matrix(self):
+        """空 matrix 渲染空字符串."""
+        assert _format_15channel_matrix_for_journal([]) == ""
