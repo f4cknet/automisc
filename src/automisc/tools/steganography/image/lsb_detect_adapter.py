@@ -1,3 +1,10 @@
+# --- DEPRECATED adapter (per v0.5-lsb-tool-unify, 2026-06-29) ---
+# 本 adapter 在 auto-run 池中已被 LsbToolAdapter 替代
+# (per FIND_SUSPICIOUS_PICTURE_TOOLS Phase 3 切换)。
+# 本 adapter 注册保留 backward compat, 不再被自动调用; v0.6+ 删除。
+# 详见 upgrade/v0.5-lsb-tool-unify.md。
+# --- /DEPRECATED ---
+
 """lsb_detect adapter (per tools.md §3.5 + v0.5-lsb-detector spec)
 
 **lsb_detect** —— auto-run readonly 智能 LSB 检测 (替代 zsteg auto-run 位)

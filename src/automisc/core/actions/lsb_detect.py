@@ -1,5 +1,10 @@
 """Action: auto-run readonly 智能 LSB 检测 (v0.5-lsb-detector)
 
+**DEPRECATED** (per v0.5-lsb-tool-unify, 2026-06-29): 本模块将被废弃 (v0.6+ 删除)。
+请使用 LSBToolAction (automisc.core.actions.lsb_tool, mode='detect') 替代,
+覆盖本模块所有能力 + 更强 (3 维检测: text + magic + entropy)。
+详见 upgrade/v0.5-lsb-tool-unify.md。
+
 **目的**: 替代 zsteg 在 auto-run 池中的位置, 提供 **只读不写 (readonly)** 的智能 LSB 检测。
 **触发**: v0.5-train-010-channel-lsb-anomaly.md — N=NP 大图副本实战, zsteg 漏 G 通道 LSB 单通道
 (zsteg 默认只显示 printable text 匹配 + 固定 xy=row + 不出单通道异常概率)。

@@ -1,3 +1,10 @@
+# --- DEPRECATED (per v0.5-lsb-tool-unify, 2026-06-29) ---
+# 本模块将被废弃 (v0.6+ 删除)。
+# 请使用 LSBToolAction (automisc.core.actions.lsb_tool, mode='extract_bytes') 替代,
+# 覆盖本模块所有能力 (4 参数 channels/bit/scan_order/byte_bit_order)。
+# 详见 upgrade/v0.5-lsb-tool-unify.md。
+# --- /DEPRECATED ---
+
 """Action: LSB 字节流自定义抽取（v0.5-lsb-byte-stream-extract 能力 B）
 
 **目的**：从 PNG/BMP/GIF 任意通道 × 任意 bit 位 × 任意扫描顺序 × 任意字节内 bit 序,

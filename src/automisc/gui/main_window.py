@@ -396,7 +396,7 @@ class MainWindow(QMainWindow):
         for action_name, display in (
             ("fix_pseudo_zip", "Fix Zip 伪加密"),
             ("bruteforce_zip", "Zip 暴力破解 (4-6 位)"),
-            ("lsb_extract", "PNG LSB 智能提取"),  # 保留 backward compat, Phase 6 deprecated
+            ("lsb_extract", "PNG LSB 智能提取"),  # 保留 backward compat, v0.5-lsb-tool-unify Phase 6 DEPRECATED → lsb_tool
             ("lsb_tool", "PNG LSB 隐写分析"),  # v0.5-lsb-tool-unify Phase 4: 3 mode 统一入口
             ("bruteforce_rar", "RAR 暴力破解 (4-6 位)"),
         ):

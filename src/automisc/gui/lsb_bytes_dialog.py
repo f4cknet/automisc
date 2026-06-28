@@ -1,3 +1,10 @@
+# --- DEPRECATED dialog (per v0.5-lsb-tool-unify, 2026-06-29) ---
+# 本 dialog 已被 LSBToolParamDialog (gui/lsb_tool_dialog.py, Phase 4) 替代。
+# 本 dialog 仍可用 (backward compat for chain lsb-bytes), 但 v0.6+ 删除。
+# GUI 工具栏新入口请用 "PNG LSB 隐写分析" → LSBToolParamDialog (9 参数 + 3 mode)。
+# 详见 upgrade/v0.5-lsb-tool-unify.md。
+# --- /DEPRECATED ---
+
 """LSB 字节流参数 dialog (v0.5-lsb-bytes-gui)
 
 GUI 第一个带参数的 chain (lsb-bytes),所以单独抽 dialog 模块。

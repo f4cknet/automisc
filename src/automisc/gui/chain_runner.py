@@ -57,7 +57,7 @@ def _ensure_action_registry() -> None:
         FixPseudoEncryptionAction,
     )
 
-    register_action("lsb_extract", LSBExtractAction())
+    register_action("lsb_extract", LSBExtractAction())  # v0.5-lsb-tool-unify Phase 6 DEPRECATED → lsb_tool (backward compat 保留)
     register_action("fix_pseudo_zip", FixPseudoEncryptionAction())
     register_action("bruteforce_zip", BruteforceZipAction())
     register_action("bruteforce_rar", BruteforceRarAction())

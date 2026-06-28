@@ -1,3 +1,11 @@
+# --- DEPRECATED (per v0.5-lsb-tool-unify, 2026-06-29) ---
+# 本模块将被废弃 (v0.6+ 删除)。
+# 本模块依赖 zsteg subprocess (Win 不可用, Ruby gem)。
+# 请使用 LSBToolAction (automisc.core.actions.lsb_tool, mode='extract') 替代,
+# 内置 12 组合字节流提取 + zsteg 能力 (per spec §3.4)。
+# 详见 upgrade/v0.5-lsb-tool-unify.md。
+# --- /DEPRECATED ---
+
 """Action: LSB 抽取后智能路由（v0.5-LSB-router 核心）
 
 逻辑（per upgrade/v0.5-LSB-router.md）:
