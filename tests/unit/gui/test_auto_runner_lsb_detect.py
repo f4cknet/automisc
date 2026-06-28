@@ -6,7 +6,7 @@ auto_run 池 (FIND_SUSPICIOUS_PICTURE_TOOLS) lsb_detect → lsb_tool 后的整�
 - lsb_tool adapter 已双注册 (per automisc-tool-registration 铁律)
 - .png 后缀走 picture pool (per EXTENSION_TO_POOL)
 - pool 跟 lsb_tool 集成 (run 6 tools 含 lsb_tool)
-- zsteg adapter 保留 (per AGENTS §5.2 + v0.5-windows-tool-compat, 供未来手工调用)
+- zsteg adapter **已彻底删** (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4, Owner Q4=b 拍板)
 - 老 lsb_detect adapter 仍 get_tool('lsb_detect') 可访问 (Phase 6 deprecated 但未删)
 """
 from __future__ import annotations
@@ -125,22 +125,25 @@ class TestPickSuspiciousPool:
 
 
 class TestBackwardCompatLegacyTools:
-    """老 LSB 工具 (lsb_detect / zsteg) 仍可访问 (per Phase 6 deprecated 但未删).
+    """老 LSB 工具 (lsb_detect) backward compat 保留 (Phase 6 deprecated 但未删).
 
-    zsteg: 保留 (per AGENTS §5.2 + v0.5-windows-tool-compat)
+    zsteg: 已彻底删 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4, Owner Q4=b 拍板)
     lsb_detect: Phase 6 后删, 当前保留 backward compat
     """
 
-    def test_zsteg_still_in_list_tools(self):
-        """zsteg adapter 文件保留, list_tools() 仍含 zsteg."""
+    def test_zsteg_no_longer_in_list_tools(self):
+        """zsteg adapter 已删 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4), list_tools() 不含 zsteg."""
         tools = list_tools()
-        assert "zsteg" in tools
+        assert "zsteg" not in tools, (
+            "zsteg adapter deleted (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4), "
+            f"should NOT be in list_tools(), got: {tools}"
+        )
 
-    def test_get_tool_zsteg_still_works(self):
-        """get_tool('zsteg') 仍能找到 (供未来手工调用)."""
-        tool = get_tool("zsteg")
-        assert tool is not None
-        assert tool.name == "zsteg"
+    def test_get_tool_zsteg_raises(self):
+        """get_tool('zsteg') 应抛 ToolNotFoundError (adapter 已删)."""
+        from automisc.core.registry import ToolNotFoundError
+        with pytest.raises(ToolNotFoundError):
+            get_tool("zsteg")
 
     def test_lsb_detect_still_in_list_tools(self):
         """lsb_detect adapter Phase 6 deprecated 但未删, list_tools() 仍含."""

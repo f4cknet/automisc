@@ -20,11 +20,11 @@ from automisc.tools.shared import foremost  # noqa: F401
 from automisc.tools.shared import strings  # noqa: F401
 from automisc.tools.shared import xxd  # noqa: F401
 
-# steganography/image/ 的 4 个 adapter（v0.1.0b-PR2 + v0.5-lsb-detector + v0.5-lsb-tool-unify）
+# steganography/image/ 的 3 个 adapter（v0.1.0b-PR2 + v0.5-lsb-detector + v0.5-lsb-tool-unify + v0.5-lsb-tool-bitplane-preview-matrix）
+# zsteg 已彻底删除 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4, Owner Q4=b 拍板)
 from automisc.tools.steganography.image import lsb_detect_adapter as _lsb_detect_v050  # noqa: F401  # v0.5-lsb-detector Owner 2026-06-21 22:00 (Phase 6 deprecated)
-from automisc.tools.steganography.image import lsb_tool_adapter  # noqa: F401  # v0.5-lsb-tool-unify (Phase 3, 替代 lsb_detect auto-run)
+from automisc.tools.steganography.image import lsb_tool_adapter  # noqa: F401  # v0.5-lsb-tool-unify (Phase 3, 替代 lsb_detect auto-run + Commit 4 替代 zsteg)
 from automisc.tools.steganography.image import steghide  # noqa: F401
-from automisc.tools.steganography.image import zsteg  # noqa: F401
 
 # steganography/audio/ 的 3 个 adapter（v0.1.0b-PR4）
 from automisc.tools.steganography.audio import ffmpeg_audio  # noqa: F401

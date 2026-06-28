@@ -1,10 +1,10 @@
-"""GUI menu 不含 zsteg 测试 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 3)
+"""GUI menu 不含 zsteg 测试 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 3+4)
 
 验证:
-- TOOL_CATEGORIES["Stego/Image (PR2)"] 不含 zsteg
-- ADAPTER_TOOLS 不含 zsteg (per Commit 4 还要再删 zsteg adapter, Commit 3 只删 GUI/Router 入口)
-- core.registry.list_tools() 仍含 zsteg (Commit 4 才删 adapter 文件)
-- core.registry.get_tool("zsteg") 仍能找到 (adapter 文件保留, CLI 仍可用)
+- TOOL_CATEGORIES["Stego/Image (PR2)"] 不含 zsteg (Commit 3)
+- ADAPTER_TOOLS 不含 zsteg (Commit 3)
+- core.registry.list_tools() **不**含 zsteg (Commit 4 删 adapter)
+- core.registry.get_tool("zsteg") 抛 ToolNotFoundError (Commit 4 删 adapter)
 
 Owner Q4=b 拍板 Commit 4 彻底删 zsteg adapter + import; Commit 3 范围 = GUI/Router/auto-run 入口清理.
 """
@@ -41,18 +41,19 @@ class TestGuiMenuNoZsteg:
         )
 
 
-class TestRegistryStillHasZsteg:
-    """core.registry 仍含 zsteg (Commit 4 才删 adapter, Commit 3 范围 = GUI 入口)."""
+class TestRegistryZstegRemoved:
+    """core.registry 已删 zsteg (per Commit 4, Owner Q4=b 拍板彻底删)."""
 
-    def test_list_tools_contains_zsteg(self):
-        """list_tools() 仍含 zsteg (adapter 文件未删)."""
+    def test_list_tools_not_contains_zsteg(self):
+        """list_tools() 不含 zsteg (adapter 已删)."""
         tools = list_tools()
-        assert "zsteg" in tools, (
-            f"zsteg should still be in list_tools() (Commit 4 才删 adapter), got: {tools}"
+        assert "zsteg" not in tools, (
+            f"zsteg should NOT be in list_tools() (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4), "
+            f"got: {tools}"
         )
 
-    def test_get_tool_zsteg_still_works(self):
-        """get_tool('zsteg') 仍能找到 (CLI 显式调用可用)."""
-        tool = get_tool("zsteg")
-        assert tool is not None
-        assert tool.name == "zsteg"
+    def test_get_tool_zsteg_raises(self):
+        """get_tool('zsteg') 抛 ToolNotFoundError (adapter 已删, 未来 Ruby 装回需重新加)."""
+        from automisc.core.registry import ToolNotFoundError
+        with pytest.raises(ToolNotFoundError):
+            get_tool("zsteg")
