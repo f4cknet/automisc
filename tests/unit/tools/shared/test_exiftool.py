@@ -75,6 +75,45 @@ def test_exiftool_handles_missing_file(tmp_path):
     assert not result.is_success
 
 
+def test_per_line_redecode_handles_unicode_chars():
+    """_per_line_redecode 必须能处理含非 latin-1 字符的 str (per Owner 实战 2026-06-28).
+
+    触发 bug: exiftool 输出含 UTF-8 多字节字符 (e.g. 中文省略号 … code point 0x2026=8230),
+    base.py 解码后残留 Unicode 字符在 s, 此时 `s.encode("latin-1")` 抛 UnicodeEncodeError
+    阻断整条 auto_run 链 (后续 5 个工具不跑).
+
+    修复: `s.encode("latin-1", errors="replace")` 让 >255 字符变 '?', 后续 per-line
+    decode 仍能 try utf-8/cp936/gbk.
+    """
+    from automisc.tools.shared.exiftool import _per_line_redecode
+
+    # 含中文省略号 (code point 0x2026 > 255) 的 str
+    s_with_unicode = "File Name: steg.png\nDescription: 图穷flag见…\n"
+    # 不应抛 UnicodeEncodeError
+    result = _per_line_redecode(s_with_unicode)
+    assert isinstance(result, str)
+    # 关键: 中文 "图穷flag见" 仍能正确解码
+    assert "图穷flag见" in result, f"中文丢失: {result!r}"
+    # 省略号 (0x2026) 经 replace 后变 '?', 但不阻断
+    assert "?" in result or "…" in result
+
+
+def test_per_line_redecode_handles_pure_ascii():
+    """纯 ASCII 字符串 (回归测试): 1:1 round-trip."""
+    from automisc.tools.shared.exiftool import _per_line_redecode
+
+    s = "File Type: PNG\nFile Size: 233 KB\n"
+    result = _per_line_redecode(s)
+    assert result == s
+
+
+def test_per_line_redecode_handles_empty_string():
+    """空字符串 短路."""
+    from automisc.tools.shared.exiftool import _per_line_redecode
+
+    assert _per_line_redecode("") == ""
+
+
 def test_exiftool_chinese_exif_decodes_correctly(tmp_path):
     """per v0.5-windows-tool-compat PR1: adapter 传 -charset utf8, 中文 EXIF 不乱码.
 
@@ -84,6 +123,8 @@ def test_exiftool_chinese_exif_decodes_correctly(tmp_path):
 
     验证: 写入带中文 Title 的 PNG, exiftool 读回应保留中文.
     """
+    import subprocess
+
     from PIL import Image
     src = tmp_path / "chinese.png"
     Image.new("RGB", (8, 8), "red").save(src, "PNG")

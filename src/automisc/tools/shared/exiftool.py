@@ -27,14 +27,43 @@ def _per_line_redecode(s: str) -> str:
     - 解决: 按行重 decode, 每行单独试 utf-8 → cp936 → gbk → latin-1, UTF-8 EXIF 行正常显示
 
     Args:
-        s: `base.py:_decode_output_bytes` 解码后的 str (latin-1 fallback 状态)
+        s: `base.py:_decode_output_bytes` 解码后的 str
 
     Returns:
         Per-line 重 decode 后的 str (中文 EXIF 正常显示, cp936 文件名也正常)
+
+    注 (per v0.5-train-013 + Owner 实战 2026-06-28 22:34): exiftool 输出可能含
+    Unicode 字符 (e.g. 中文标点 "…" code point 0x2026=8230) 在 base.py 解码阶段
+    残留, 此时 `s.encode("latin-1")` 抛 UnicodeEncodeError 阻断整条 auto_run 链.
+
+    修复策略:
+    - 检测 s 是否含 >255 字符 (s.isascii() 返回 False). 若是 → s 已是 base.py
+      解码后的"真 Unicode" (不是 latin-1 fallback 字节), 跳过 latin-1 round-trip,
+      直接 per-line 重 decode (utf-8 → cp936 → gbk → latin-1 fallback).
+    - 若 s 全 ASCII (latin-1 fallback 字节) → 1:1 round-trip 还原原 bytes, 再
+      per-line decode. 正常路径 (中文 EXIF 正常显示).
     """
     if not s:
         return s
-    raw = s.encode("latin-1")  # 1:1 byte mapping 还原原始 bytes
+
+    # 检测 s 是否含 latin-1 范围外字符 (>255)
+    if not s.isascii():
+        # s 已含 base.py 解码后的真 Unicode 字符 (例如中文省略号 …), 不能 latin-1 round-trip
+        # (会抛 UnicodeEncodeError). 跳过 round-trip, 直接 per-line 重 decode s 本身.
+        lines: list[str] = []
+        for line in s.split("\n"):
+            for enc in ("utf-8", "cp936", "gbk", "latin-1"):
+                try:
+                    lines.append(line.encode(enc).decode(enc))
+                    break
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    continue
+            else:
+                lines.append(line)  # 兜底: 保持原样
+        return "\n".join(lines)
+
+    # s 全 ASCII → latin-1 round-trip 还原原 bytes, 再 per-line decode
+    raw = s.encode("latin-1")  # 1:1 byte mapping
     lines = []
     for line_bytes in raw.split(b"\n"):
         for enc in ("utf-8", "cp936", "gbk", "latin-1"):
