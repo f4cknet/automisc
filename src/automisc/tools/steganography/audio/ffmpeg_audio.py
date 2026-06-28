@@ -8,7 +8,7 @@
 - 检测可疑音频参数（如 duration=0 / 不常见 codec）
 
 **已知音频隐写场景**：
-- LSB 隐写（wav）：可结合 zsteg 思路扩展，v0.5+ 加
+- LSB 隐写（wav）：可结合 lsb_tool 思路扩展，v0.5+ 加
 - 频谱隐写（mp3/wav）：v0.5+ 加 sox 频谱图
 - 摩斯码 / DTMF：v0.5+ multimon-ng
 

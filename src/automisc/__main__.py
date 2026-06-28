@@ -330,7 +330,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--chain",
         required=True,
         choices=["zip", "zip-full", "binwalk", "foremost", "lsb", "lsb-bytes"],
-        help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取) / lsb (zsteg 智能路由) / lsb-bytes (4 参数自定义抽取)",
+        help="chain 类型: zip / zip-full / binwalk (检测+foremost提取) / foremost (单独提取) / lsb (lsb_tool 智能路由) / lsb-bytes (4 参数自定义抽取)",
     )
     p_chain.add_argument("--file", required=True, help="目标文件路径")
     p_chain.add_argument(

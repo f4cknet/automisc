@@ -2,7 +2,7 @@
 
 GUI 统一 LSB 入口,替代:
 - `lsb_bytes_dialog.LSBBytesParamDialog` (chain `lsb-bytes` 4 参数 dialog, Phase 6 删除)
-- `lsb_extract` action button (zsteg subprocess, Win 不可用)
+- `lsb_extract` action button (老 zsteg subprocess, Win 不可用, backward compat 保留)
 
 **用法**::
 

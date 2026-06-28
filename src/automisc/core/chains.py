@@ -61,7 +61,7 @@ def build_lsb_extract_chain() -> DAG:
     binwalk_extract → (success/failure → lsb_extract → 终止)
 
     - binwalk 检测 binwalk/foremost 提取嵌入文件
-    - lsb_extract: zsteg 抽 LSB 内容, 分类 (text 终止 / file 二次 router)
+    - lsb_extract: lsb_tool 抽 LSB 内容, 分类 (text 终止 / file 二次 router)
     - max_depth=3 防 LSB 死循环
     """
     binwalk_node = DAGNode(BinwalkExtractAction())

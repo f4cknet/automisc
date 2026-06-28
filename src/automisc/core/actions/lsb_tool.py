@@ -401,7 +401,7 @@ class LSBToolAction(Action):
     # ----- extract / extract_bytes mode (Phase 2b, 走 lsb_tool_extract 模块) -----
 
     def _run_extract(self, arr, file_path):
-        """extract mode: preset='all' 12 组合 + magic 命中写文件 (替代 zsteg subprocess)."""
+        """extract mode: preset='all' 12 组合 + magic 命中写文件 (替代老 zsteg-based lsb_extract)."""
         from automisc.core.actions.lsb_tool_extract import run_extract_mode
         return run_extract_mode(self, arr, file_path, self.bit, self.byte_bit_order)
 

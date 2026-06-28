@@ -1,8 +1,8 @@
-"""菜单树（左 QDockWidget）— 22 adapter + 4 快捷 action + 21 decoder + 14 cipher (v0.5+)
+"""菜单树（左 QDockWidget）— 21 adapter + 4 快捷 action + 21 decoder + 14 cipher (v0.5+)
 
 分类（按 prd.md §4.1 + v0.5-cipher-decoders）：
 - 共享基础工具 (PR1) — file / strings / binwalk / foremost / exiftool / xxd
-- Stego/Image (PR2) — zsteg / steghide
+- Stego/Image (PR2) — stegseek (per v0.5-lsb-tool-bitplane-preview-matrix: zsteg 删除, lsb_tool 替代)
 - Forensics/Network (PR3) — tshark / tcpdump
 - Stego/Audio+Video (PR4) — ffmpeg_audio / ffprobe / ffmpeg_video / sox / steghide_audio
 - Misc/Archive (PR5) — sevenz_extract / unzip / john / zip_classify (sevenz 是探测类, GUI 不显示, per Owner 20:03)
@@ -17,6 +17,8 @@
 - 🔤 解密工具1 (v0.5-cipher-decoders) — 12 经典 cipher (凯撒/培根/栅栏/猪圈/摩尔斯/xxencode/uuencode/jsfuck/jjencode/QP/BF/BubbleBabble)
 - 📦 解密工具2 (v0.5-cipher-decoders) — 占位 (TBD)
 - 📦 解密工具3 (v0.5-cipher-decoders) — 占位 (TBD)
+
+v0.5-lsb-tool-bitplane-preview-matrix 变更: zsteg 从 GUI menu 删除 (Win 不可用 → lsb_tool 替代)
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 # v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
     "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd"],
-    "Stego/Image (PR2)": ["zsteg", "stegseek"],
+    "Stego/Image (PR2)": ["stegseek"],  # v0.5-lsb-tool-bitplane-preview-matrix: zsteg 删除, lsb_tool 替代
     "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
         "ffmpeg_audio",
@@ -158,7 +160,9 @@ ZBAR_DISPLAY_NAME = "🔳 二维码解析"
 #   但 adapter 仍注册 (auto_run / router / find_suspicious 用)
 ADAPTER_TOOLS: set[str] = {
     "file", "strings", "binwalk", "foremost", "exiftool", "xxd",
-    "zsteg", "stegseek",
+    # v0.5-lsb-tool-bitplane-preview-matrix: zsteg 从 ADAPTER_TOOLS 删除
+    # (但 adapter 文件保留 Commit 4 才删, CLI `python -m automisc run <file>` 仍可显式调用)
+    "stegseek",
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
     "sevenz", "sevenz_extract", "unzip", "john", "zip_classify",

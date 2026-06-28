@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
             # 之前 auto-run 对 .zip 自动触发 zip 链 (build_zip_chain_dag) — 违背新哲学 "auto_run 不抢 flag"
             # 之前 auto-run 对 .rar / .7z 留接口, 跟 .zip 走 archive_chain_map — 同上违背
             # 新设计: auto_run 改名 find_suspicious_from_<type>, 按扩展名选工具池
-            # - picture (.png/.jpg/.jpeg/.bmp/.gif): zsteg/exiftool/binwalk/strings/file
+            # - picture (.png/.jpg/.jpeg/.bmp/.gif): lsb_tool/exiftool/binwalk/strings/file
             # - traffic (.pcap/.pcapng): pcap_protocol_router/tshark/strings/file
             # - archive (.zip/.7z/.rar/.tar/.gz): sevenz/unzip/file/strings
             # - binary (.exe/.dll/.elf/.bin + 默认兜底): file/strings/binwalk/exiftool

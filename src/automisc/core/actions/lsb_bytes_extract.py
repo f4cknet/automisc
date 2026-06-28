@@ -30,7 +30,7 @@
 同目录。
 
 **与现有 LSBExtractAction 关系**:
-- LSBExtractAction (zsteg-based) = 固定通道位组合 + 固定 row 扫描 + 文本/文件自动分类
+- LSBExtractAction (老 zsteg-based, DEPRECATED) = 固定通道位组合 + 固定 row 扫描 + 文本/文件自动分类
 - LSBBytesExtractAction (本) = **user-controlled 4 参数** + 直接 PIL/numpy 切片 + **只抽字节流,不分类**
 
 **用法** (DAG chain):

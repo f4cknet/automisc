@@ -114,18 +114,22 @@ EXTENSION_TO_POOL: dict[str, str] = {
 
 # v0.5-auto-run-suggest: auto_run 命中后写"建议手工跑 X chain" SP (per Owner 06-21 18:41 + 18:57)
 #
-# **核心**: auto_run 跑完 zsteg / binwalk / strings 后, 对命中 SP 加 suggest SP (severity=4)
+# **核心**: auto_run 跑完 lsb_tool / binwalk / strings 后, 对命中 SP 加 suggest SP (severity=4)
 #          告诉 Owner "可以手工跑 X chain 进一步分析"。
 # **铁律 7 合规**: 不触发下一步工具, 只写 SP 建议 (Owner 决策)。
+#
+# v0.5-lsb-tool-bitplane-preview-matrix: 之前 `zsteg:lsb_text` 条目改为 `lsb_tool:lsb_text`
+#   (zsteg 已不在 auto-run 池, per v0.5-lsb-detector; lsb_tool 是替代)
 #
 # key 格式: "<tool_name>:<sp_category>" (binwalk:file_header_* 细分靠 matched_pattern)
 # value: (suggest_category, suggest_text)
 _SUGGEST_MAP: dict[str, tuple[str, str]] = {
-    # zsteg 命中 lsb_text → 建议手工跑 lsb-bytes chain (4 参数 dialog)
-    # Owner 18:41 实战触发: zsteg 默认行扫描漏 col, lsb-bytes chain 才能命中 N=NP 类
-    "zsteg:lsb_text": (
+    # lsb_tool 命中 lsb_text → 建议手工跑 lsb-bytes chain (4 参数 dialog)
+    # Owner 18:41 实战触发: 默认行扫描漏 col, lsb-bytes chain 才能命中 N=NP 类
+    # (per v0.5-lsb-tool-bitplane-preview-matrix: 之前 zsteg:lsb_text 改为 lsb_tool:lsb_text)
+    "lsb_tool:lsb_text": (
         "auto_run_suggest",
-        "🔍 zsteg 命中 lsb_text, 但默认行扫描可能漏 col, "
+        "🔍 lsb_tool 命中 lsb_text, 但默认行扫描可能漏 col, "
         "建议手工跑 lsb-bytes chain (Run→Chain→lsb-bytes, 4 参数 dialog)",
     ),
     # binwalk 命中 ZIP → 建议 zip chain
@@ -171,7 +175,7 @@ def _maybe_suggest(
     binwalk:file_header 细分靠 matched_pattern (ZIP / 7z / RAR / pyc)。
 
     Args:
-        tool_name: 跑的工具名 (e.g. "zsteg" / "binwalk" / "strings")
+        tool_name: 跑的工具名 (e.g. "lsb_tool" / "binwalk" / "strings")
         suspicious_points: ToolResult.suspicious_points 列表
         file_path: 目标文件路径
 
@@ -246,7 +250,7 @@ def pick_suspicious_pool(file_path: str) -> tuple[str, list[str]]:
 def find_suspicious_from_picture(core: CoreOrchestrator, file_path: str) -> list[ToolResult]:
     """图片专用探测器 (per v0.5-philosophy-rethink).
 
-    跑 [zsteg / exiftool / binwalk / strings / file] — 纯探测, **不**雕不修不爆.
+    跑 [lsb_tool / exiftool / binwalk / strings / file] — 纯探测, **不**雕不修不爆.
     结果自动写 journal (per core.run_tool).
 
     Args:

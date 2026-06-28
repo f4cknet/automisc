@@ -5,7 +5,7 @@
 **v0.1 范围**（最小可用 — Video Stego）：
 - ``-i <file>`` 探测元数据
 - 检测非 video/audio stream（data stream 隐写强信号）
-- 不做帧提取（v0.5+ 用 ffmpeg 抽帧 + zsteg 思路分析）
+- 不做帧提取（v0.5+ 用 ffmpeg 抽帧 + lsb_tool 思路分析）
 
 **v0.1 仅做元数据探测**。
 """

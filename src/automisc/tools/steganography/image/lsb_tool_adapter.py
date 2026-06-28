@@ -11,7 +11,7 @@
 - `extract`: GUI 工具栏抽字节流 (替代 zsteg subprocess, Win 不依赖 Ruby)
 - `extract_bytes`: chain `lsb-bytes` 4 参数 (backward compat)
 
-**跟 zsteg adapter 关系**: 保留 (per AGENTS §5.2 + v0.5-windows-tool-compat, Owner 装 Ruby 后可用)
+**跟 zsteg adapter 关系**: zsteg adapter 已删除 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4, Owner Q4=b 拍板);本 lsb_tool adapter 完整替代 zsteg 能力 + 8 bit × 6 perm preview matrix + GUI 工具栏抽字节流.
 """
 from __future__ import annotations
 

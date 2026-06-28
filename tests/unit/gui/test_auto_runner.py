@@ -1,10 +1,10 @@
 """Tests for auto_runner._maybe_suggest (per v0.5-auto-run-suggest).
 
-auto_run 跑 zsteg / binwalk / strings 命中后, 加 suggest SP severity=4
+auto_run 跑 lsb_tool / binwalk / strings 命中后, 加 suggest SP severity=4
 告诉 Owner "可以手工跑 X chain 进一步分析"。
 
 覆盖:
-- zsteg 命中 lsb_text → suggest lsb-bytes chain
+- lsb_tool 命中 lsb_text → suggest lsb-bytes chain (per v0.5-lsb-tool-bitplane-preview-matrix: 之前 zsteg 改 lsb_tool)
 - binwalk 命中 ZIP / 7z / RAR / pyc → 对应 suggest
 - strings 命中敏感关键词 → suggest bruteforce
 - file / exiftool 命中 file_type → **不**加 suggest (无下一步)
@@ -34,14 +34,14 @@ def _make_sp(category: str, matched_pattern: str, offset: int = 0) -> Suspicious
     )
 
 
-# ---------- zsteg suggest ----------
-class TestZstegSuggest:
-    """zsteg 命中 lsb_text → suggest lsb-bytes chain."""
+# ---------- lsb_tool suggest (per v0.5-lsb-tool-bitplane-preview-matrix: 之前 zsteg 改 lsb_tool) ----------
+class TestLsbToolSuggest:
+    """lsb_tool 命中 lsb_text → suggest lsb-bytes chain."""
 
-    def test_zsteg_lsb_text_suggests_lsb_bytes_chain(self):
-        """zsteg 命中 lsb_text → suggest SP 含 'lsb-bytes chain'."""
+    def test_lsb_tool_lsb_text_suggests_lsb_bytes_chain(self):
+        """lsb_tool 命中 lsb_text → suggest SP 含 'lsb-bytes chain'."""
         sp = _make_sp("lsb_text", "b1,bgr,lsb,xy: AfKg^pL :")
-        suggests = _maybe_suggest("zsteg", [sp], "/tmp/x.png")
+        suggests = _maybe_suggest("lsb_tool", [sp], "/tmp/x.png")
 
         assert len(suggests) == 1
         s = suggests[0]
@@ -51,10 +51,10 @@ class TestZstegSuggest:
         assert "lsb-bytes chain" in s.matched_pattern
         assert "Run→Chain→lsb-bytes" in s.matched_pattern
 
-    def test_zsteg_other_category_no_suggest(self):
-        """zsteg 命中其他 category → 不加 suggest (MVP 只覆盖 lsb_text)."""
+    def test_lsb_tool_other_category_no_suggest(self):
+        """lsb_tool 命中其他 category → 不加 suggest (MVP 只覆盖 lsb_text)."""
         sp = _make_sp("other_category", "something")
-        suggests = _maybe_suggest("zsteg", [sp], "/tmp/x.png")
+        suggests = _maybe_suggest("lsb_tool", [sp], "/tmp/x.png")
         assert suggests == []
 
 
@@ -136,14 +136,14 @@ class TestNoSuggestForOtherTools:
 class TestDedup:
     """每个 tool + 每个 sub-category 只加 1 条 suggest (噪声控制)."""
 
-    def test_dedup_zsteg_multiple_lsb_text(self):
-        """zsteg 命中 3 条 lsb_text → 只加 1 条 suggest."""
+    def test_dedup_lsb_tool_multiple_lsb_text(self):
+        """lsb_tool 命中 3 条 lsb_text → 只加 1 条 suggest."""
         sps = [
             _make_sp("lsb_text", "b1,bgr,lsb,xy: AfKg^pL :"),
             _make_sp("lsb_text", "b3,rgba,lsb,xy: \"u?3tG^q"),
             _make_sp("lsb_text", "b4,rgba,lsb,xy: v_h_4/8O8O"),
         ]
-        suggests = _maybe_suggest("zsteg", sps, "/tmp/x.png")
+        suggests = _maybe_suggest("lsb_tool", sps, "/tmp/x.png")
         assert len(suggests) == 1  # dedup
 
     def test_dedup_binwalk_multiple_zips(self):
@@ -162,7 +162,7 @@ class TestEdgeCases:
 
     def test_empty_suspicious_points_returns_empty(self):
         """空 SP 列表 → 空 suggest."""
-        assert _maybe_suggest("zsteg", [], "/tmp/x.png") == []
+        assert _maybe_suggest("lsb_tool", [], "/tmp/x.png") == []
 
     def test_no_suggest_for_unknown_tool(self):
         """未知工具名 → 空 suggest (不抛异常)."""
@@ -179,5 +179,5 @@ class TestEdgeCases:
     def test_suggest_severity_is_4(self):
         """所有 suggest SP severity=4 (info, 不是真正可疑)."""
         sp = _make_sp("lsb_text", "b1,bgr,lsb,xy: AfKg^pL :")
-        suggests = _maybe_suggest("zsteg", [sp], "/tmp/x.png")
+        suggests = _maybe_suggest("lsb_tool", [sp], "/tmp/x.png")
         assert all(s.severity == 4 for s in suggests)

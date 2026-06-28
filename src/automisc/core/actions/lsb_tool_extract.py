@@ -1,7 +1,7 @@
 """LSB extract / extract_bytes mode (v0.5-lsb-tool-unify, Phase 2b)
 
 替代:
-- LSBExtractAction (`core/actions/lsb_extract.py` 356 LOC) - zsteg subprocess 抽 raw
+- LSBExtractAction (`core/actions/lsb_extract.py` 356 LOC, DEPRECATED) - 老 zsteg subprocess 抽 raw (Win 不可用, 保留 backward compat)
 - LSBBytesExtractAction (`core/actions/lsb_bytes_extract.py` 312 LOC) - chain lsb-bytes
 
 **核心改进**:
@@ -92,7 +92,7 @@ def run_extract(
 ) -> dict[str, Any]:
     """extract mode 主函数 (preset="all" 12 组合 + magic 检测 + 写文件).
 
-    替代 LSBExtractAction zsteg subprocess 路径 (Win 上坏) → PIL/numpy 字节流.
+    替代 LSBExtractAction 老 zsteg subprocess 路径 (Win 上坏) → PIL/numpy 字节流.
 
     Args:
         arr: (H, W, 3) uint8 numpy array (RGB)

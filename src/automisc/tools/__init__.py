@@ -5,7 +5,7 @@ v0.1.0b-PR1 范围：
 - ``shared`` — 共享基础工具（file / strings / binwalk / foremost / exiftool / xxd）
 
 v0.1.0b-PR2 范围：
-- ``steganography/image`` — Stego/Image（zsteg + steghide）
+- ``steganography/image`` — Stego/Image（lsb_tool + stegseek; per v0.5-lsb-tool-bitplane-preview-matrix zsteg 替换为 lsb_tool）
 """
 
 # 显式 import 触发 @register_tool 装饰器
