@@ -2,14 +2,46 @@
 
 v0.1.0b-PR1 阶段仅暴露 ``automisc tools list`` 子命令用于核对 adapter 注册。
 v0.1.1 起新增 ``automisc gui`` 启动 PySide6 GUI 窗口（macOS only）。
+
+v0.5-automisc-icon (2026-06-28): GUI 启动挂 automisc.ico 图标 (src/automisc.ico
+3 级 fallback path 解析), 找不到不崩 (skip setWindowIcon).
 """
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from automisc import __version__
+
+
+# ---------- v0.5-automisc-icon: 共享图标路径解析 ----------
+def _find_ico_path() -> Path | None:
+    """解析 automisc.ico 路径, 3 级 fallback.
+
+    优先级 (per v0.5-automisc-icon spec §3.1):
+    1. ``<__main__.py 所在目录>/automisc.ico``       — 跟代码同源 (开发模式 + PyInstaller 打包)
+    2. ``<__main__.py 父目录>/automisc.ico``          — fallback: src/automisc.ico (Owner 拍板位置)
+    3. ``<__main__.py 祖父目录>/automisc.ico``        — fallback: repo 根 automisc.ico
+
+    Returns:
+        找到的 Path, 找不到返回 None (caller skip setWindowIcon, 不崩).
+    """
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here / "automisc.ico",                  # 同目录 (PyInstaller _MEIPASS 等)
+        here.parent / "automisc.ico",            # 父目录 = src/
+        here.parent.parent / "automisc.ico",     # 祖父目录 = repo 根
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
+if TYPE_CHECKING:
+    pass  # 占位, 防止 IDE 把 QIcon/QApplication import 误删
 
 
 def cmd_tools_list(_args: argparse.Namespace) -> int:
@@ -64,6 +96,7 @@ def main_gui() -> int:
     """无参入口：给 console_script `automisc-gui` 用."""
     import sys
 
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
     from automisc.core.orchestrator import CoreOrchestrator
@@ -73,8 +106,15 @@ def main_gui() -> int:
     from automisc.tools import steganography, forensics, misc  # noqa: F401
 
     app = QApplication.instance() or QApplication(sys.argv)
+    # v0.5-automisc-icon: 挂窗口图标 (找不到不崩, 优雅 skip)
+    icon_path = _find_ico_path()
+    if icon_path is not None:
+        app.setWindowIcon(QIcon(str(icon_path)))
     core = CoreOrchestrator()
     win = MainWindow(core=core)
+    # 标题栏左上角图标 (显式 override 保险, app 级有时被覆盖)
+    if icon_path is not None:
+        win.setWindowIcon(QIcon(str(icon_path)))
     win.show()
     return app.exec()
 

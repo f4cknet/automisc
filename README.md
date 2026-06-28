@@ -1,5 +1,7 @@
 # AutoMisc
 
+![AutoMisc Logo](automisc.png)
+
 > CTF Misc 半自动化辅助工具箱（Windows GUI / 完全离线 / PySide6）
 
 详细开发文档：
