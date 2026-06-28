@@ -44,11 +44,13 @@ from automisc.core.actions.lsb_tool_common import (
     _VALID_MODES,
     _VALID_PRESETS,
     _VALID_SCAN_ORDERS,
+    _build_15channel_preview_matrix,
     _build_bit_plane_preview_matrix,
     _channel_8bit_byte_stream,
     _bytes_preview,
     _detect_file_header_hex,
     _extract_lsb_byte_stream,
+    _format_15channel_matrix_for_journal,
     _format_matrix_for_journal,
     _is_printable_text,
     _parse_channels,
@@ -155,6 +157,12 @@ class LSBToolAction(Action):
         matrix = _build_bit_plane_preview_matrix(arr, n_bytes=32)
         matrix_text = _format_matrix_for_journal(matrix)
 
+        # 新增 15 通道 × (LSB+MSB) preview matrix (per v0.5-lsb-tool-15channel-matrix)
+        # 跟 随波逐流 gold standard 对齐, 一眼锁定出明文的通道组合
+        # KEEP+ADD 策略: 保留 8×6 matrix (mid-bit coverage), 新增 15 通道 (实战 UX 优化)
+        matrix_15ch = _build_15channel_preview_matrix(arr, n_bytes=50)
+        matrix_15ch_text = _format_15channel_matrix_for_journal(matrix_15ch)
+
         return ActionResult(
             success=True,
             data={
@@ -181,7 +189,9 @@ class LSBToolAction(Action):
                 f"{sum(1 for sp in sps if sp.severity == 4)} sev=4 概率)\n"
                 f"\n[bit-plane preview matrix 8 bit × 6 perm, 每行 32 字节 ASCII preview, "
                 f"<== 标 hit-keyword]\n"
-                f"{matrix_text}"
+                f"{matrix_text}\n"
+                f"\n[15 通道 preview (随波逐流 风格, LSB+MSB 增强, 每行 50 字节, <== 标 hit-keyword)]\n"
+                f"{matrix_15ch_text}"
             ),
         )
 

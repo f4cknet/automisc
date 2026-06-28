@@ -185,6 +185,73 @@ class TestRealFixtureSmoke:
             # 不 crash 即可
             assert result.exit_code in (0, 1), f"mode={mode} failed: {result.stdout}"
 
+    def test_lsb_tool_detect_includes_15channel_matrix(self, real_png_path):
+        """lsb_tool detect mode 输出含 15 通道 preview matrix (per v0.5-lsb-tool-15channel-matrix).
+
+        验证 journal 输出含:
+        - "[15 通道 LSB (bit 0) 预览]" 段标题
+        - "[15 通道 MSB (bit 7) 预览]" 段标题
+        - 15 行 label (RGB/RBG/GRB/GBR/BRG/BGR/RG0/R0B/0GB/R00/0G0/00B/R/G/B)
+        """
+        from automisc.tools.steganography.image.lsb_tool_adapter import LsbToolAdapter
+
+        adapter = LsbToolAdapter(mode="detect")  # 默认 preset=None
+        result = adapter.run(str(real_png_path))
+
+        stdout = result.stdout or ""
+        # 段标题存在
+        assert "[15 通道 LSB (bit 0) 预览]" in stdout, (
+            f"stdout 应含 15 通道 LSB 段标题, got first 500 chars:\n{stdout[:500]!r}"
+        )
+        assert "[15 通道 MSB (bit 7) 预览]" in stdout, (
+            f"stdout 应含 15 通道 MSB 段标题, got first 500 chars:\n{stdout[:500]!r}"
+        )
+
+        # 15 通道 label 全在 LSB 段 (per Owner 列表)
+        expected_labels = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
+                           "RG0", "R0B", "0GB", "R00", "0G0", "00B",
+                           "R:", "G:", "B:"]
+        # 取 LSB 段 (LSB 到 MSB 之间)
+        lsb_section = stdout.split("[15 通道 LSB (bit 0) 预览]")[1].split("[15 通道 MSB")[0]
+        for label in expected_labels:
+            assert label in lsb_section, (
+                f"LSB 段应含 {label!r}, got:\n{lsb_section[:500]!r}"
+            )
+
+    def test_lsb_tool_detect_synthetic_15ch_keyword(self, tmp_path):
+        """synthetic: RGB per-pixel interleaved LSB 嵌 'Hey' → 15 通道矩阵 LSB RGB 行 <==.
+
+        端到端验证: 写 PNG → LsbToolAdapter detect → result.stdout 应含 'Hey' 命中.
+        """
+        from PIL import Image
+
+        from automisc.tools.steganography.image.lsb_tool_adapter import LsbToolAdapter
+
+        # 16x2 PNG (32 pixels), RGB per-pixel interleaved LSB 嵌 'Hey!' (32 bits)
+        payload = b"Hey!"
+        bits = [(byte >> (7 - i)) & 1 for byte in payload for i in range(8)]
+        width, height = 16, 2
+        arr = np.zeros((height, width, 3), dtype=np.uint8)
+        for bit_pos, bit_val in enumerate(bits):
+            pixel_offset = bit_pos // 3
+            ch_offset = bit_pos % 3
+            y = pixel_offset // width
+            x = pixel_offset % width
+            if y >= height:
+                break
+            arr[y, x, ch_offset] = bit_val
+
+        png_path = tmp_path / "lsb_15ch_synthetic.png"
+        Image.fromarray(arr).save(png_path, "PNG")
+
+        adapter = LsbToolAdapter(mode="detect")
+        result = adapter.run(str(png_path))
+        stdout = result.stdout or ""
+
+        # 15 通道矩阵 LSB RGB 行应含 'Hey' 命中 (per Owner 截图场景)
+        assert "RGB:" in stdout
+        assert "Hey" in stdout, f"stdout 应含 'Hey' 命中, got:\n{stdout[:1000]!r}"
+
 
 # ============================================================
 # Test 3: Backward compat — 老 API 仍能跑 (Phase 6 deprecated, but 仍可用)
