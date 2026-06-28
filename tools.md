@@ -70,28 +70,24 @@ MISC（根）
     └── 脑洞题
 ```
 
-**删去的旧分类**（per [`prd.md §3.2`](./prd.md) 非范围硬约束 + 用户决策）：
-- ❌ OSINT（开源情报）—— 与 automisc"完全离线"产品定位冲突
-- ❌ Blockchain（区块链）—— automisc 不做
-- ❌ Games & VMs（游戏题 / VM 题）—— automisc 不做
-- ❌ 二进制分析（独立 subflow）—— `strings/file/binwalk/xxd` 等基础工具下沉到各分支共享
+
 
 **精简后的统计**：
 
 | 一级分支 | 子分支数 | 工具总数（✅/⚠️/❌）| v0.1 P0 adapter |
 |---|---|---|---|
-| **Forensics** | 4 | 14（**1✅ / 0⚠️ / 13❌**）| 6 |
-| **Steganography** | 3 | 22（**3✅ / 0⚠️ / 19❌**）| 8 |
+| **Forensics** | 4 | 14（**2✅ / 0⚠️ / 12❌**）| 6 |
+| **Steganography** | 3 | 22（**4✅ / 0⚠️ / 18❌**）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
-| **Misc Others** | 3 | 10（**3✅ / 0⚠️ / 7❌**）| 3 |
-| **共享基础工具** | — | 8（**4✅ / 0⚠️ / 4❌**）| 5 |
-| **合计** | 14 | 54（**11✅ / 0⚠️ / 43❌**）| **22** |
+| **Misc Others** | 3 | 10（**4✅ / 0⚠️ / 6❌**）| 3 |
+| **共享基础工具** | — | 8（**6✅ / 0⚠️ / 2❌**）| 5 |
+| **合计** | 14 | 54（**18✅ / 0⚠️ / 36❌**）| **22** |
 
-> **2026-06-28 更新（per §8 v2.6 + 本次 sync）**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），**§3 + §6.1 状态列已同步**：
-> - §3 表格里行级 status 已 ✅（含 Windows extend-tools 路径）
-> - 其他工具全部 ❌ (pending)
-> - §2 数字为**去重后**统计（`exiftool` / `steghide` / `7z` 在 §3 多节出现，但 unique tool 数仍为 8）；§3 表格 awk 切片会读到 74 行（含跨节重复）
-> - §6.1 P0 列表同步：6 个 P0 工具已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd`），16 个 P0 工具 pending
+> **2026-06-28 更新（per §8 v2.6 + v2.7 + 本次 sync）**：
+> - **v2.6 (PR3-prep)**: Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），§3 + §6.1 status 标 ✅；其他 ❌ pending
+> - **v2.7 (本次 sync)**: 新增 `strings.exe` + pip `binwalk 2.3.2`；`grep` → PowerShell `Select-String`（Win 内置）；§4 Python 包 11 个 ✅ + 8 个 ❌ pending；新增 `requirements.txt`
+> - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk）
+> - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），14 个 P0 工具 pending
 
 > **v0.1 P0 实际 adapter 数**：22 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），22 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
@@ -105,8 +101,8 @@ MISC（根）
 |---|---|---|---|---|
 | **vol.py (Volatility 2)** | ❌ | `misc/volatility2/`（原目录丢失，软链 `automisc/extend_tools/volatility2` 为空） | 内存镜像取证（profiles + plugins） | **v0.1 必须恢复安装**（blocker） |
 | **vol3 (Volatility 3)** | ❌ | `pip install volatility3` | 现代内存取证 | v0.5 安装 |
-| **strings** | ❌ | `/usr/bin/strings` | 内存字符串提取（含 FLAG / SSH_CLIENT / SESSION_KEY） | P0 |
-| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 内存镜像内嵌文件提取 | P0 |
+| **strings** | ✅ | `extend-tools/bin/win-x64/strings.exe` 内存字符串提取（含 FLAG / SSH_CLIENT / SESSION_KEY） | P0 |
+| **binwalk** | ✅ | `python -m binwalk` 内存镜像内嵌文件提取 | P0 |
 
 ### 3.2 Forensics / Disk Forensics（磁盘取证）
 
@@ -136,7 +132,7 @@ MISC（根）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **grep / awk / sed / sort / uniq** | ❌ | macOS 自带 | 日志关键字 + 异常分析 | P0 |
+| **Select-String** | ✅ | PowerShell 内置 | 日志关键字 + 异常分析 | P0 |
 | **evtx_dump** | ❌ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64） | Windows .evtx 事件日志解析（XML / JSON / JSONL） | P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） |
 | **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**CLI 入口走 extend_tools/evtx_dump**（Rust 0.8.2），不依赖 shim | .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
 | **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
@@ -237,7 +233,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 嵌入文件检测 + 提取 | P0 |
+| **binwalk** | ✅ | `python -m binwalk` 嵌入文件检测 + 提取 | P0 |
 | **zsteg** | ❌ | `/usr/local/bin/zsteg`（**Ruby gem**，不是 Python 包） | PNG/BMP LSB 全通道检测 | P0 |
 | **steghide** | ✅ | `extend-tools/bin/win-x64/steghide/steghide.exe` | JPEG/BMP/WAV/AU 隐写（口令） | P0 |
 | **outguess** | ❌ | `/usr/local/bin/outguess` | JPEG 隐写 | P1 · v0.5 候选 |
@@ -353,7 +349,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | Office/PDF 元数据 + 隐藏字段 | P0 |
-| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 文档内嵌文件检测 | P0 |
+| **binwalk** | ✅ | `python -m binwalk` 文档内嵌文件检测 | P0 |
 | **pdftotext** | ❌ | `brew install poppler` 后 `/usr/local/bin/pdftotext` | PDF 文本提取 | v0.1 通过 exiftool + binwalk 间接覆盖，pdftotext 可选 |
 | **mutool** | ❌ | `brew install mupdf-tools` | PDF 重组 + 对象提取（xref 隐藏页） | v0.5 安装 |
 | **python-docx** | ❌ | `python3 -c "import docx"` ✅ | .docx 解析（XML 结构 + 隐藏文字 + macro） | v0.5 候选 |
@@ -364,18 +360,18 @@ with Evtx.Evtx("file.evtx") as log:
 |---|---|---|---|---|
 | **Python 标准库** | ❌ | macOS 自带 | 字符串/字符操作 + struct + re | 全部脑洞题 base |
 | **z3-solver** | ❌ | `pip install z3-solver` | 约束求解（约束编码 / Boolean gate network） | v0.5 安装 |
-| **PIL（Pillow）** | ❌ | `python3 -c "import PIL"` ✅ | 像素级脑洞题（图片当数据） | 已装 Python 包 |
+| **PIL（Pillow）** | ✅ | `python3 -c "import PIL"` ✅ | 像素级脑洞题（图片当数据） |（已装 Pillow 12.2.0） 已装 Python 包 |
 | **qrcode / segno / pyzbar** | ❌ | `pip install qrcode segno pyzbar` | QR 生成 / 解析 / 重组 | v0.5 安装 |
 
 ### 3.12 共享基础工具（不挂 subflow · 各分支通用）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **strings** | ❌ | `/usr/bin/strings` | 提取可打印字符串（跨所有 binary 类文件） | P0 · 通用 |
+| **strings** | ✅ | `extend-tools/bin/win-x64/strings.exe` 提取可打印字符串（跨所有 binary 类文件） | P0 · 通用 |
 | **file** | ✅ | `extend-tools/bin/win-x64/file.exe` | magic 识别（跨所有文件） | P0 · 通用 |
 | **xxd** | ✅ | `extend-tools/bin/win-x64/vim92/xxd.exe` | hex dump / hex ↔ binary | P0 · 通用 |
 | **hexdump** | ❌ | `/usr/bin/hexdump` | hex dump（BSD 风格） | P1 · 通用 |
-| **grep** | ❌ | macOS 自带 | 文本搜索（flag / ctf / key） | P0 · 通用 |
+| **Select-String** | ✅ | PowerShell 内置 | 文本搜索（flag / ctf / key） | P0 · 通用 |
 | **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | 元数据（跨图片 / Office / 部分 PDF） | P0 · 通用 |
 | **foremost** | ✅ | `extend-tools/bin/win-x64/foremost.exe` | 文件雕刻（跨所有 binary 类文件） | P0 · 通用 |
 | **scalpel** | ❌ | `brew install scalpel` | 高效文件雕刻（foremost 备选） | v0.5 安装 |
@@ -386,26 +382,26 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 包 | 状态 | 用途 | 备注 |
 |---|---|---|---|
-| **PIL（Pillow）** | ✅ | 图像读取 + LSB 提取 + 像素脑洞 | P0 |
-| **pwn（pwntools）** | ✅ | 通用 CTF 工具库（含 base64/hex/远程交互）| P0 |
-| **lxml** | ✅ | XML 解析（OOXML / Plist / Kitty 协议）| P1 |
-| **docx（python-docx）** | ✅ | .docx 解析 | P1 |
-| **numpy** | ❌ | 数值计算 + 图像处理（频谱 / FFT）| P0 · `pip install numpy` |
-| **requests** | ❌ | （**保留**：虽然 automisc 不联网，但保留供 CTFd API 等离线场景使用，per [`prd.md §3.3`](./prd.md) 占位说明）| P1 · `pip install requests` |
+| **PIL（Pillow）** | ✅ | 图像读取 + LSB 提取 + 像素脑洞 | P0 |（已装 Pillow 12.2.0）
+| **pwn（pwntools）** | ❌ | 通用 CTF 工具库（含 base64/hex/远程交互）| P0 · `pip install pwntools` |
+| **lxml** | ✅ | XML 解析（OOXML / Plist / Kitty 协议）| P1 |（已装 lxml 6.1.1）
+| **docx（python-docx）** | ✅ | .docx 解析 | P1 |（已装 python-docx 1.2.0）
+| **numpy** | ✅ | 数值计算 + 图像处理（频谱 / FFT）| P0 · `pip install numpy` |（已装 numpy 2.3.5）
+| **requests** | ✅ | （**保留**：虽然 automisc 不联网，但保留供 CTFd API 等离线场景使用，per [`prd.md §3.3`](./prd.md) 占位说明）| P1 · `pip install requests` |（已装 requests 2.34.2）
 | **z3-solver** | ❌ | 约束求解（约束编码 / Boolean gate network）| P0 · `pip install z3-solver` |
 | **matplotlib** | ❌ | 频谱图 + 直方图绘图 | P1 · `pip install matplotlib` |
-| **scipy** | ❌ | 信号处理 + 频谱分析（FFT / 时频分析）| P1 · `pip install scipy` |
-| **magic（python-magic-bin）** | ❌ | file 类型识别（macOS 用 `python-magic-bin`）| P0 · `pip install python-magic-bin` |
+| **scipy** | ✅ | 信号处理 + 频谱分析（FFT / 时频分析）| P1 · `pip install scipy` |（已装 scipy 1.18.0）
+| **magic（python-magic-bin）** | ✅ | file 类型识别（macOS 用 `python-magic-bin`）| P0 · `pip install python-magic-bin` |（已装 python-magic 0.4.27）
 | **dnslib** | ❌ | DNS 解析（DNS 隐写题 / dnscat2 reassembly）| P1 · `pip install dnslib` |
 | **zsteg（**注意：实为 Ruby gem**）** | ✅（PATH） | PNG/BMP LSB（不在 Python 包）| 已在 §3.5 修正 |
-| **Crypto（pycryptodome）** | ❌ | 古典密码 + AES/DES | P1 · `pip install pycryptodome` |
+| **Crypto（pycryptodome）** | ✅ | 古典密码 + AES/DES | P1 · `pip install pycryptodome` |（已装 pycryptodome 3.23.0）
 | **pikepdf** | ❌ | PDF 操作 + 解密 | P1 · `pip install pikepdf` |
-| **zstandard** | ❌ | zstd 解压（CTF 偶尔出现）| P1 · `pip install zstandard` |
+| **zstandard** | ✅ | zstd 解压（CTF 偶尔出现）| P1 · `pip install zstandard` |（已装 zstandard 0.25.0）
 | **mutagen** | ❌ | 音频元数据 | P1 · `pip install mutagen` |
 | **segno / pyzbar / qrcode** | ❌ | QR 生成 / 解析 | P2 · `pip install segno pyzbar qrcode` |
 | **stegano / stegolsb / stegcracker** | ❌ | 高级 LSB + 爆破 | P2 · `pip install stegano stegolsb stegcracker` |
-| **base65536** | ❌ | base65536 编码 | P1 · `pip install base65536` |
-| **python-evtx** | ✅ | .evtx 事件日志解析（Python 模块；**CLI 走 extend_tools/evtx_dump 0.8.2 Rust 二进制**）| P0 · v0.5 已装 |
+| **base65536** | ✅ | base65536 编码 | P1 · `pip install base65536` |（已装 base65536 0.1.1）
+| **python-evtx** | ✅ | .evtx 事件日志解析（Python 模块；**CLI 走 extend_tools/evtx_dump 0.8.2 Rust 二进制**）| P0 · v0.5 已装 |（已装 python-evtx 0.8.1）
 
 > **自动检测范围**：v0.1 启动时，Core 调度层应在启动时调用 `check_dependencies()`，对 §6 P0 工具做可达性检查，缺失时 GUI 提示并降级（而非阻塞启动）。
 
@@ -420,7 +416,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **Memory Forensics** | vol.py + strings + binwalk | vol3 / photorec（雕刻）|
 | **Disk Forensics** | 7z（解 VMDK/OVA）+ photorec + testdisk | sleuthkit（fls/icat）/ veracrypt |
 | **Network Forensics** | tshark + tcpdump + file | wireshark（GUI 辅助）/ pcapfix / scapy |
-| **Log Forensics** | grep + awk + sed + evtx_dump | 7z（解压 .evtx.bz2）+ python-evtx |
+| **Log Forensics** | Select-String（PowerShell）+ evtx_dump | 7z（解压 .evtx.bz2）+ python-evtx |
 | **Image Stego** | exiftool + zsteg + foremost + binwalk | steghide / outguess / stegdetect / stegseek / F5 |
 | **Audio Stego** | ffmpeg（频谱）| sox / audacity / DeepSound / MP3Stego |
 | **Video Stego** | ffmpeg + ffprobe（多 stream 提取）| vlc（视觉验证）/ MP4Box / mediainfo |
@@ -441,8 +437,8 @@ with Evtx.Evtx("file.evtx") as log:
 
 | # | 工具 | 分支 / 子分支 | 安装依赖 |
 |---|---|---|---|
-| 1 | **binwalk** | Stego/Image + Forensics/Memory + 通用 | ❌ pending（pip 包，待装）|
-| 2 | **strings** | Forensics/Memory + 通用 | ❌ pending |
+| 1 | **binwalk** | Stego/Image + Forensics/Memory + 通用 | ✅ 已装（`python -m binwalk`，pip binwalk 2.3.2）|
+| 2 | **strings** | Forensics/Memory + 通用 | ✅ 已装（`extend-tools/bin/win-x64/strings.exe`）|
 | 3 | **foremost** | Stego/Image + 通用 | ✅ 已装（`extend-tools/bin/win-x64/foremost.exe`）|
 | 4 | **exiftool** | Stego/Image + Misc/Office + 通用 | ✅ 已装（`extend-tools/bin/win-x64/exiftool.exe`）|
 | 5 | **tshark** | Forensics/Network | ❌ pending |
@@ -455,7 +451,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 12 | **ffprobe** | Stego/Video | ❌ pending |
 | 13 | **unzip** | Misc/Archive | ❌ pending（Win 可走 7z / Python `zipfile` 替代）|
 | 14 | **xxd** | 通用 | ✅ 已装（`extend-tools/bin/win-x64/vim92/xxd.exe`）|
-| 15 | **grep** | Forensics/Log + 通用 | ❌ pending（Win 可用 `findstr` / PowerShell `Select-String` 替代）|
+| 15 | **Select-String** | Forensics/Log + 通用 | ✅ 已装（PowerShell 内置）|
 | 16 | **evtx_dump** | Forensics/Log | ❌ pending（per `extend_tools/evtx_dump` 路径待重装）|
 | 17 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
 | 18 | **john** | Misc/Archive | ❌ pending（Win 可用 `hashcat` / `zipcrack.py` 替代）|
@@ -517,6 +513,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-28 | **2.7** | **§3 strings + binwalk + grep→Select-String + §4 Python 包同步** (per Owner 2026-06-28 指令): Owner 实装 `strings.exe` 到 `extend-tools/bin/win-x64/strings.exe` (370KB, 2026-06-27) + `pip install binwalk 2.3.2` 已在 venv (注意: pip freeze 显示从 `automisc/extend-tools/bin/win-x64/binwalk-2.3.2` 本地路径安装, 老目录残留, 需清); §3 strings/binwalk 标 ✅; §3 + §6.1 `grep` 替换为 PowerShell `Select-String` (Win 替代, awk/sed/sort/uniq 仍 pending); §4 Python 包: PIL/lxml/docx/numpy/scipy/python-magic/pycryptodome/zstandard/base65536/python-evtx 已装, 12+ 包仍 pending; 新增 `requirements.txt` (pinned 版本, 从 pip freeze 提取 + pyproject.toml 对齐); §2 统计刷新 (18✅ / 36❌ pending)。 |
 | 2026-06-28 | **2.6** | **§3 + §6.1 状态同步**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个二进制（`file.exe` / `7z.exe` + `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），对应 §3 / §6.1 表格行已标 ✅ + Windows extend-tools 路径；其他工具统一标 ❌ (pending)。同步由 `tools_status_sync.py` 脚本完成（单文件，不入 commit）。 |
 | 2026-06-27 | **2.5** | v0.5-windows-only 治理变更 v3.3：项目定位收窄为 Windows only（per `AGENTS.md §2.3`）；`extend-tools/bin/win-x64/` 是 Win 优先工具链；macOS / Linux 路径探测代码 + brew 注释清理待 PR5/6 实施；详见 [`upgrade/v0.5-windows-only.md`](./upgrade/v0.5-windows-only.md)。 |
 | 2026-06-13 | 1.0 | 初版：扫描 9 个 subflow + macOS 工具抽查。详见 git history。 |

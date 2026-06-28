@@ -1,0 +1,39 @@
+# requirements.txt — AutoMisc Python dependencies
+#
+# Generated: 2026-06-28 (per Owner 指令: sync §4 + add requirements.txt)
+# Source: pip freeze (实际 venv 安装状态) + pyproject.toml 对齐
+# Platform: Windows 10/11 x64 + Python 3.13.6 (pyenv-win)
+#
+# Install: pip install -r requirements.txt
+#
+# 注: binwalk 通过本地 wheel 安装 (`automisc/extend-tools/bin/win-x64/binwalk-2.3.2`),
+#     其他 PyPI 包装包走 pip 标准源。
+
+# === automisc pyproject.toml 官方声明 (core deps) ===
+python-evtx==0.8.1    # >=0.8.1
+volatility3==2.28.0    # >=2.0
+base91==1.0.1    # >=1.0.1
+base65536==0.1.1    # >=0.1.1
+PySide6==6.11.1    # >=6.6
+
+# === 已装的 CTF 工具依赖 (从 §4 Python 包清单同步) ===
+binwalk==2.3.2    # Stego/Image + Forensics/Memory + 通用
+pillow==12.2.0    # PIL — 图像读取 + LSB 提取 + 像素脑洞
+lxml==6.1.1    # XML 解析 (OOXML / Plist / Kitty 协议)
+python-docx==1.2.0    # .docx 解析
+numpy==2.3.5    # 数值计算 + 图像处理 (频谱 / FFT)
+scipy==1.18.0    # 信号处理 + 频谱分析 (FFT / 时频分析)
+pycryptodome==3.23.0    # 古典密码 + AES/DES
+zstandard==0.25.0    # zstd 解压 (CTF 偶尔出现)
+python-magic==0.4.27    # file 类型识别 (PyPI 版本, 不是 python-magic-bin)
+requests==2.34.2    # (保留) 离线场景使用
+
+# === 仍 pending 的工具 (未装, 如需要可 pip install) ===
+# z3-solver       — 约束求解
+# matplotlib      — 频谱图 + 直方图绘图
+# dnslib          — DNS 解析
+# pikepdf         — PDF 操作 + 解密
+# mutagen         — 音频元数据
+# segno, pyzbar, qrcode — QR 生成 / 解析
+# stegano, stegolsb, stegcracker — 高级 LSB + 爆破
+# pwntools (pwn)  — 通用 CTF 工具库
