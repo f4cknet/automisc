@@ -69,18 +69,15 @@ $binaries = @(
         url = "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
         target = "file.exe"
         post_extract = "file_zip"
-    },
-    @{
-        name = "evtx_dump"
-        version = "0.12.2"
-        # omerbenamram/evtx v0.12.2 (2026-06-13 release), Rust crate `evtx` 0.12.2.
-        # 单文件 Win x86_64 prebuilt (2.5MB, static link, 零运行时依赖).
-        # 旧版本 v0.8.2 (extend_tools/evtx_dump, macOS only) 已废弃.
-        url = "https://github.com/omerbenamram/evtx/releases/download/v0.12.2/evtx_dump-v0.12.2.exe"
-        target = "evtx_dump.exe"  # strip version suffix (源文件 evtx_dump-v0.12.2.exe)
-        post_extract = $null  # 单文件, no extract
     }
 )
+
+# 注: evtx_dump (omerbenamram/evtx v0.12.2 Rust CLI) **不**走 install.ps1 — 2026-06-28 决策:
+# 当前 adapter (src/automisc/tools/forensics/log/evtx_dump.py) 用 python-evtx 0.8.1 实现
+# (结构化字段访问 + EventID scoring + 命令行关键字匹配), evtx_dump CLI 在 adapter 路径上 0 调用.
+# 实际价值 = Owner 手动 `evtx_dump file.evtx | grep flag` (便利, 可被 5 行 Python one-liner 替代).
+# 详见 upgrade/v0.5-windows-evtx-dump.md §6 决策记录 + AGENTS.md §5.2 防单题打补丁.
+# v0.5+ 实战 ≥3 道同类命中再升架构 (per AGENTS §5.2 标准).
 
 # ---- Python packages (pip install from source) ----
 # binwalk: no official Windows prebuilt (ReFirmLabs never published release assets).
@@ -160,7 +157,7 @@ if (-not $rust_installed) {
 Write-Host ""
 
 # ---- Stage 1: Download + extract binaries ----
-Write-Host "--- Stage 1: Binaries (5 tools) ---" -ForegroundColor Cyan
+Write-Host "--- Stage 1: Binaries (4 tools) ---" -ForegroundColor Cyan
 
 foreach ($tool in $binaries) {
     $dest = Join-Path $BinDir $tool.target
@@ -410,4 +407,4 @@ Write-Host "  cd $RepoRoot"
 Write-Host "  .venv\Scripts\Activate.ps1   # if venv not yet activated"
 Write-Host "  automisc-gui                  # or: python -m automisc gui"
 Write-Host ""
-Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost / evtx_dump)"
+Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost)"

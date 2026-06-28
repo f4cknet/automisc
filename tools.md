@@ -76,19 +76,19 @@ MISC（根）
 
 | 一级分支 | 子分支数 | 工具总数（✅/⚠️/❌）| v0.1 P0 adapter |
 |---|---|---|---|
-| **Forensics** | 4 | 14（**3✅ / 0⚠️ / 11❌**）| 6 |
+| **Forensics** | 4 | 14（**2✅ / 0⚠️ / 12❌**）| 6 |
 | **Steganography** | 3 | 22（**4✅ / 0⚠️ / 18❌**）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
 | **Misc Others** | 3 | 10（**4✅ / 0⚠️ / 6❌**）| 3 |
 | **共享基础工具** | — | 8（**6✅ / 0⚠️ / 2❌**）| 5 |
-| **合计** | 14 | 54（**19✅ / 0⚠️ / 35❌**）| **22** |
+| **合计** | 14 | 54（**18✅ / 0⚠️ / 36❌**）| **22** |
 
 > **2026-06-28 更新（per §8 v2.6 + v2.7 + v2.8）**：
 > - **v2.6 (PR3-prep)**: Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），§3 + §6.1 status 标 ✅；其他 ❌ pending
 > - **v2.7**: 新增 `strings.exe` + pip `binwalk 2.3.2`；`grep` → PowerShell `Select-String`（Win 内置）；§4 Python 包 11 个 ✅ + 8 个 ❌ pending；新增 `requirements.txt`
-> - **v2.8**: `extend-tools/install.ps1` 加 Stage 0 Rust toolchain 装 + Stage 1 加 `evtx_dump` v0.12.2（omerbenamram/evtx, Win x86_64 prebuilt, GitHub release `.exe` 2.5MB）→ `extend-tools/bin/win-x64/evtx_dump.exe`；Forensics 1✅+（evtx_dump）→ Forensics 3✅；详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)
-> - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk/evtx_dump）
-> - §6.1 P0 列表：9 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk` / `evtx_dump`）+ `Select-String`（grep 替代），13 个 P0 工具 pending
+> - **v2.8 (scope 收窄)**: `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — Rust 装**保留**（独立价值：未来 cargo install 兜底 / binwalk v3 备选 / ad-hoc 工具编写）；**Stage 1 evtx_dump CLI 撤回** (per Owner 2026-06-28 决策：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 + EventID scoring + 命令行关键字匹配, evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 grep 的便利；实战 ≥3 道同类命中再升架构 per AGENTS §5.2)。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)
+> - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk）
+> - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），14 个 P0 工具 pending
 
 > **v0.1 P0 实际 adapter 数**：22 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），22 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
@@ -133,12 +133,12 @@ MISC（根）
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **Select-String** | ✅ | PowerShell 内置 | 日志关键字 + 异常分析 | P0 |
-| **evtx_dump** | ✅ | `extend-tools/bin/win-x64/evtx_dump.exe`（v0.12.2，Rust crate `evtx` 0.12.2，omerbenamram/evtx GitHub release Win x86_64 prebuilt 单文件 2.5MB，零运行时依赖） | Windows .evtx 事件日志解析（XML / JSON / JSONL） | P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） |
-| **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**CLI 入口走 extend-tools/bin/win-x64/evtx_dump.exe**（Rust 0.12.2），不依赖 shim | .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
+| **evtx_dump** | ❌ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64） | Windows .evtx 事件日志解析（XML / JSON / JSONL） | P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） · **2026-06-28 决策: CLI 不走 install.ps1**（adapter 走 python-evtx）|
+| **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**adapter 走 python-evtx 路径**（src/automisc/tools/forensics/log/evtx_dump.py，结构化字段访问 + EventID scoring + 命令行关键字匹配）| .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
 | **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
 
-#### 3.4.1 evtx_dump 参数速查（per `evtx_dump v0.12.2 --help`）
+#### 3.4.1 evtx_dump 参数速查（per `evtx_dump --help`）
 
 | 参数 | 类型 | 默认 | 说明 | automisc 封装建议 |
 |---|---|---|---|---|
@@ -185,9 +185,9 @@ from pathlib import Path
 from ...base import ToolAdapter, ToolResult
 
 class EVTXDumpAdapter(ToolAdapter):
-    """evtx_dump (Rust evtx crate 0.12.2) — Windows .evtx parser"""
+    """evtx_dump (Rust evtx crate 0.8.2) — Windows .evtx parser"""
     name = "evtx_dump"
-    binary = "extend-tools/bin/win-x64/evtx_dump.exe"  # 相对 repo root，subprocess 走绝对路径
+    binary = "extend_tools/evtx_dump"  # 相对 repo root，subprocess 走绝对路径
 
     def run(self, file_path: Path, **kwargs) -> ToolResult:
         fmt = kwargs.get("format", "xml")           # xml / json / jsonl
@@ -208,7 +208,7 @@ class EVTXDumpAdapter(ToolAdapter):
 
 | 决策点 | 建议 | 理由 |
 |---|---|---|
-| binary 路径 | `extend-tools/bin/win-x64/evtx_dump.exe` | per AGENTS §2.3 Windows only 治理 + `tools/paths.py:resolve_tool_binary` 优先查 win-x64 |
+| binary 路径 | 相对 repo root `extend_tools/evtx_dump` | per AGENTS §2.3 macOS 标准 PATH 简洁 |
 | 默认 format | `xml` | CLI grep 友好 |
 | threads 默认 | `0`（auto）| 多核机器加速 |
 | timeout | `60s` 起，跑挂再加 | 大文件可能 60s+ |
@@ -225,7 +225,7 @@ with Evtx.Evtx("file.evtx") as log:
 ```
 
 **CLI vs Python 路径分工**：
-- **CLI**（`extend-tools/bin/win-x64/evtx_dump.exe`）→ **快速 grep / 大文件流式** / 不写代码的场景
+- **CLI**（`extend_tools/evtx_dump`）→ **快速 grep / 大文件流式** / 不写代码的场景
 - **Python**（`import Evtx`）→ **结构化字段提取** / 写 adapter 时遍历字段
 
 
@@ -401,7 +401,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **segno / pyzbar / qrcode** | ❌ | QR 生成 / 解析 | P2 · `pip install segno pyzbar qrcode` |
 | **stegano / stegolsb / stegcracker** | ❌ | 高级 LSB + 爆破 | P2 · `pip install stegano stegolsb stegcracker` |
 | **base65536** | ✅ | base65536 编码 | P1 · `pip install base65536` |（已装 base65536 0.1.1）
-| **python-evtx** | ✅ | .evtx 事件日志解析（Python 模块；**CLI 走 extend-tools/bin/win-x64/evtx_dump.exe v0.12.2 Rust 二进制**）| P0 · v0.5 已装 |（已装 python-evtx 0.8.1）|
+| **python-evtx** | ✅ | .evtx 事件日志解析（Python 模块 + adapter `EvtxDumpAdapter` 用 in-process `import Evtx` 做结构化字段访问 + EventID 4625/1102/4688 scoring）| P0 · v0.5 已装 |（已装 python-evtx 0.8.1）|
 
 > **自动检测范围**：v0.1 启动时，Core 调度层应在启动时调用 `check_dependencies()`，对 §6 P0 工具做可达性检查，缺失时 GUI 提示并降级（而非阻塞启动）。
 
@@ -452,7 +452,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 13 | **unzip** | Misc/Archive | ❌ pending（Win 可走 7z / Python `zipfile` 替代）|
 | 14 | **xxd** | 通用 | ✅ 已装（`extend-tools/bin/win-x64/vim92/xxd.exe`）|
 | 15 | **Select-String** | Forensics/Log + 通用 | ✅ 已装（PowerShell 内置）|
-| 16 | **evtx_dump** | Forensics/Log | ✅ 已装（`extend-tools/bin/win-x64/evtx_dump.exe` v0.12.2，Rust crate `evtx` 0.12.2，omerbenamram/evtx GitHub release Win x86_64 prebuilt 2.5MB）|
+| 16 | **evtx_dump** | Forensics/Log | ❌ pending（per `extend_tools/evtx_dump` 路径待重装；**2026-06-28 决策**：adapter 走 python-evtx in-process, CLI 不走 install.ps1; 实战 ≥3 道同类命中再升架构 per AGENTS §5.2）|
 | 17 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
 | 18 | **john** | Misc/Archive | ❌ pending（Win 可用 `hashcat` / `zipcrack.py` 替代）|
 | 19 | **zbar** | Misc/Brainteaser（QR）| ❌ pending |
@@ -513,7 +513,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
-| 2026-06-28 | **2.8** | **§3.4 evtx_dump ❌→✅** (per Owner 2026-06-28 指令 + v0.5-windows-evtx-dump 治理): `extend-tools/install.ps1` 加 Stage 0 Rust toolchain 装 (rustup-init stable + minimal profile, 失败 warning continue) + Stage 1 加 `evtx_dump` 条目 (omerbenamram/evtx v0.12.2, GitHub release Win x86_64 prebuilt 单文件 .exe 2.5MB, SHA256 已校验); `extend-tools/manifest.yaml` v1.1 → v1.2 加 evtx_dump 元信息; `extend-tools/bin/win-x64/evtx_dump.exe` 部署成功 (2,526,208 bytes, SHA256 = `fdc170115cbb84eadc4ef5ed66807be08d24aab7383324b562b78d8035f9f16a` ✓); smoke 测试: `--version` → `EVTX Parser 0.12.2` ✓, `--help` → 14 主参数 + 3 新子命令 (extract-wevt-templates / dump-template-instances / apply-wevt-cache) + 1 新 flag (--wevt-cache) ✓, 真 evtx (Python 生成 4096-byte header + 65536-byte chunk) XML/JSON/JSONL 三格式全部 exit 0 ✓; §3.4 + §3.4.3 + §3.4.4 + §4 + §6.1 #16 路径同步 `extend-tools/bin/win-x64/evtx_dump.exe`; §2 总表 18✅/36❌ → 19✅/35❌ (Forensics 2✅→3✅); Rust 装本身**不**自动跑（用户 invoke install.ps1 才装），本 spec 只验证脚本 AST 解析 + evtx_dump 部署。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
+| 2026-06-28 | **2.8** | **scope 收窄** (per Owner 2026-06-28 "既然python-evtx能代替 evtx-dump"): `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — **保留**（独立价值：未来 cargo install / binwalk v3 备选 / ad-hoc 工具）；**Stage 1 evtx_dump CLI 撤回** — 不加 evtx_dump 到 `$binaries` 数组。决策依据：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 (XPath `e:System/e:EventID` / `e:EventData/e:Data[@Name='CommandLine']`) + EventID scoring (4625/1102 → sev 5) + 命令行关键字匹配 (powershell/cmd/mimikatz/-enc), evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 `evtx_dump file.evtx | grep flag` 的便利 (可被 5 行 Python one-liner 替代); 实战 ≥3 道同类命中再升架构 per AGENTS §5.2 防单题打补丁。`extend-tools/manifest.yaml` v1.2 → v1.1 回滚 (evtx_dump 块删除); §3.4/§3.4.1/§3.4.3/§3.4.4/§4/§6.1#16 evtx_dump 路径全部回滚到 `extend_tools/evtx_dump` (legacy macOS 软链, 当前 Win 未生效); §2 总表 19✅/35❌ → 18✅/36❌ (Forensics 3✅→2✅)。原 commit `f54d859` 的 smoke 9 测 + SHA256 校验结果作为"已验证，待实战触发再启用"证据保留在 `upgrade/v0.5-windows-evtx-dump.md` §6 决策记录。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
 | 2026-06-28 | **2.7** | **§3 strings + binwalk + grep→Select-String + §4 Python 包同步** (per Owner 2026-06-28 指令): Owner 实装 `strings.exe` 到 `extend-tools/bin/win-x64/strings.exe` (370KB, 2026-06-27) + `pip install binwalk 2.3.2` 已在 venv (注意: pip freeze 显示从 `automisc/extend-tools/bin/win-x64/binwalk-2.3.2` 本地路径安装, 老目录残留, 需清); §3 strings/binwalk 标 ✅; §3 + §6.1 `grep` 替换为 PowerShell `Select-String` (Win 替代, awk/sed/sort/uniq 仍 pending); §4 Python 包: PIL/lxml/docx/numpy/scipy/python-magic/pycryptodome/zstandard/base65536/python-evtx 已装, 12+ 包仍 pending; 新增 `requirements.txt` (pinned 版本, 从 pip freeze 提取 + pyproject.toml 对齐); §2 统计刷新 (18✅ / 36❌ pending)。 |
 | 2026-06-28 | **2.6** | **§3 + §6.1 状态同步**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个二进制（`file.exe` / `7z.exe` + `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），对应 §3 / §6.1 表格行已标 ✅ + Windows extend-tools 路径；其他工具统一标 ❌ (pending)。同步由 `tools_status_sync.py` 脚本完成（单文件，不入 commit）。 |
 | 2026-06-27 | **2.5** | v0.5-windows-only 治理变更 v3.3：项目定位收窄为 Windows only（per `AGENTS.md §2.3`）；`extend-tools/bin/win-x64/` 是 Win 优先工具链；macOS / Linux 路径探测代码 + brew 注释清理待 PR5/6 实施；详见 [`upgrade/v0.5-windows-only.md`](./upgrade/v0.5-windows-only.md)。 |
