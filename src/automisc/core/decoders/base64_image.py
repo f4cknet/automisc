@@ -23,17 +23,23 @@
 - 原因: Owner "不论是 foremost 还是 base64 转图片, 都把输出文件保存到输入文件的相同目录下"
 
 macOS 依赖：`file`（系统自带，/usr/bin/file）。
+
+**v0.5+ 跨平台 (per fix-base64-image-file-windows 2026-06-28)**:
+- Windows: `file` 通过 `automisc.tools.paths.resolve_tool_binary("file")` 解析
+  → extend-tools/bin/win-x64/file.exe (v5.29 prebuilt, per v0.5-windows-tool-compat PR2)
+- macOS / Linux: `shutil.which("file")` 走 PATH 优先（系统自带）
+- 错误文案增加 "file 命令未找到 + extend-tools 排错指引"，避免 Owner 看到空字符串不知道咋办
 """
 from __future__ import annotations
 
 import base64
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from automisc.core.utils.output_path import output_path_for
+from automisc.tools.paths import resolve_tool_binary
 
 
 # 1. data URL 头正则 (per RFC 2397)
@@ -124,8 +130,17 @@ def _try_with_fallback_headers(raw: str) -> tuple[bytes, str] | None:
 
 
 def _file_detect(path: str) -> str:
-    """`file --brief` 检测文件 mime. 失败返回空字符串."""
-    file_bin = shutil.which("file")
+    """`file --brief` 检测文件 mime. 失败返回空字符串.
+
+    平台解析 (per v0.5-platform-extend-tools):
+    1) PATH 优先 (macOS /usr/bin/file, Linux /usr/bin/file)
+    2) fallback extend-tools/bin/<platform>/file.exe (Windows prebuilt v5.29)
+
+    Returns:
+        file 命令 stdout (e.g. "PNG image data, 133 x 133, ...").
+        空字符串 = 命令未找到 / 跑挂 / 非 0 exit.
+    """
+    file_bin = resolve_tool_binary("file")
     if not file_bin:
         return ""
     try:
@@ -213,9 +228,14 @@ def decode_file_to_image(
     if not _is_image_mime(detected):
         # 不是图片
         out_path.unlink(missing_ok=True)
-        raise Base64ImageError(
-            f"转图片失败, file 检测: {detected or '(empty / no file command)'}"
-        )
+        if not detected:
+            # file 命令找不到 — 给 Owner 明确指引 (per fix-base64-image-file-windows)
+            raise Base64ImageError(
+                "转图片失败: file 命令未找到。"
+                "Windows 端确认 extend-tools/bin/win-x64/file.exe 存在"
+                "（跑 install.ps1 装 v5.29 prebuilt），macOS / Linux 自带无需处理。"
+            )
+        raise Base64ImageError(f"转图片失败, file 检测: {detected}")
 
     return Base64ImageResult(
         output_path=str(out_path),

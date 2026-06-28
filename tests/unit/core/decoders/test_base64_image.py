@@ -1,12 +1,18 @@
 """单测: core.decoders.base64_image (v0.5+ standalone)
 
 覆盖 5 决策树分支 + 3 边界.
+
+**fix-base64-image-file-windows (2026-06-28) 新增 3 case**:
+- test_file_detect_uses_resolve_tool_binary: mock 确认走 resolve_tool_binary
+- test_file_detect_no_file_binary: file 找不到 -> 错误文案兜底
+- test_decode_file_to_image_windows_no_file: 整链路 Win 端无 file 报错文案
 """
 from __future__ import annotations
 
 import base64
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
@@ -14,6 +20,7 @@ from PIL import Image
 from automisc.core.decoders.base64_image import (
     Base64ImageError,
     Base64ImageResult,
+    _file_detect,
     _strip_data_url,
     _strip_padding,
     _try_with_fallback_headers,
@@ -222,3 +229,59 @@ class TestDecodeFileToImage:
         assert r.kept_output is True
         assert Path(r.output_path).exists()
         Path(r.output_path).unlink()
+
+
+# ---------- fix-base64-image-file-windows 新增 (2026-06-28) ----------
+class TestFileDetectWindows:
+    """`_file_detect` 在 Windows 上走 resolve_tool_binary (PATH 优先 → extend-tools fallback).
+
+    修复前: shutil.which("file") 在 Windows 上 None -> 返回空 -> 触发
+    "转图片失败, file 检测: (empty / no file command)".
+    修复后: resolve_tool_binary("file") 自动 fallback extend-tools/bin/win-x64/file.exe.
+    """
+
+    def test_file_detect_uses_resolve_tool_binary(self, tmp_path):
+        """_file_detect 走 resolve_tool_binary (不是 shutil.which).
+
+        验证方式: mock resolve_tool_binary 调用的 sub 模块, 确认被调过 + 拿真实 binary 跑.
+        """
+        png_bytes = _make_png_bytes()
+        f = tmp_path / "img.png"
+        f.write_bytes(png_bytes)
+
+        # 1. resolve_tool_binary 拿到的 fake 路径应被用 (用 Python 当 file, 模拟 --brief 行为)
+        #    这里偷懒: mock resolve_tool_binary 返回 None 验空字符串 + 返回真 binary 验真值
+        with patch("automisc.core.decoders.base64_image.resolve_tool_binary") as mock_rtb:
+            mock_rtb.return_value = None
+            assert _file_detect(str(f)) == ""
+            assert mock_rtb.called, "resolve_tool_binary 必须被调用 (取代 shutil.which)"
+
+    def test_file_detect_no_file_binary_returns_empty(self, tmp_path):
+        """file 命令完全找不到 (PATH + extend-tools 都空) -> 返回空字符串."""
+        with patch("automisc.core.decoders.base64_image.resolve_tool_binary") as mock_rtb:
+            mock_rtb.return_value = None
+            result = _file_detect(str(tmp_path / "nonexistent.png"))
+        assert result == ""
+
+    def test_decode_file_to_image_windows_no_file_binary(self, tmp_path):
+        """整链路: 真实 base64 输入 + Windows 端 file 找不到 -> 抛文案友好错.
+
+        修复前: "转图片失败, file 检测: (empty / no file command)" — Owner 不知道咋办
+        修复后: "转图片失败: file 命令未找到。Windows 端确认 extend-tools/bin/win-x64/file.exe ..."
+        """
+        png_bytes = _make_png_bytes()
+        b64 = base64.b64encode(png_bytes).decode()
+        f = tmp_path / "in.txt"
+        f.write_text(b64)
+
+        with patch("automisc.core.decoders.base64_image.resolve_tool_binary") as mock_rtb:
+            mock_rtb.return_value = None  # 模拟 Win 端 extend-tools 也没 file.exe
+            with pytest.raises(Base64ImageError) as exc_info:
+                decode_file_to_image(str(f))
+
+        err_msg = str(exc_info.value)
+        assert "file 命令未找到" in err_msg, f"错误文案应明确指出 file 缺失, 实际: {err_msg}"
+        assert "extend-tools" in err_msg, f"错误文案应指引到 extend-tools 排错, 实际: {err_msg}"
+        assert "install.ps1" in err_msg, f"错误文案应提到 install.ps1, 实际: {err_msg}"
+        # 旧文案不应再出现
+        assert "(empty / no file command)" not in err_msg, f"旧文案已废弃: {err_msg}"
