@@ -27,6 +27,7 @@ pycryptodome==3.23.0    # 古典密码 + AES/DES
 zstandard==0.25.0    # zstd 解压 (CTF 偶尔出现)
 python-magic==0.4.27    # file 类型识别 (PyPI 版本, 不是 python-magic-bin)
 requests==2.34.2    # (保留) 离线场景使用
+pyzbar==0.1.9    # QR / 条码识别 (zbar Py3 ctypes wrapper, Win wheel 自带 zbar DLL) — per v0.5-zbar-windows-install
 
 # === 仍 pending 的工具 (未装, 如需要可 pip install) ===
 # z3-solver       — 约束求解
@@ -34,6 +35,6 @@ requests==2.34.2    # (保留) 离线场景使用
 # dnslib          — DNS 解析
 # pikepdf         — PDF 操作 + 解密
 # mutagen         — 音频元数据
-# segno, pyzbar, qrcode — QR 生成 / 解析
+# segno, qrcode   — QR 生成 (pyzbar 已装, 仅生成仍 pending)
 # stegano, stegolsb, stegcracker — 高级 LSB + 爆破
 # pwntools (pwn)  — 通用 CTF 工具库

@@ -1,19 +1,27 @@
-"""zbar adapter（per ``tools.md`` §3.11）
+"""zbar adapter (per `tools.md` §3.11 + v0.5-zbar-windows-install)
 
-``zbarimg``：zbar 项目的图片扫描 CLI，**支持 QR / EAN-13 / Code-128 / PDF417 / DataMatrix** 等
-30+ 条码格式。
+QR / 条码识别 (QR / EAN-13 / Code-128 / PDF417 / DataMatrix 等 30+ 格式).
 
-**v0.1 范围**（最小可用 — Brainteaser / QR）：
-- ``zbarimg --quiet --raw <file>``：扫描图片，输出识别到的字符串（每行一条）
-- 解析输出：识别码类型 + 字符串内容
-- 强信号：识别到 `flag{...}` / `ctf{...}` → severity=5（直接拿 flag）
-- 弱信号：识别到 URL / 长字符串 → severity=2（可能含线索）
+**v0.5-zbar-windows-install** (2026-06-28 23:00 Owner 拍板):
+- 之前: `subprocess` 调 `zbarimg --quiet --raw <file>` (CLI)
+- 现在: `pyzbar.pyzbar.decode(PIL.Image)` (Py3 ctypes wrapper, Win wheel 自带 zbar DLL)
+- output 格式 100% 兼容 `zbarimg --raw` (一行一条解码文本), GUI 入口/单测/`coords_to_qr.py` 内部调用**0 改动**
 
-**macOS**：`brew install zbar`（已装 0.23.93）。
+**为什么不直接装 zbarimg**:
+- `zbar` 0.10 (PyPI 2009) 是 Py2 时代 C 扩展, Win 无 wheel, 源码要 MSVC 编译 (实测 2026-06-28 失败: "Microsoft Visual C++ 14.0 or greater is required")
+- SourceForge `zbar-0.10-setup.exe` (2010 NSIS) 4 个 mirror 全 200 HTML, 链接失效
+- pyzbar 跨平台 wheel 走 ctypes + libzbar 库 = 0 编译 + Win ship DLL (per PyPI 主页: "zbar DLLs are included with the Windows Python wheels")
+
+**Win ship `msvcr120.dll` 部署**:
+- libzbar-64.dll (pyzbar 自带) 是 VS 2013 编译, 链 `MSVCR120.dll`
+- Win ship 默认没装 VS 2013 redist, 报 "Could not find module 'libiconv.dll' (or one of its dependencies)"
+- 解决: install.ps1 把 `extend-tools/bin/win-x64/msvcr120.dll` 复制到 pyzbar site-packages
+- `msvcr120.dll` (973KB) 从 MS Office 自带抽, MS 允许随 redist 自由分发, 第三方打包合法
 """
 from __future__ import annotations
 
 import re
+from typing import List
 
 from automisc.core.registry import register_tool
 from automisc.core.result import ToolResult
@@ -21,43 +29,95 @@ from automisc.core.suspicious import SuspiciousPoint, scan_output_for_suspicious
 from automisc.tools.base import ToolAdapter
 
 
-# zbarimg --raw 输出格式: "QR-Code:https://example.com" / "CODE-128:ABC123"
-# 也可能只是字符串 (--raw 模式不带前缀)
+# zbarimg --raw 输出格式: 一行一条解码文本 (无前缀)
+# 我们的 pyzbar 实现保持同样格式, 复用下面解析逻辑
 _ZBAR_OUTPUT_RE = re.compile(r"^(?:([\w-]+):)?(.+)$")
 
 
 @register_tool
 class ZbarAdapter(ToolAdapter):
-    """`zbarimg` adapter —— QR / 条码识别（zbar CLI，30+ 格式）。"""
+    """`zbarimg` adapter — QR / 条码识别 (per v0.5-zbar-windows-install 走 pyzbar 后端)."""
 
     name = "zbar"
     category = "misc_brainteaser"
-    description = "QR / 条码识别（zbarimg；QR / EAN-13 / Code-128 / PDF417 等 30+ 格式）"
+    description = "QR / 条码识别 (pyzbar 后端, 30+ 格式: QR / EAN-13 / Code-128 / PDF417 / DataMatrix)"
 
     default_timeout = 30.0
 
+    def check_available(self) -> bool:
+        """v0.5-zbar-windows-install: check pyzbar importable (not binary in PATH).
+
+        pyzbar 装载链: libzbar-64.dll + libiconv.dll (Win wheel 自带) + msvcr120.dll (extend-tools 部署).
+        任何一环缺都 ImportError / OSError, 统一返回 False 即可.
+        """
+        try:
+            import pyzbar.pyzbar  # noqa: F401
+            return True
+        except (ImportError, OSError):
+            return False
+
     def run(self, file_path: str) -> ToolResult:
-        # --quiet: 抑制除结果外的输出
-        # --raw: 不输出码类型前缀（仅字符串；让 flag 扫描更容易命中）
-        cmd = [self.binary_path or "zbarimg", "--quiet", "--raw", file_path]
-        exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
+        # v0.5-zbar-windows-install: use pyzbar instead of subprocess zbarimg
+        # 行为等价: 30+ 格式解码, output 格式 = zbarimg --raw (一行一条文本)
+        try:
+            from PIL import Image
+            from pyzbar.pyzbar import decode as pyzbar_decode
+        except ImportError as e:
+            return ToolResult(
+                tool_name=self.name,
+                exit_code=127,
+                stdout="",
+                stderr=f"pyzbar not installed: {e} (run: pip install pyzbar)",
+                suspicious_points=[],
+            )
 
+        try:
+            img = Image.open(file_path)
+            results = pyzbar_decode(img)
+        except FileNotFoundError:
+            return ToolResult(
+                tool_name=self.name,
+                exit_code=2,
+                stdout="",
+                stderr=f"file not found: {file_path}",
+                suspicious_points=[],
+            )
+        except Exception as e:
+            # PIL.UnidentifiedImageError for non-image files
+            # OSError for libzbar load failure (missing msvcr120.dll)
+            return ToolResult(
+                tool_name=self.name,
+                exit_code=1,
+                stdout="",
+                stderr=f"decode failed: {type(e).__name__}: {e}",
+                suspicious_points=[],
+            )
+
+        # 构造 stdout: 跟 zbarimg --raw 行为一致 (一行一条解码文本)
+        stdout_lines: List[str] = []
+        for r in results:
+            data_bytes = r.data
+            try:
+                data_str = data_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                # 二进制 payload (e.g. raw bytes) fallback
+                data_str = data_bytes.decode("latin-1", errors="replace")
+            stdout_lines.append(data_str)
+        stdout = "\n".join(stdout_lines)
+
+        # 复用原 zbar SuspiciousPoint 逻辑 (per tools.md §3.11)
         suspicious: list[SuspiciousPoint] = []
-
-        # 1. 通用扫描（捕获 flag{...}）
+        # 1. 通用扫描 (捕获 flag{...})
         suspicious.extend(scan_output_for_suspicious(
             tool_name=self.name, file_path=file_path, stdout=stdout,
         ))
 
-        # 2. 解析每条识别结果
-        # 注意：zbarimg --raw 输出**只**有字符串，没有码类型前缀
-        # 但 stdout 里可能含 "scheme:..." 形式（如 https://...），要把 scheme 识别为 code_type
+        # 2. 解析每条识别结果 — 跟原 zbar 行为 1:1 兼容
         for line in stdout.splitlines():
             line = line.strip()
             if not line:
                 continue
-
-            # 1) 检测 URL scheme（含 ://）
+            # 1) 检测 URL scheme (含 ://)
             url_match = re.match(r"^(https?|ftp|file)://(.+)$", line)
             if url_match:
                 code_type, content = url_match.group(1), url_match.group(2)
@@ -71,7 +131,7 @@ class ZbarAdapter(ToolAdapter):
             if not content:
                 continue
 
-            # 长度 > 50 的字符串（可能是 base64/URL）
+            # 长度 > 50 的字符串 (可能是 base64/URL)
             if len(content) > 50:
                 suspicious.append(
                     SuspiciousPoint(
@@ -85,9 +145,8 @@ class ZbarAdapter(ToolAdapter):
                         suggested_action="长字符串可能是 base64/URL/编码内容，建议 base64/hex 解码或访问 URL",
                     )
                 )
-            # 看起来像 URL（之前 URL scheme 的 content 可能以 / 开头）
+            # 看起来像 URL (之前 URL scheme 的 content 可能以 / 开头)
             elif content.startswith(("/", "//", "?", "&")) or code_type in ("http", "https", "ftp", "file"):
-                # 拼回完整 URL
                 full_url = f"{code_type}:{content}" if not content.startswith("//") else f"{code_type}:/{content}"
                 suspicious.append(
                     SuspiciousPoint(
@@ -101,7 +160,7 @@ class ZbarAdapter(ToolAdapter):
                         suggested_action="URL 线索：在浏览器访问或 curl 抓内容",
                     )
                 )
-            # 短字符串（正常识别结果）
+            # 短字符串 (正常识别结果)
             else:
                 suspicious.append(
                     SuspiciousPoint(
@@ -134,9 +193,9 @@ class ZbarAdapter(ToolAdapter):
 
         return ToolResult(
             tool_name=self.name,
-            exit_code=exit_code,
+            exit_code=0,
             stdout=stdout,
-            stderr=stderr,
+            stderr="",
             suspicious_points=suspicious,
-            duration_ms=duration_ms,
+            duration_ms=0,  # pyzbar 无独立计时, GUI 显示 0ms 可接受
         )

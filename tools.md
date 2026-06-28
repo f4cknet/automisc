@@ -79,18 +79,19 @@ MISC（根）
 | **Forensics** | 4 | 14（**3✅ / 0⚠️ / 11❌**）| 6 |
 | **Steganography** | 3 | 22（**4✅ / 0⚠️ / 18❌**）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
-| **Misc Others** | 3 | 10（**4✅ / 0⚠️ / 6❌**）| 3 |
+| **Misc Others** | 3 | 10（**6✅ / 0⚠️ / 4❌**）| 3 |
 | **共享基础工具** | — | 8（**6✅ / 0⚠️ / 2❌**）| 5 |
-| **合计** | 14 | 54（**19✅ / 0⚠️ / 35❌**）| **22** |
+| **合计** | 14 | 54（**21✅ / 0⚠️ / 33❌**）| **22** |
 
-> **2026-06-29 更新（per §8 v2.6 + v2.7 + v2.8 + v2.9 + v2.10 + v2.11）**：
+> **2026-06-29 更新（per §8 v2.6 + v2.7 + v2.8 + v2.9 + v2.10 + v2.11 + v2.12）**：
 > - **v2.6 (PR3-prep)**: Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），§3 + §6.1 status 标 ✅；其他 ❌ pending
 > - **v2.7**: 新增 `strings.exe` + pip `binwalk 2.3.2`；`grep` → PowerShell `Select-String`（Win 内置）；§4 Python 包 11 个 ✅ + 8 个 ❌ pending；新增 `requirements.txt`
 > - **v2.8 (scope 收窄)**: `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — Rust 装**保留**（独立价值：未来 cargo install 兜底 / binwalk v3 备选 / ad-hoc 工具编写）；**Stage 1 evtx_dump CLI 撤回** (per Owner 2026-06-28 决策：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 + EventID scoring + 命令行关键字匹配, evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 grep 的便利；实战 ≥3 道同类命中再升架构 per AGENTS §5.2)。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)
 > - **v2.10**: §3.4 python-evtx 状态 ❌→✅（per Owner 2026-06-28 "更新 python-evtx 在 tools.md 的状态"）；`requirements.txt` 第 12 行已有 `python-evtx==0.8.1`（v2.7 加的, 无需重复添加, Owner 二次确认时同步文档说明）；§2 总表 Forensics 2✅→3✅ / total 18✅/36❌ → 19✅/35❌
-> - **v2.11 (本次)**: §3.5 Steganography/Image 加 **lsb_tool** 行（✅ 自研 Python, 3 mode 统一 LSB 工具 detect/extract/extract_bytes, 替代 zsteg + lsb_detect + lsb_extract + lsb_bytes_extract; per [`upgrade/v0.5-lsb-tool-unify.md`](./upgrade/v0.5-lsb-tool-unify.md)）; §6.1 P0 #10 zsteg 备注更新 `lsb_detect` → `lsb_tool` + 链接 spec; Phase 1 spec + Phase 2a detect + Phase 2b extract + Phase 3 adapter + Phase 4 GUI dialog 合并 全部落地（5 commits 2904a3b/5cba63a/d5de9ed/2f6825d/b7b212c）。**不动 §2 总表数字**: lsb_tool 是 Python 实现无独立 binary, 不增 "21→22"。
+> - **v2.11**: §3.5 Steganography/Image 加 **lsb_tool** 行（✅ 自研 Python, 3 mode 统一 LSB 工具 detect/extract/extract_bytes, 替代 zsteg + lsb_detect + lsb_extract + lsb_bytes_extract; per [`upgrade/v0.5-lsb-tool-unify.md`](./upgrade/v0.5-lsb-tool-unify.md)）; §6.1 P0 #10 zsteg 备注更新 `lsb_detect` → `lsb_tool` + 链接 spec; Phase 1 spec + Phase 2a detect + Phase 2b extract + Phase 3 adapter + Phase 4 GUI dialog 合并 全部落地（5 commits 2904a3b/5cba63a/d5de9ed/2f6825d/b7b212c）。**不动 §2 总表数字**: lsb_tool 是 Python 实现无独立 binary, 不增 "21→22"
+> - **v2.12 (本次)**: §3.11 "qrcode / segno / pyzbar" 行拆 2 行（pyzbar ✅ + qrcode/segno ❌） + §6.1 #19 zbar ❌→✅ + §2 总表 19✅/35❌ → **21✅/33❌**（Misc Others 4✅/6❌ → **6✅/4❌**, zbar + pyzbar 双 ✅）; 详见 [`upgrade/v0.5-zbar-windows-install.md`](./upgrade/v0.5-zbar-windows-install.md)
 > - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk）
-> - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），13 个 P0 工具 pending（v2.9 删 evtx_dump #16）
+> - §6.1 P0 列表：9 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk` / `zbar`）+ `Select-String`（grep 替代），12 个 P0 工具 pending（v2.9 删 evtx_dump #16, v2.12 加 zbar #19）
 
 > **v0.1 P0 实际 adapter 数**：21 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求；v2.9 删 evtx_dump #16）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），21 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
@@ -285,7 +286,8 @@ with Evtx.Evtx("file.evtx") as log:
 | **Python 标准库** | ❌ | macOS 自带 | 字符串/字符操作 + struct + re | 全部脑洞题 base |
 | **z3-solver** | ❌ | `pip install z3-solver` | 约束求解（约束编码 / Boolean gate network） | v0.5 安装 |
 | **PIL（Pillow）** | ✅ | `python3 -c "import PIL"` ✅ | 像素级脑洞题（图片当数据） |（已装 Pillow 12.2.0） 已装 Python 包 |
-| **qrcode / segno / pyzbar** | ❌ | `pip install qrcode segno pyzbar` | QR 生成 / 解析 / 重组 | v0.5 安装 |
+| **pyzbar** | ✅ | `pip install pyzbar==0.1.9` | QR / 30+ 条码解析（zbar Python ctypes wrapper，Win wheel 自带 zbar DLL） | per [`upgrade/v0.5-zbar-windows-install.md`](./upgrade/v0.5-zbar-windows-install.md) — 替代 zbarimg.exe subprocess（SourceForge 链接失效） |
+| **qrcode / segno** | ❌ | `pip install qrcode segno` | QR 生成 / 重组 | v0.5 安装（pyzbar 已装, 仅生成仍 pending） |
 
 ### 3.12 共享基础工具（不挂 subflow · 各分支通用）
 
@@ -379,7 +381,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 15 | **Select-String** | Forensics/Log + 通用 | ✅ 已装（PowerShell 内置）|
 | 16 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
 | 18 | **john** | Misc/Archive | ❌ pending（Win 用自研 `BruteforceZipAction` Python 字典爆破替代，per [`upgrade/v0.5-zipcrack-doc-update.md`](./upgrade/v0.5-zipcrack-doc-update.md)）|
-| 19 | **zbar** | Misc/Brainteaser（QR）| ❌ pending |
+| 19 | **zbar** | Misc/Brainteaser（QR）| ✅ 已装（`pyzbar==0.1.9` + `msvcr120.dll` 部署到 `site-packages/pyzbar/`，per [`upgrade/v0.5-zbar-windows-install.md`](./upgrade/v0.5-zbar-windows-install.md)）|
 | 20 | **sox** | Stego/Audio | ❌ pending |
 | 21 | **python-magic-bin** | 通用（file 类型识别 Python）| ❌ pending（pip install 待装）|
 | 22 | **numpy** | 通用（图像/频谱处理）| ❌ pending（pip install 待装）|
@@ -437,6 +439,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-29 | **2.12** | **v0.5-zbar-windows-install 落地 + §3.11/§6.1 zbar + pyzbar ❌→✅** (per Owner 2026-06-28 23:00 拍板 "安装zbar, 对应工具栏中的二维码解析"): 失败根因 `pip install zbar` (Py2 时代 C 扩展, Win 无 wheel, 要 MSVC 编译) → 改用 `pyzbar==0.1.9` (Py3 ctypes wrapper, Win wheel 自带 `libzbar-64.dll` + `libiconv.dll`); 二次失败 `Could not find module 'libiconv.dll' (or one of its dependencies)` → `libzbar-64.dll` 是 VS 2013 编译, 链 `MSVCR120.dll`, 系统若没装 VS 2013 redist 就 fail → 部署 `msvcr120.dll` (973KB, MS 允许随 redist 分发) 到 pyzbar site-packages; **zbar adapter 重构** (per spec §5.1) `subprocess zbarimg --raw` → `pyzbar.pyzbar.decode(PIL.Image)`, output 格式 1:1 兼容 (一行一条解码文本), GUI 入口 (`menu_dock` "🔳 二维码解析") + 单测 (`test_brainteaser.py` 5 tests) + `core/decoders/coords_to_qr.py` 内部用 ZbarAdapter **0 改动**; §3.11 "qrcode / segno / pyzbar" 行拆 2 行 (pyzbar ✅ + qrcode/segno ❌) + §6.1 #19 zbar ❌→✅; **§2 总表**: Misc Others 4✅/6❌ → **6✅/4❌** (zbar + pyzbar 双 ✅), 合计 19✅/35❌ → **21✅/33❌**; **install.ps1 Stage 2** 重构支持 install_method="pypi" (pyzbar) + 现有 install_method="source" (binwalk) 双模式 + **Stage 3** 新增 `msvcr120.dll` 部署步骤; **manifest.yaml** 新增 `msvcr120` (12.00.30501.0, SHA256=B8FDFC70... 已填) + `pyzbar` pip 段; **requirements.txt** 第 31 行加 `pyzbar==0.1.9` (从 pending 注释移到 ✅ 区); **extend-tools/bin/win-x64/msvcr120.dll** 部署 (953KB, 不入 git 走 manifest); **smoke 验证** (2026-06-28 23:10 实测): `pip install pyzbar` OK + `tools/_debug/smoke_zbar_refactor.py` 跑 `sample_qr_flag.png` → `flag{pr8_smoke_qr_xyz}` sev=5 ✓ + `sample_qr_url.png` → URL sev=2 ✓; **架构判定** (per AGENTS §5.2): 切 pyzbar 不是单题打补丁, 是 v0.5-windows-only 治理的**统一 DLL 依赖处理** (per `v0.5-windows-tool-compat` + `v0.5-platform-extend-tools` 已有 win redist 模式); pyzbar 跨平台 wheel + Win ship DLL 是 zbar 跨平台使用**标准做法** (PyPI 主页明文 "zbar DLLs included with Windows wheels"). 详见 [`upgrade/v0.5-zbar-windows-install.md`](./upgrade/v0.5-zbar-windows-install.md) |
 | 2026-06-29 | **2.11** | **v0.5-lsb-tool-unify 落地 + §3.5/§6.1 lsb_tool 行** (per Owner 2026-06-28 10:40 全批准 + 5 commits 2904a3b/5cba63a/d5de9ed/2f6825d/b7b212c): §3.5 Steganography/Image 加 **lsb_tool** 行（✅ 自研 Python, 3 mode 统一 LSB 工具 detect/extract/extract_bytes, 替代 zsteg + lsb_detect + lsb_extract + lsb_bytes_extract; per `upgrade/v0.5-lsb-tool-unify.md`）; §6.1 P0 #10 zsteg 备注更新: `lsb_detect` → `lsb_tool` + 链接到 `upgrade/v0.5-lsb-tool-unify.md`; §8 v2.11 changelog 加本条。**Scope 范围**: Phase 1 spec + Phase 2a detect mode + Phase 2b extract/extract_bytes mode + Phase 3 adapter + Phase 4 GUI dialog 合并（lsb_bytes_dialog + lsb_extract 按钮 → lsb_tool_dialog + lsb_tool 按钮，9 参数）; Phase 5 本次 docs 同步; Phase 6 老 action deprecated 标记 + Phase 7 实战 regression 待办。**不动 §2 总表数字**: lsb_tool 是 Python 实现无独立 binary, 不增 "21→22"; lsb_detect / lsb_extract / lsb_bytes_extract 仍是 P0 adapter 但功能合并到 lsb_tool（仍注册 backward compat, Phase 6 才 deprecated）。详见 [`upgrade/v0.5-lsb-tool-unify.md`](./upgrade/v0.5-lsb-tool-unify.md)。 |
 | 2026-06-28 | **2.10** | **§3.4 python-evtx ❌→✅ + requirements.txt 文档同步** (per Owner 2026-06-28 "更新 python-evtx 在 tools.md 的状态, 并且加入requirements.txt"): §3.4 python-evtx 行状态 ❌→✅ + 路径列加 `requirements.txt` 第 12 行 pinned 说明; §2 总表 Forensics 2✅/12❌ → 3✅/11❌ + 合计 18✅/36❌ → 19✅/35❌; §2 备注 header 加 v2.10 引用。**requirements.txt 不动**: `python-evtx==0.8.1` 已在 v2.7 commit (`b8e5241`) 加入第 12 行 + 注释 `>=0.8.1`, 无需重复添加（`pip show python-evtx` 验证 0.8.1 已装）。§6.1 P0 列表不动: python-evtx 是 Python 包不是外部工具, 不进 §6.1 P0 22→21 范围。详见 §3.4 + `requirements.txt`。 |
 | 2026-06-28 | **2.9** | **§3.4 evtx_dump 整段删除** (per Owner 2026-06-28 "是否可以删除 tools.md 中3.4 evtx_dump"): §3.4 表格删 evtx_dump 行（剩 Select-String + python-evtx + 7z + journalctl 4 项）+ 删 §3.4.1 (参数速查表 14 参数) + 删 §3.4.2 (典型调用 5 pattern) + 删 §3.4.3 (adapter 封装模板 + 决策点表); §3.4.4 (python-evtx Python 模块用法) → 重编号 §3.4.1 + 删 "CLI vs Python 路径分工" 段（CLI 文档全删, 这段成空头）; §5 subflow 表 Log Forensics 行 `Select-String + evtx_dump \| 7z + python-evtx` → `Select-String + python-evtx (adapter in-process) \| 7z`; §6.1 P0 #16 evtx_dump 行删除（21 个 P0 工具, 不是 22 个）; 5 处 "22 个" → "21 个" 同步 (§2 备注 / §6 header / §6.1 / §6.2 / §6 header); §3.4 表格底加 evtx_dump CLI 撤回说明脚注（指 upgrade/v0.5-windows-evtx-dump.md §6）。**不动**: python-evtx 行状态仍 ❌（虽然已装且 adapter 在用, Owner 未拍板 ✅ 切换; 留 §8 v2.10 跟进）。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |

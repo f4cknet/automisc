@@ -33,8 +33,6 @@ macOS 依赖: zbarimg (brew install zbar, 已装 0.23.93) + Pillow (PR9 装)
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
@@ -219,20 +217,25 @@ def _render_qr_png(
 
 
 def _run_zbar(png_path: Path) -> tuple[str, list[str]]:
-    """调 zbarimg 扫 PNG, 返回 (stdout, decoded_lines)."""
-    zbar = shutil.which("zbarimg")
-    if not zbar:
-        raise CoordsQRDecoderError("zbarimg 未找到 (brew install zbar)")
+    """扫 PNG 拿 QR 解码结果, 返回 (stdout, decoded_lines).
+
+    v0.5-zbar-windows-install: 改用 ZbarAdapter (pyzbar 后端) 而非 subprocess zbarimg.
+    - 之前: `subprocess` 调 `zbarimg --quiet --raw` (SourceForge NSIS installer 2010 老, Win 端失效)
+    - 现在: ZbarAdapter.run() 内部调 pyzbar.pyzbar.decode(PIL.Image) (Win wheel 自带 zbar DLL)
+    - output 格式 1:1 兼容: stdout = 一行一条解码文本 (跟 zbarimg --raw 一样)
+    """
+    from automisc.tools.misc.brainteaser.zbar import ZbarAdapter
+    adapter = ZbarAdapter()
+    if not adapter.check_available():
+        raise CoordsQRDecoderError("zbar 不可用: pyzbar 未装 (pip install pyzbar)")
     try:
-        r = subprocess.run(
-            [zbar, "--quiet", "--raw", str(png_path)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except subprocess.TimeoutExpired as e:
-        raise CoordsQRDecoderError(f"zbarimg timeout: {e}")
-    stdout = r.stdout.strip()
+        result = adapter.run(str(png_path))
+    except Exception as e:
+        raise CoordsQRDecoderError(f"zbar decode 失败: {type(e).__name__}: {e}")
+    if not result.is_success:
+        # exit 1 (UnidentifiedImageError) / 2 (file not found) / 127 (pyzbar missing)
+        raise CoordsQRDecoderError(f"zbar exit {result.exit_code}: {result.stderr}")
+    stdout = result.stdout.strip()
     decoded = [ln.strip() for ln in stdout.splitlines() if ln.strip()]
     return stdout, decoded
 

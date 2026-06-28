@@ -13,8 +13,6 @@ Owner 触发 (2026-06-14 10:16):
 """
 from __future__ import annotations
 
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -156,7 +154,16 @@ class TestRenderQR:
 
 
 # ---------- CLI 端到端 ----------
-@pytest.mark.skipif(not shutil.which("zbarimg"), reason="zbarimg 未装")
+# v0.5-zbar-windows-install: skipif 改查 pyzbar 是否可导入 (替代 zbarimg CLI)
+def _pyzbar_available() -> bool:
+    try:
+        import pyzbar.pyzbar  # noqa: F401
+        return True
+    except (ImportError, OSError):
+        return False
+
+
+@pytest.mark.skipif(not _pyzbar_available(), reason="pyzbar 未装 (pip install pyzbar)")
 class TestEnd2End:
     def test_simple_finder_pattern_21x21(self, tmp_path):
         """21x21 3 角 finder pattern (meihuai 真实是 25x25, 但 21x21 是最简单)"""

@@ -15,11 +15,14 @@
 # - available: false = 该平台暂无方案
 
 version: "1.1"
-# 最后更新: 2026-06-28 (per v0.5-windows-tool-compat PR3 manifest 同步)
+# 最后更新: 2026-06-28 (per v0.5-zbar-windows-install manifest 同步)
 # - 新增: steghide (Cygwin 构建), vim92 (Vim Win32 installer 整包)
 # - 备注: 7z.exe 是 7zr.exe 的 hardlink, manifest 仍只列 7zr
 # - 注: evtx_dump CLI 暂不加入 manifest (per v0.5-windows-evtx-dump §6 决策:
 #   adapter 用 python-evtx 0.8.1, CLI 0 调用; 实战 ≥3 道同类再升架构 per AGENTS §5.2)
+# - v0.5-zbar-windows-install (2026-06-28 23:00 Owner 拍板):
+#   新增 msvcr120.dll (VS 2013 redist, 953KB) + pyzbar pip 包.
+#   zbar 走 pyzbar Python lib (Win wheel 自带 zbar DLL) 而非 zbarimg.exe (SourceForge 失效).
 
 platforms:
   win-x64:
@@ -86,6 +89,27 @@ platforms:
           调 'steghide' 命令, adapter 解析时优先 extend-tools/bin/win-x64/steghide/steghide.exe.
           已知限制: Win 进程需要 msys-2.0.dll 不需要 (cygwin1.dll 已含), 不依赖额外 PATH.
 
+      msvcr120:
+        version: "12.00.30501.0"  # VS 2013 Update 5 redist
+        # MSVCR120.dll (VS 2013 C runtime) — pyzbar 自带的 libzbar-64.dll 链这个.
+        # Win ship 默认没装 VS 2013 redist, 报 "Could not find module 'libiconv.dll' (or one of its dependencies)".
+        # 解决: install.ps1 把这个 DLL 复制到 pyzbar site-packages.
+        # 来源: Microsoft Office 2016 自带 (per Owner 2026-06-28 实测 C:\Program Files\Microsoft Office\root\Client\msvcr120.dll)
+        # 微软允许随 redist 自由分发, 第三方打包合法.
+        # 替代方案: 装 vcredist_x64.exe (7MB, https://aka.ms/highdpimfc2013x64enu), 但 7MB 比 953KB DLL 重, 不必要.
+        url: ""  # TODO: 2026-06-28 Owner 自带, 走 manifest + install.ps1 复用, 不下载
+        sha256: "B8FDFC70374672B4DFB41EB48509405017F316C029F4EF6F5C490ECAFB16DBF6"  # 2026-06-28 install.ps1 算出
+        available: true
+        notes: |
+          msvcr120.dll 953KB, 微软 VS 2013 C runtime (Update 5 版本 12.00.30501.0).
+          来源: 任何装过 Office 2016+ 的 Windows 系统 C:\Program Files\Microsoft Office\root\Client\msvcr120.dll.
+          install.ps1 部署流程:
+            1) source = extend-tools/bin/win-x64/msvcr120.dll (跟 exiftool_files/ 同级)
+            2) 找 site-packages/pyzbar/ 路径 (pyzbar pip install 后才有)
+            3) Copy-Item 到 site-packages/pyzbar/msvcr120.dll
+            4) 装完后 pyzbar import 即可加载 libzbar-64.dll, 报 "Could not find module" 错误消失.
+          不需要 PATH 注册, 跟 libzbar-64.dll 同目录即可被 LoadLibrary 找到.
+
       vim92:
         version: "9.2.0"
         # Vim 官方 Windows installer (vim-win32-installer on GitHub).
@@ -119,6 +143,19 @@ platforms:
           改用 pip install binwalk (v2.3.x Python 版, CTF 实战足够).
           pyproject.toml 已声明此依赖, venv 激活后 binwalk.exe 在 PATH,
           adapter 调 'binwalk' 命令即可, 不需要 extend-tools 路径.
+
+      pyzbar:
+        pip_name: "pyzbar"
+        version_spec: "==0.1.9"  # 2026-06-28 实测 Win wheel 含 libzbar-64.dll + libiconv.dll
+        available: true
+        notes: |
+          pyzbar 0.1.9 — Py3 ctypes wrapper for zbar barcode reader.
+          Win wheel (817KB) 自带 libzbar-64.dll (164KB) + libiconv.dll (958KB).
+          替代 zbarimg subprocess (SourceForge `zbar-0.10-setup.exe` 4 mirror 全 200 HTML, 链接失效).
+          adapter `src/automisc/tools/misc/brainteaser/zbar.py` 切到 `pyzbar.pyzbar.decode(PIL.Image)`,
+          output 格式 1:1 兼容 `zbarimg --raw` (一行一条解码文本), GUI 入口 + 单测**0 改动**.
+          依赖: msvcr120.dll (本 manifest 同步部署到 site-packages/pyzbar/).
+          macOS / Linux 同样 work, 跨平台统一 (v0.5-zbar-windows-install 决策).
 
     # Windows 上仍不可用的工具（v0.5+ 评估替代方案）
     unavailable:

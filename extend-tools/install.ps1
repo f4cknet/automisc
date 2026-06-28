@@ -83,12 +83,23 @@ $binaries = @(
 # binwalk: no official Windows prebuilt (ReFirmLabs never published release assets).
 #          v3 is Rust rewrite, v2 latest PyPI is 2.1.0 (incompatible with Python 3.12+).
 #          -> download v2.3.2 source zip + patch compat.py + pip install from source.
+# pyzbar: per v0.5-zbar-windows-install (2026-06-28 Owner 拍板).
+#         Win wheel 自带 zbar DLL, 替代 zbarimg subprocess (SourceForge 失效).
 $pip_packages = @(
     @{
         name = "binwalk"
         version = "2.3.2"
+        install_method = "source"
         url = "https://github.com/ReFirmLabs/binwalk/archive/refs/tags/v2.3.2.zip"
         notes = "v2.3.2 source + patch (imp -> importlib) for Python 3.12+ compat"
+    },
+    @{
+        name = "pyzbar"
+        version = "0.1.9"
+        install_method = "pypi"
+        # pyzbar 0.1.9 Win wheel 自带 libzbar-64.dll + libiconv.dll (per PyPI 主页)
+        # 装完即可 `from pyzbar.pyzbar import decode` 直接用, 无需再 pip 安装 zbar 库
+        notes = "v0.5-zbar-windows-install: 替代 zbarimg.exe subprocess (SourceForge 失效)"
     }
 )
 
@@ -264,45 +275,46 @@ foreach ($tool in $binaries) {
     }
 }
 
-# ---- Stage 2: pip install binwalk (from patched source) ----
+# ---- Stage 2: pip install (binwalk source + patch / pyzbar PyPI) ----
 Write-Host ""
-Write-Host "--- Stage 2: Python packages (1 tool, source + patch) ---" -ForegroundColor Cyan
+Write-Host "--- Stage 2: Python packages ($($pip_packages.Count) tool) ---" -ForegroundColor Cyan
 
 foreach ($pkg in $pip_packages) {
     # Quick check: already installed at correct version?
     $installed_ok = $false
     try {
-        $ver = & python -c "import binwalk; print(binwalk.__version__)" 2>$null
+        $ver = & python -c "import $($pkg.name); print($($pkg.name).__version__)" 2>$null
         if ($ver -eq $pkg.version) {
             $installed_ok = $true
             Write-Host "[skip] $($pkg.name): v$($pkg.version) already installed" -ForegroundColor Gray
-            $results += [PSCustomObject]@{name=$pkg.name; status="skipped"; path="python -m binwalk"}
+            $results += [PSCustomObject]@{name=$pkg.name; status="skipped"; path="python -m $($pkg.name) v$($pkg.version)"}
         }
     } catch {}
 
     if ($installed_ok) { continue }
 
     try {
-        Write-Host "[download] $($pkg.name) v$($pkg.version) source ..." -NoNewline
-        $src_zip = Join-Path $StageDir "$($pkg.name)-v$($pkg.version).zip"
-        Download-File -Url $pkg.url -Out $src_zip | Out-Null
-        # Download-File already prints OK; suppress
+        if ($pkg.install_method -eq "source") {
+            # binwalk: download source zip + patch + pip install from extracted dir
+            Write-Host "[download] $($pkg.name) v$($pkg.version) source ..." -NoNewline
+            $src_zip = Join-Path $StageDir "$($pkg.name)-v$($pkg.version).zip"
+            Download-File -Url $pkg.url -Out $src_zip | Out-Null
 
-        Write-Host "[extract] $($pkg.name) source ..." -NoNewline
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $src_extract = Join-Path $StageDir "$($pkg.name)-v$($pkg.version)"
-        if (Test-Path $src_extract) { Remove-Item $src_extract -Recurse -Force }
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($src_zip, $StageDir)
-        Write-Host " OK" -ForegroundColor Green
+            Write-Host "[extract] $($pkg.name) source ..." -NoNewline
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $src_extract = Join-Path $StageDir "$($pkg.name)-v$($pkg.version)"
+            if (Test-Path $src_extract) { Remove-Item $src_extract -Recurse -Force }
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($src_zip, $StageDir)
+            Write-Host " OK" -ForegroundColor Green
 
-        # Patch compat.py: append _imp_load_source helper (Python 3.12+ removed imp)
-        $compat_py = Join-Path $src_extract "src\binwalk\core\compat.py"
-        if (-not (Test-Path $compat_py)) {
-            throw "compat.py not found at $compat_py (source layout changed?)"
-        }
-        $compat_content = Get-Content $compat_py -Raw -Encoding UTF8
-        if ($compat_content -notmatch "def _imp_load_source") {
-            $patch = @'
+            # Patch compat.py: append _imp_load_source helper (Python 3.12+ removed imp)
+            $compat_py = Join-Path $src_extract "src\binwalk\core\compat.py"
+            if (-not (Test-Path $compat_py)) {
+                throw "compat.py not found at $compat_py (source layout changed?)"
+            }
+            $compat_content = Get-Content $compat_py -Raw -Encoding UTF8
+            if ($compat_content -notmatch "def _imp_load_source") {
+                $patch = @'
 
 
 # v0.5-platform-extend-tools: Python 3.12+ removed `imp` module.
@@ -317,49 +329,99 @@ def _imp_load_source(name, path):
     spec.loader.exec_module(mod)
     return mod
 '@
-            Add-Content -Path $compat_py -Value $patch -Encoding UTF8
-            Write-Host "[patch] $($pkg.name) compat.py: added _imp_load_source" -ForegroundColor Gray
-        }
+                Add-Content -Path $compat_py -Value $patch -Encoding UTF8
+                Write-Host "[patch] $($pkg.name) compat.py: added _imp_load_source" -ForegroundColor Gray
+            }
 
-        # Patch plugin.py + module.py: use compat._imp_load_source instead of imp.load_source
-        foreach ($rel in @("src\binwalk\core\plugin.py", "src\binwalk\core\module.py")) {
-            $py = Join-Path $src_extract $rel
-            if (Test-Path $py) {
-                $c = Get-Content $py -Raw -Encoding UTF8
-                $changed = $false
-                if ($c -match "^import imp\b") {
-                    $c = $c -replace "^import imp\b", "# import imp removed (Python 3.12+)"
-                    $changed = $true
-                }
-                if ($c -match "imp\.load_source") {
-                    $c = $c -replace "imp\.load_source", "_imp_load_source"
-                    # Add import if missing
-                    if ($c -notmatch "from binwalk\.core\.compat import _imp_load_source") {
-                        $c = $c -replace "(^import os\r?\n)", "`$1from binwalk.core.compat import _imp_load_source`r`n"
+            # Patch plugin.py + module.py: use compat._imp_load_source instead of imp.load_source
+            foreach ($rel in @("src\binwalk\core\plugin.py", "src\binwalk\core\module.py")) {
+                $py = Join-Path $src_extract $rel
+                if (Test-Path $py) {
+                    $c = Get-Content $py -Raw -Encoding UTF8
+                    $changed = $false
+                    if ($c -match "^import imp\b") {
+                        $c = $c -replace "^import imp\b", "# import imp removed (Python 3.12+)"
+                        $changed = $true
                     }
-                    $changed = $true
-                }
-                if ($changed) {
-                    Set-Content $py -Value $c -Encoding UTF8 -NoNewline
-                    Write-Host "[patch] $rel : imp -> compat._imp_load_source" -ForegroundColor Gray
+                    if ($c -match "imp\.load_source") {
+                        $c = $c -replace "imp\.load_source", "_imp_load_source"
+                        # Add import if missing
+                        if ($c -notmatch "from binwalk\.core\.compat import _imp_load_source") {
+                            $c = $c -replace "(^import os\r?\n)", "`$1from binwalk.core.compat import _imp_load_source`r`n"
+                        }
+                        $changed = $true
+                    }
+                    if ($changed) {
+                        Set-Content $py -Value $c -Encoding UTF8 -NoNewline
+                        Write-Host "[patch] $rel : imp -> compat._imp_load_source" -ForegroundColor Gray
+                    }
                 }
             }
-        }
 
-        Write-Host "[pip install] $($pkg.name) v$($pkg.version) (no-deps) ..." -NoNewline
-        & python -m pip install --proxy $ProxyUrl --force-reinstall --no-deps --quiet $src_extract
-        if ($LASTEXITCODE -ne 0) {
-            throw "pip install failed with exit $LASTEXITCODE"
-        }
-        Write-Host " OK" -ForegroundColor Green
+            Write-Host "[pip install] $($pkg.name) v$($pkg.version) (no-deps) ..." -NoNewline
+            & python -m pip install --proxy $ProxyUrl --force-reinstall --no-deps --quiet $src_extract
+            if ($LASTEXITCODE -ne 0) {
+                throw "pip install failed with exit $LASTEXITCODE"
+            }
+            Write-Host " OK" -ForegroundColor Green
 
-        $results += [PSCustomObject]@{name=$pkg.name; status="ok"; path="python -m binwalk v$($pkg.version)"}
+            $results += [PSCustomObject]@{name=$pkg.name; status="ok"; path="python -m binwalk v$($pkg.version)"}
+
+        } elseif ($pkg.install_method -eq "pypi") {
+            # pyzbar (and future PyPI-only packages): just pip install
+            Write-Host "[pip install] $($pkg.name) v$($pkg.version) ..." -NoNewline
+            & python -m pip install --proxy $ProxyUrl --quiet "$($pkg.name)==$($pkg.version)"
+            if ($LASTEXITCODE -ne 0) {
+                throw "pip install failed with exit $LASTEXITCODE"
+            }
+            Write-Host " OK" -ForegroundColor Green
+
+            $results += [PSCustomObject]@{name=$pkg.name; status="ok"; path="python -m $($pkg.name) v$($pkg.version)"}
+        } else {
+            throw "unknown install_method: $($pkg.install_method)"
+        }
 
     } catch {
         Write-Host " FAILED" -ForegroundColor Red
         Write-Host "         error: $_" -ForegroundColor Red
         $results += [PSCustomObject]@{name=$pkg.name; status="failed"; error="$_"}
     }
+}
+
+# ---- Stage 3: deploy msvcr120.dll to pyzbar site-packages (per v0.5-zbar-windows-install) ----
+# 背景: libzbar-64.dll (pyzbar 自带) 是 VS 2013 编译, 链 MSVCR120.dll.
+#       Win ship 默认没装 VS 2013 redist, pyzbar 加载报 "Could not find module 'libiconv.dll' (or one of its dependencies)".
+#       解决: 把 extend-tools/bin/win-x64/msvcr120.dll 复制到 pyzbar site-packages.
+#       跟 libzbar-64.dll 同目录, LoadLibrary 即可找到.
+Write-Host ""
+Write-Host "--- Stage 3: deploy msvcr120.dll to pyzbar site-packages ---" -ForegroundColor Cyan
+
+$msvcr_src = Join-Path $BinDir "msvcr120.dll"
+if (Test-Path $msvcr_src) {
+    try {
+        # 找 pyzbar site-packages 路径
+        $pyzbar_dir = & python -c "import pyzbar, os; print(os.path.dirname(pyzbar.__file__))" 2>$null
+        if ($pyzbar_dir -and (Test-Path $pyzbar_dir)) {
+            $msvcr_dst = Join-Path $pyzbar_dir "msvcr120.dll"
+            if ((Test-Path $msvcr_dst) -and (-not $Force)) {
+                Write-Host "[skip] msvcr120.dll: already at $msvcr_dst" -ForegroundColor Gray
+                $results += [PSCustomObject]@{name="msvcr120"; status="skipped"; path=$msvcr_dst}
+            } else {
+                Write-Host "[deploy] msvcr120.dll -> $msvcr_dst ..." -NoNewline
+                Copy-Item $msvcr_src $msvcr_dst -Force
+                Write-Host " OK" -ForegroundColor Green
+                $results += [PSCustomObject]@{name="msvcr120"; status="ok"; path=$msvcr_dst}
+            }
+        } else {
+            Write-Host "[warn] pyzbar not importable, skip msvcr120.dll deploy (re-run after `pip install pyzbar`)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host " FAILED" -ForegroundColor Red
+        Write-Host "         error: $_" -ForegroundColor Red
+        $results += [PSCustomObject]@{name="msvcr120"; status="failed"; error="$_"}
+    }
+} else {
+    Write-Host "[skip] msvcr120.dll: not in $BinDir (Stage 1 download failed? or 手动部署)"
 }
 
 # ---- Cleanup stage ----
@@ -407,4 +469,4 @@ Write-Host "  cd $RepoRoot"
 Write-Host "  .venv\Scripts\Activate.ps1   # if venv not yet activated"
 Write-Host "  automisc-gui                  # or: python -m automisc gui"
 Write-Host ""
-Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost)"
+Write-Host "Verify: python -m automisc tools list  (should show binwalk / exiftool / 7zr / foremost / pyzbar via msvcr120.dll deploy)"
