@@ -57,12 +57,12 @@ SHORT_CIRCUIT_SEVERITY = 99
 # - **不**含: foremost / binwalk_extract / steghide_extract / john / fix_pseudo / bruteforce (这些留 GUI 工具栏 / CLI 链)
 # - binwalk adapter 默认探测模式 (跑 `binwalk <file>` 不带 -e), 写 SP 到 journal — OK
 FIND_SUSPICIOUS_PICTURE_TOOLS = [
-    "lsb_tool",     # v0.5-lsb-tool-unify: 3 mode 统一 LSB 工具 (detect/extract/extract_bytes), 替代 lsb_detect + lsb_extract + lsb_bytes_extract
-    "steghide",     # v0.5-stegseek-remove (2026-06-28): 替代 stegseek, 统一 steghide (info + 空密码 extract 兜底 CVE-2021-27211, 5s timeout)
-    "exiftool",     # EXIF metadata
-    "binwalk",      # 探测 (不 -e)
-    "strings",      # rule_scanner 可疑字符串
-    "file",         # 文件类型
+    "lsb_tool",     # 1. v0.5-lsb-tool-unify: 3 mode 统一 LSB 工具 (detect/extract/extract_bytes), 替代 lsb_detect + lsb_extract + lsb_bytes_extract
+    "exiftool",     # 2. EXIF metadata
+    "binwalk",      # 3. 探测 (不 -e)
+    "strings",      # 4. rule_scanner 可疑字符串
+    "steghide",     # 5. 慢路径密码学 stego, 最后 fallback (per v0.5-auto-run-pool-steghide-last: steghide 从 [1] 移到最后, 快速工具先跑出可疑点; per Owner 经验"通常在其他工具没发现可疑信息后才会尝试 steghide")
+    "file",         # 6. 文件类型 (兜底, 永远最后)
 ]  
 FIND_SUSPICIOUS_TRAFFIC_TOOLS = [
     "pcap_protocol_router",  # pcap 协议分类 + key 候选
