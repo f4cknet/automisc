@@ -373,69 +373,70 @@ def _ascii_preview(byte_stream: bytes, n_bytes: int = 32) -> str:
 
 def _build_bit_plane_preview_matrix(
     img_array: np.ndarray,
-    n_bytes: int = 32,
+    n_bytes: int = 16,
     scan_order: str = "row",
     byte_bit_order: str = "msb",
 ) -> list[tuple[int, str, str, bool]]:
-    """8 bit × 6 perm preview 矩阵 (Owner "超过随波逐流" 要求).
+    """8 bit × 15 channel preview 矩阵 (per v0.5-lsb-tool-15channel-matrix §3.2 实战修订).
 
-    遍历 8 个 bit plane (b0=LSB ~ b7=MSB) × 6 个 RGB perm 排列, 每个 combo 抽前 N 字节字节流
-    转 ASCII preview + 命中关键字标注.
+    遍历 8 个 bit plane (b0=LSB ~ b7=MSB) × 15 个通道组合 (per _15_CHANNELS, 含 zero-padded + single channel),
+    每个 combo 抽前 N 字节字节流转 ASCII preview + 命中关键字标注.
 
     Args:
-        img_array: (H, W, 3 or 4) uint8 numpy array
-        n_bytes: 每个 combo preview 长度 (默认 32, per Owner 拍板)
+        img_array: (H, W, 3 or 4) RGB numpy array
+        n_bytes: 每个 combo preview 长度 (默认 16, 15 列宽适配 journal)
         scan_order: "row" / "col" (默认 row, zsteg 默认)
         byte_bit_order: "msb" / "lsb" (默认 msb, zsteg 默认)
 
     Returns:
-        list of (bit, perm_name, preview_str, has_keyword) tuples
-        长度 = 8 × 6 = 48
+        list of (bit, channel_name, preview_str, has_keyword) tuples
+        长度 = 8 × 15 = 120
     """
-    PERMS = [
-        ("RGB", ["R", "G", "B"]),
-        ("RBG", ["R", "B", "G"]),
-        ("GRB", ["G", "R", "B"]),
-        ("GBR", ["G", "B", "R"]),
-        ("BRG", ["B", "R", "G"]),
-        ("BGR", ["B", "G", "R"]),
-    ]
     matrix: list[tuple[int, str, str, bool]] = []
     for bit in range(8):
-        for perm_name, channels in PERMS:
-            byte_stream = _extract_lsb_byte_stream(
-                img_array, channels=channels, bit=bit,
-                scan_order=scan_order, byte_bit_order=byte_bit_order,
-            )
+        for label, channels in _15_CHANNELS:
+            try:
+                byte_stream = _extract_lsb_byte_stream_zero_aware(
+                    img_array, channels=channels, bit=bit,
+                    scan_order=scan_order, byte_bit_order=byte_bit_order,
+                )
+            except ValueError:
+                byte_stream = b""
             preview = _ascii_preview(byte_stream, n_bytes=n_bytes)
             has_kw = any(kw in byte_stream[:n_bytes] for kw in _PREVIEW_KEYWORDS)
-            matrix.append((bit, perm_name, preview, has_kw))
+            matrix.append((bit, label, preview, has_kw))
     return matrix
 
 
 def _format_matrix_for_journal(
     matrix: list[tuple[int, str, str, bool]],
-    col_width: int = 32,
+    col_width: int = 16,
 ) -> str:
     """把 preview matrix 渲染成 journal 可读字符串.
 
-    行 = bit (b0~b7), 列 = perm (RGB~BGR).
+    行 = bit (b0~b7, 8 行), 列 = 通道 (15 列, per _15_CHANNELS).
+    8 × 15 = 120 cells.
     """
     if not matrix:
         return ""
-    # 表头
-    perm_names = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR"]
-    header_cells = [f"{p:>{col_width}s}" for p in perm_names]
+    # 表头: 15 通道 (per _15_CHANNELS 顺序)
+    channel_names = [label for label, _ in _15_CHANNELS]
+    header_cells = [f"{p:>{col_width}s}" for p in channel_names]
     header = " " * 18 + "".join(header_cells)
 
-    # 按 bit 分组
+    # 按 bit 分组 (8 行)
     lines = [header]
     for bit in range(8):
-        label = f"bit={bit} ({'LSB' if bit == 0 else 'MSB' if bit == 7 else 'MSB'}):"
+        if bit == 0:
+            label_text = "bit=0 (LSB):"
+        elif bit == 7:
+            label_text = "bit=7 (MSB):"
+        else:
+            label_text = f"bit={bit}:      "
         row_cells = []
-        for perm_name in perm_names:
+        for ch_name in channel_names:
             entry = next(
-                (e for e in matrix if e[0] == bit and e[1] == perm_name),
+                (e for e in matrix if e[0] == bit and e[1] == ch_name),
                 None,
             )
             if entry is None:
@@ -448,18 +449,19 @@ def _format_matrix_for_journal(
                 cell = cell.rstrip() + " <=="
                 cell = cell.ljust(col_width + 4)
             row_cells.append(cell)
-        lines.append(f"{label:18s}" + "".join(row_cells))
+        lines.append(f"{label_text:18s}" + "".join(row_cells))
     return "\n".join(lines)
 
 
-# ============ 15 通道 × LSB+MSB preview matrix (per v0.5-lsb-tool-15channel-matrix Commit 2) ============
+# ============ 15 通道定义 + 8 bit × 15 channel preview matrix (per v0.5-lsb-tool-15channel-matrix Commit 2) ============
 
 
-# 15 通道组合定义 (per Owner 列表 + 随波逐流 风格, v0.5-train-016 §1.2)
+# 15 通道组合定义 (per Owner 2026-06-28 18:13 反馈, 作为 8 bit × 15 channel 矩阵的横向表头)
 # ('label', channels_with_zero)
 #  - 6 full perm: RGB/RBG/GRB/GBR/BRG/BGR (3 bits/pixel)
-#  - 6 zero-padded: RG0/R0B/0GB/R00/0G0/00B (1~3 bits/pixel)
+#  - 6 zero-padded: RG0/R0B/0GB/R00/0G0/00B (1~3 bits/pixel, positional zero 跟 随波逐流 一致)
 #  - 3 single channel: R/G/B (1 bit/pixel)
+# 注: 同时被 `_build_bit_plane_preview_matrix` (横向 PERMS) 跟 zero_aware 函数复用
 _15_CHANNELS: list[tuple[str, list[str]]] = [
     # 6 full perm
     ("RGB", ["R", "G", "B"]),
@@ -480,94 +482,3 @@ _15_CHANNELS: list[tuple[str, list[str]]] = [
     ("G", ["G"]),
     ("B", ["B"]),
 ]
-
-# LSB + MSB (per Owner "LSB+MSB 增强版")
-_15CH_BIT_MODES: list[int] = [0, 7]
-
-
-def _build_15channel_preview_matrix(
-    img_array: np.ndarray,
-    n_bytes: int = 50,
-    scan_order: str = "row",
-    byte_bit_order: str = "msb",
-) -> list[tuple[str, int, str, bool]]:
-    """15 通道 × 2 bit mode (LSB + MSB) preview 矩阵 (per v0.5-lsb-tool-15channel-matrix).
-
-    Args:
-        img_array: (H, W, 3 or 4) uint8 numpy array
-        n_bytes: 每 cell preview 长度 (默认 50, per Owner 截图长度, 够识别明文)
-        scan_order: "row" (随波逐流 默认)
-        byte_bit_order: "msb" (随波逐流 默认)
-
-    Returns:
-        list of (label, bit, preview_str, has_keyword) tuples
-        长度 = 15 × 2 = 30
-    """
-    matrix: list[tuple[str, int, str, bool]] = []
-    for label, channels in _15_CHANNELS:
-        for bit in _15CH_BIT_MODES:
-            try:
-                byte_stream = _extract_lsb_byte_stream_zero_aware(
-                    img_array, channels=channels, bit=bit,
-                    scan_order=scan_order, byte_bit_order=byte_bit_order,
-                )
-            except ValueError:
-                byte_stream = b""
-            preview = _ascii_preview(byte_stream, n_bytes=n_bytes)
-            has_kw = any(kw in byte_stream[:n_bytes] for kw in _PREVIEW_KEYWORDS)
-            matrix.append((label, bit, preview, has_kw))
-    return matrix
-
-
-def _format_15channel_matrix_for_journal(
-    matrix: list[tuple[str, int, str, bool]],
-    preview_width: int = 50,
-) -> str:
-    """15 通道矩阵渲染 (per 随波逐流 风格 + LSB+MSB 增强).
-
-    输出格式 (2 段: LSB 段 + MSB 段, 每段 15 行):
-        [15 通道 LSB (bit 0) 预览]
-            preview (50 bytes):
-        RGB:        Hey! I think we can write safely in this file witho  <==
-        BRG:        $3..$..54<........{...y..3...4...5.;.4..2....?
-        ...
-        B:          .................................................
-
-        [15 通道 MSB (bit 7) 预览]
-            preview (50 bytes):
-        RGB:        .....
-        ...
-
-    Args:
-        matrix: 15 channels × 2 bit modes = 30 entries
-        preview_width: preview 列宽 (默认 50, 跟 _build_15channel_preview_matrix n_bytes 对齐)
-
-    Returns:
-        多行字符串, journal 友好
-    """
-    if not matrix:
-        return ""
-
-    lines: list[str] = []
-
-    for bit in _15CH_BIT_MODES:
-        bit_label = "LSB (bit 0)" if bit == 0 else "MSB (bit 7)"
-        lines.append(f"[15 通道 {bit_label} 预览]")
-        lines.append(f"{'':<6}preview ({preview_width} bytes):")
-
-        # 按 _15_CHANNELS 顺序输出 (跟 随波逐流 一致)
-        for label, _ in _15_CHANNELS:
-            entry = next(
-                (e for e in matrix if e[0] == label and e[1] == bit),
-                None,
-            )
-            if entry is None:
-                lines.append(f"{label}:{'':<{preview_width + 5}}")
-                continue
-            _, _, preview, has_kw = entry
-            cell = preview.ljust(preview_width)
-            marker = "  <==" if has_kw else ""
-            lines.append(f"{label}:{cell}{marker}")
-        lines.append("")  # 段间空行
-
-    return "\n".join(lines).rstrip()

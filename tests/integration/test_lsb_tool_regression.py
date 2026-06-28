@@ -186,12 +186,12 @@ class TestRealFixtureSmoke:
             assert result.exit_code in (0, 1), f"mode={mode} failed: {result.stdout}"
 
     def test_lsb_tool_detect_includes_15channel_matrix(self, real_png_path):
-        """lsb_tool detect mode 输出含 15 通道 preview matrix (per v0.5-lsb-tool-15channel-matrix).
+        """lsb_tool detect mode 输出含 8 bit × 15 channel preview matrix (per v0.5-lsb-tool-15channel-matrix 实战修订).
 
         验证 journal 输出含:
-        - "[15 通道 LSB (bit 0) 预览]" 段标题
-        - "[15 通道 MSB (bit 7) 预览]" 段标题
-        - 15 行 label (RGB/RBG/GRB/GBR/BRG/BGR/RG0/R0B/0GB/R00/0G0/00B/R/G/B)
+        - "[bit-plane preview matrix 8 bit × 15 channel]" 段标题
+        - 15 通道横向表头 (RGB/RBG/GRB/GBR/BRG/BGR/RG0/R0B/0GB/R00/0G0/00B/R/G/B)
+        - 8 bit 纵向表头 (bit=0 LSB ~ bit=7 MSB)
         """
         from automisc.tools.steganography.image.lsb_tool_adapter import LsbToolAdapter
 
@@ -200,28 +200,30 @@ class TestRealFixtureSmoke:
 
         stdout = result.stdout or ""
         # 段标题存在
-        assert "[15 通道 LSB (bit 0) 预览]" in stdout, (
-            f"stdout 应含 15 通道 LSB 段标题, got first 500 chars:\n{stdout[:500]!r}"
-        )
-        assert "[15 通道 MSB (bit 7) 预览]" in stdout, (
-            f"stdout 应含 15 通道 MSB 段标题, got first 500 chars:\n{stdout[:500]!r}"
+        assert "[bit-plane preview matrix 8 bit × 15 channel" in stdout, (
+            f"stdout 应含 8 bit × 15 channel 标题, got first 500 chars:\n{stdout[:500]!r}"
         )
 
-        # 15 通道 label 全在 LSB 段 (per Owner 列表)
+        # 15 通道 label 全在表头行 (per Owner 列表)
+        # stdout 结构:
+        #   line 0: "lsb_tool detect: ..."
+        #   line 1: "" (空)
+        #   line 2: "[bit-plane preview matrix 8 bit × 15 channel, ...]"
+        #   line 3: 横向表头 (15 通道名)
         expected_labels = ["RGB", "RBG", "GRB", "GBR", "BRG", "BGR",
                            "RG0", "R0B", "0GB", "R00", "0G0", "00B",
-                           "R:", "G:", "B:"]
-        # 取 LSB 段 (LSB 到 MSB 之间)
-        lsb_section = stdout.split("[15 通道 LSB (bit 0) 预览]")[1].split("[15 通道 MSB")[0]
+                           "R", "G", "B"]
+        all_lines = stdout.split("\n")
+        header_line = all_lines[3] if len(all_lines) > 3 else ""
         for label in expected_labels:
-            assert label in lsb_section, (
-                f"LSB 段应含 {label!r}, got:\n{lsb_section[:500]!r}"
+            assert label in header_line, (
+                f"表头应含 {label!r}, got header line:\n{header_line!r}"
             )
 
     def test_lsb_tool_detect_synthetic_15ch_keyword(self, tmp_path):
-        """synthetic: RGB per-pixel interleaved LSB 嵌 'Hey' → 15 通道矩阵 LSB RGB 行 <==.
+        """synthetic: RGB per-pixel interleaved LSB 嵌 'Hey' → 8 bit × 15 channel 矩阵 bit=0 RGB 行 <==.
 
-        端到端验证: 写 PNG → LsbToolAdapter detect → result.stdout 应含 'Hey' 命中.
+        端到端验证: 写 PNG → LsbToolAdapter detect → result.stdout 应含 'Hey' 命中 + <== 标记.
         """
         from PIL import Image
 
@@ -248,9 +250,10 @@ class TestRealFixtureSmoke:
         result = adapter.run(str(png_path))
         stdout = result.stdout or ""
 
-        # 15 通道矩阵 LSB RGB 行应含 'Hey' 命中 (per Owner 截图场景)
-        assert "RGB:" in stdout
-        assert "Hey" in stdout, f"stdout 应含 'Hey' 命中, got:\n{stdout[:1000]!r}"
+        # 8 bit × 15 channel 矩阵 bit=0 RGB 行应含 'Hey' 命中 + <== 标记
+        assert "bit=0" in stdout
+        assert "Hey" in stdout, f"stdout 应含 'Hey' 命中, got:\n{stdout[:1500]!r}"
+        assert "<==" in stdout, f"stdout 应含 '<==' 命中标记, got:\n{stdout[:1500]!r}"
 
 
 # ============================================================
