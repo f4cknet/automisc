@@ -88,9 +88,9 @@ MISC（根）
 > - **v2.7**: 新增 `strings.exe` + pip `binwalk 2.3.2`；`grep` → PowerShell `Select-String`（Win 内置）；§4 Python 包 11 个 ✅ + 8 个 ❌ pending；新增 `requirements.txt`
 > - **v2.8 (scope 收窄)**: `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — Rust 装**保留**（独立价值：未来 cargo install 兜底 / binwalk v3 备选 / ad-hoc 工具编写）；**Stage 1 evtx_dump CLI 撤回** (per Owner 2026-06-28 决策：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 + EventID scoring + 命令行关键字匹配, evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 grep 的便利；实战 ≥3 道同类命中再升架构 per AGENTS §5.2)。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)
 > - §2 数字为**去重后**统计（54 unique tools）；§3 表格 awk 切片会读到更多行（含跨节重复 + 新增 strings/binwalk）
-> - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），14 个 P0 工具 pending
+> - §6.1 P0 列表：8 个 P0 已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd` / `strings` / `binwalk`）+ `Select-String`（grep 替代），13 个 P0 工具 pending（v2.9 删 evtx_dump #16）
 
-> **v0.1 P0 实际 adapter 数**：22 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），22 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
+> **v0.1 P0 实际 adapter 数**：21 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求；v2.9 删 evtx_dump #16）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），21 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
 ---
 
@@ -133,88 +133,13 @@ MISC（根）
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
 | **Select-String** | ✅ | PowerShell 内置 | 日志关键字 + 异常分析 | P0 |
-| **evtx_dump** | ❌ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64） | Windows .evtx 事件日志解析（XML / JSON / JSONL） | P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） · **2026-06-28 决策: CLI 不走 install.ps1**（adapter 走 python-evtx）|
 | **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**adapter 走 python-evtx 路径**（src/automisc/tools/forensics/log/evtx_dump.py，结构化字段访问 + EventID scoring + 命令行关键字匹配）| .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
 | **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
 
-#### 3.4.1 evtx_dump 参数速查（per `evtx_dump --help`）
+> **evtx_dump CLI** 不在本表（2026-06-28 决策：CLI 不走 install.ps1，adapter 走 python-evtx in-process）。决策依据 + 未来实战触发条件见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md) §6。
 
-| 参数 | 类型 | 默认 | 说明 | automisc 封装建议 |
-|---|---|---|---|---|
-| `<INPUT>` | 路径 | （必填）| .evtx 文件路径 | `argv[1]` |
-| `-t, --threads <N>` | int | 0 (=CPU cores) | worker 线程数 | **保持默认**（自动并行） |
-| `-o, --format <F>` | enum | `xml` | 输出格式：`xml` / `json` / `jsonl` | **默认 xml**（grep 友好）；JSONL 适合 journal 结构化落盘 |
-| `-f, --output <FILE>` | 路径 | stdout | 写到文件而不是 stdout（写文件前会问确认） | **加 `--no-confirm-overwrite`**（自动化必加） |
-| `--no-confirm-overwrite` | flag | false | 跳过 `-f` 写文件的覆盖确认 | **自动化场景必加** |
-| `--events <RANGES>` | string | 全输出 | 事件范围，如 `1`（第 1 个）/ `0-10,20-30`（0~10 + 20~30）| 可选，**调试 / 抽样** 用 |
-| `--validate-checksums` | flag | false | 校验 chunk checksum，坏的跳过 | **CTF 场景不推荐**（损坏文件反而记录更多） |
-| `--no-indent` | flag | false | 输出不缩进 | JSONL 自动启用 |
-| `--separate-json-attributes` | flag | false | JSON 模式：XML 属性放 `_attributes` 对象 | 可选，**结构化解析时开** |
-| `--dont-show-record-number` | flag | false | 不打印 `Record <id>` 前缀 | JSONL 自动启用 |
-| `--ansi-codec <C>` | enum | `windows-1252` | ANSI 字符串编码（CJK / 西欧 / 西里尔等）| **默认即可**；CJK 文件可试 `utf-8` / `gbk` / `gb18030` |
-| `--stop-after-one-error` | flag | false | 出错立即停止 | **debug 用**，CTF 跑全文件别开 |
-| `-v` / `-vv` / `-vvv` | flag | 0 | info / debug / trace 日志（trace 只 debug build 有） | **保持默认** |
-| `-V, --version` | flag | — | 打版本 | — |
-| `-h, --help` | flag | — | 打 help | — |
-
-#### 3.4.2 典型调用（5 个 pattern）
-
-```bash
-# 1) XML 到 stdout（默认，最简，GUI 可直接 grep）
-evtx_dump file.evtx | grep -E 'flag|key|password|ctf' -i
-
-# 2) JSONL 到文件（journal 结构化落盘）
-evtx_dump file.evtx -o jsonl --no-indent --dont-show-record-number -f out.jsonl --no-confirm-overwrite
-
-# 3) 仅看前 10 个事件（快速 triage）
-evtx_dump file.evtx --events=0-10
-
-# 4) CJK Windows evtx
-evtx_dump file.evtx --ansi-codec=utf-8
-
-# 5) 损坏 evtx 全捞（跳过 checksum 校验）
-evtx_dump file.evtx | head -1000
-```
-
-#### 3.4.3 adapter 封装模板（per Architecture §6 plug-in）
-
-```python
-# src/automisc/tools/forensics/log/evtx_dump.py
-from pathlib import Path
-from ...base import ToolAdapter, ToolResult
-
-class EVTXDumpAdapter(ToolAdapter):
-    """evtx_dump (Rust evtx crate 0.8.2) — Windows .evtx parser"""
-    name = "evtx_dump"
-    binary = "extend_tools/evtx_dump"  # 相对 repo root，subprocess 走绝对路径
-
-    def run(self, file_path: Path, **kwargs) -> ToolResult:
-        fmt = kwargs.get("format", "xml")           # xml / json / jsonl
-        out_file = kwargs.get("out_file")           # None = stdout
-        threads = kwargs.get("threads", 0)          # 0 = CPU 自动
-
-        cmd = [self.binary, str(file_path), "-o", fmt]
-        if threads:
-            cmd += ["-t", str(threads)]
-        if out_file:
-            cmd += ["-f", str(out_file), "--no-confirm-overwrite"]
-
-        # subprocess.run(cmd, capture_output=True, timeout=60, text=True)
-        # → ToolResult(stdout=..., stderr=..., returncode=...)
-```
-
-**封装决策点**（未来 adapter 实装时定）：
-
-| 决策点 | 建议 | 理由 |
-|---|---|---|
-| binary 路径 | 相对 repo root `extend_tools/evtx_dump` | per AGENTS §2.3 macOS 标准 PATH 简洁 |
-| 默认 format | `xml` | CLI grep 友好 |
-| threads 默认 | `0`（auto）| 多核机器加速 |
-| timeout | `60s` 起，跑挂再加 | 大文件可能 60s+ |
-| 部分失败行为 | **不要 fail-fast** | evtx_dump 对损坏文件部分成功（部分 chunk 输出 + 部分 skip） |
-
-#### 3.4.4 python-evtx Python 模块用法
+#### 3.4.1 python-evtx Python 模块用法
 
 ```python
 # 结构化字段提取（自动遍历 EventID / Provider / Data）
@@ -223,10 +148,6 @@ with Evtx.Evtx("file.evtx") as log:
     for record in log.records():
         print(record.root_element().find("EventID").text)
 ```
-
-**CLI vs Python 路径分工**：
-- **CLI**（`extend_tools/evtx_dump`）→ **快速 grep / 大文件流式** / 不写代码的场景
-- **Python**（`import Evtx`）→ **结构化字段提取** / 写 adapter 时遍历字段
 
 
 ### 3.5 Steganography / Image Stego（图片隐写）
@@ -416,7 +337,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **Memory Forensics** | vol.py + strings + binwalk | vol3 / photorec（雕刻）|
 | **Disk Forensics** | 7z（解 VMDK/OVA）+ photorec + testdisk | sleuthkit（fls/icat）/ veracrypt |
 | **Network Forensics** | tshark + tcpdump + file | wireshark（GUI 辅助）/ pcapfix / scapy |
-| **Log Forensics** | Select-String（PowerShell）+ evtx_dump | 7z（解压 .evtx.bz2）+ python-evtx |
+| **Log Forensics** | Select-String（PowerShell）+ python-evtx（adapter in-process）| 7z（解压 .evtx.bz2）|
 | **Image Stego** | exiftool + zsteg + foremost + binwalk | steghide / outguess / stegdetect / stegseek / F5 |
 | **Audio Stego** | ffmpeg（频谱）| sox / audacity / DeepSound / MP3Stego |
 | **Video Stego** | ffmpeg + ffprobe（多 stream 提取）| vlc（视觉验证）/ MP4Box / mediainfo |
@@ -431,9 +352,9 @@ with Evtx.Evtx("file.evtx") as log:
 ## 6. P0 工具优先级（v0.1 必须有 adapter）
 
 > **依据** [`prd.md §4.1 v0.1.6`](./prd.md)：v0.1 必须落地 **≥5 个 adapter**。
-> **当前实际 P0 工具数：22 个**（覆盖全部 11 个 subflow）。
+> **当前实际 P0 工具数：21 个**（覆盖全部 11 个 subflow；v2.9 删 evtx_dump #16）。
 
-### 6.1 P0 工具清单（22 个 · 按 subflow 排列）
+### 6.1 P0 工具清单（21 个 · 按 subflow 排列）
 
 | # | 工具 | 分支 / 子分支 | 安装依赖 |
 |---|---|---|---|
@@ -452,8 +373,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 13 | **unzip** | Misc/Archive | ❌ pending（Win 可走 7z / Python `zipfile` 替代）|
 | 14 | **xxd** | 通用 | ✅ 已装（`extend-tools/bin/win-x64/vim92/xxd.exe`）|
 | 15 | **Select-String** | Forensics/Log + 通用 | ✅ 已装（PowerShell 内置）|
-| 16 | **evtx_dump** | Forensics/Log | ❌ pending（per `extend_tools/evtx_dump` 路径待重装；**2026-06-28 决策**：adapter 走 python-evtx in-process, CLI 不走 install.ps1; 实战 ≥3 道同类命中再升架构 per AGENTS §5.2）|
-| 17 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
+| 16 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
 | 18 | **john** | Misc/Archive | ❌ pending（Win 可用 `hashcat` / `zipcrack.py` 替代）|
 | 19 | **zbar** | Misc/Brainteaser（QR）| ❌ pending |
 | 20 | **sox** | Stego/Audio | ❌ pending |
@@ -474,7 +394,7 @@ with Evtx.Evtx("file.evtx") as log:
 | **v0.1.0b-PR8** | Misc/Brainteaser QR（zbar 安装 + adapter）| 1 | zbar 安装 |
 | **v0.1.0b-PR9** | Python 包：python-magic-bin + numpy 安装 + 基础依赖 | 3 | pip 安装 |
 
-> **判断**：v0.1 阶段 22 个 P0 adapter 分 9 个 PR，平均每 PR 2-3 个 adapter，远低于 400 行限制。
+> **判断**：v0.1 阶段 21 个 P0 adapter 分 9 个 PR，平均每 PR 2-3 个 adapter，远低于 400 行限制。
 
 ### 6.3 Encoding（自编写）的 P0 实现
 
@@ -513,6 +433,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-28 | **2.9** | **§3.4 evtx_dump 整段删除** (per Owner 2026-06-28 "是否可以删除 tools.md 中3.4 evtx_dump"): §3.4 表格删 evtx_dump 行（剩 Select-String + python-evtx + 7z + journalctl 4 项）+ 删 §3.4.1 (参数速查表 14 参数) + 删 §3.4.2 (典型调用 5 pattern) + 删 §3.4.3 (adapter 封装模板 + 决策点表); §3.4.4 (python-evtx Python 模块用法) → 重编号 §3.4.1 + 删 "CLI vs Python 路径分工" 段（CLI 文档全删, 这段成空头）; §5 subflow 表 Log Forensics 行 `Select-String + evtx_dump \| 7z + python-evtx` → `Select-String + python-evtx (adapter in-process) \| 7z`; §6.1 P0 #16 evtx_dump 行删除（21 个 P0 工具, 不是 22 个）; 5 处 "22 个" → "21 个" 同步 (§2 备注 / §6 header / §6.1 / §6.2 / §6 header); §3.4 表格底加 evtx_dump CLI 撤回说明脚注（指 upgrade/v0.5-windows-evtx-dump.md §6）。**不动**: python-evtx 行状态仍 ❌（虽然已装且 adapter 在用, Owner 未拍板 ✅ 切换; 留 §8 v2.10 跟进）。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
 | 2026-06-28 | **2.8** | **scope 收窄** (per Owner 2026-06-28 "既然python-evtx能代替 evtx-dump"): `extend-tools/install.ps1` 加 **Stage 0 Rust toolchain 装** (rustup-init stable + minimal profile, 失败 warning continue, idempotent 跳过已装) — **保留**（独立价值：未来 cargo install / binwalk v3 备选 / ad-hoc 工具）；**Stage 1 evtx_dump CLI 撤回** — 不加 evtx_dump 到 `$binaries` 数组。决策依据：adapter `src/automisc/tools/forensics/log/evtx_dump.py` 用 `python-evtx` 0.8.1 实现结构化字段访问 (XPath `e:System/e:EventID` / `e:EventData/e:Data[@Name='CommandLine']`) + EventID scoring (4625/1102 → sev 5) + 命令行关键字匹配 (powershell/cmd/mimikatz/-enc), evtx_dump CLI 在 adapter 路径上 0 调用, 实际价值仅 = Owner 手动 `evtx_dump file.evtx | grep flag` 的便利 (可被 5 行 Python one-liner 替代); 实战 ≥3 道同类命中再升架构 per AGENTS §5.2 防单题打补丁。`extend-tools/manifest.yaml` v1.2 → v1.1 回滚 (evtx_dump 块删除); §3.4/§3.4.1/§3.4.3/§3.4.4/§4/§6.1#16 evtx_dump 路径全部回滚到 `extend_tools/evtx_dump` (legacy macOS 软链, 当前 Win 未生效); §2 总表 19✅/35❌ → 18✅/36❌ (Forensics 3✅→2✅)。原 commit `f54d859` 的 smoke 9 测 + SHA256 校验结果作为"已验证，待实战触发再启用"证据保留在 `upgrade/v0.5-windows-evtx-dump.md` §6 决策记录。详见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md)。 |
 | 2026-06-28 | **2.7** | **§3 strings + binwalk + grep→Select-String + §4 Python 包同步** (per Owner 2026-06-28 指令): Owner 实装 `strings.exe` 到 `extend-tools/bin/win-x64/strings.exe` (370KB, 2026-06-27) + `pip install binwalk 2.3.2` 已在 venv (注意: pip freeze 显示从 `automisc/extend-tools/bin/win-x64/binwalk-2.3.2` 本地路径安装, 老目录残留, 需清); §3 strings/binwalk 标 ✅; §3 + §6.1 `grep` 替换为 PowerShell `Select-String` (Win 替代, awk/sed/sort/uniq 仍 pending); §4 Python 包: PIL/lxml/docx/numpy/scipy/python-magic/pycryptodome/zstandard/base65536/python-evtx 已装, 12+ 包仍 pending; 新增 `requirements.txt` (pinned 版本, 从 pip freeze 提取 + pyproject.toml 对齐); §2 统计刷新 (18✅ / 36❌ pending)。 |
 | 2026-06-28 | **2.6** | **§3 + §6.1 状态同步**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个二进制（`file.exe` / `7z.exe` + `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），对应 §3 / §6.1 表格行已标 ✅ + Windows extend-tools 路径；其他工具统一标 ❌ (pending)。同步由 `tools_status_sync.py` 脚本完成（单文件，不入 commit）。 |
