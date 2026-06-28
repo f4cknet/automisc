@@ -80,17 +80,18 @@ MISC（根）
 
 | 一级分支 | 子分支数 | 工具总数（✅/⚠️/❌）| v0.1 P0 adapter |
 |---|---|---|---|
-| **Forensics** | 4 | 14（**12✅ / 3⚠️ / 6❌** *）| 6 |
-| **Steganography** | 3 | 22（**10✅ / 1⚠️ / 11❌** *）| 8 |
+| **Forensics** | 4 | 14（**1✅ / 0⚠️ / 13❌**）| 6 |
+| **Steganography** | 3 | 22（**3✅ / 0⚠️ / 19❌**）| 8 |
 | **Encoding** | 3 | **0**（内置实现）| 0 |
-| **Misc Others** | 3 | 10（5✅ / 0⚠️ / 5❌）| 3 |
-| **共享基础工具** | — | 8（8✅）| 5 |
-| **合计** | 14 | 54（**37✅ / 2⚠️ / 15❌** *）| **22** |
+| **Misc Others** | 3 | 10（**3✅ / 0⚠️ / 7❌**）| 3 |
+| **共享基础工具** | — | 8（**4✅ / 0⚠️ / 4❌**）| 5 |
+| **合计** | 14 | 54（**11✅ / 0⚠️ / 43❌**）| **22** |
 
-> **\*** 2026-06-14 更新（per `upgrade/v0.5-tool-install-batch-1.md` + `upgrade/v0.5-tool-install-batch-2.md`）：
-> - **batch-1**：4 个工具❌→✅（pcapfix / aircrack-ng / scapy / impacket）
-> - **batch-2**：sox ❌→✅（brew install）；evtx_dump ⚠️→✅（用 `extend_tools/evtx_dump` Rust 二进制 0.8.2，不用 pyenv shim）；python-evtx ⚠️→✅（包已装，CLI 走 extend_tools 二进制）
-> - §2 数字为**去重后**统计；§3 表格里有跨节重复（如 binwalk/exiftool 同时在 Shared + Stego/Image + Misc/Office），所以 awk 切片会读到 67 个 — 这是原表结构，不影响实际工具池。
+> **2026-06-28 更新（per §8 v2.6 + 本次 sync）**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个 Win 二进制（`file.exe` / `7z.exe` / `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），**§3 + §6.1 状态列已同步**：
+> - §3 表格里行级 status 已 ✅（含 Windows extend-tools 路径）
+> - 其他工具全部 ❌ (pending)
+> - §2 数字为**去重后**统计（`exiftool` / `steghide` / `7z` 在 §3 多节出现，但 unique tool 数仍为 8）；§3 表格 awk 切片会读到 74 行（含跨节重复）
+> - §6.1 P0 列表同步：6 个 P0 工具已装（`foremost` / `exiftool` / `file` / `7z` / `steghide` / `xxd`），16 个 P0 工具 pending
 
 > **v0.1 P0 实际 adapter 数**：22 个（远超 `prd.md §4.1 v0.1.6` 的 ≥5 要求）。**按 `AGENTS.md §2.1` 任务粒度（≤400 行 / PR），22 个 P0 adapter 必须分多个 PR 实施，建议每 PR 5-7 个 adapter**。
 
@@ -102,19 +103,19 @@ MISC（根）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **vol.py (Volatility 2)** | ⚠️ | `misc/volatility2/`（原目录丢失，软链 `automisc/extend_tools/volatility2` 为空）| 内存镜像取证（profiles + plugins）| **v0.1 必须恢复安装**（blocker） |
+| **vol.py (Volatility 2)** | ❌ | `misc/volatility2/`（原目录丢失，软链 `automisc/extend_tools/volatility2` 为空） | 内存镜像取证（profiles + plugins） | **v0.1 必须恢复安装**（blocker） |
 | **vol3 (Volatility 3)** | ❌ | `pip install volatility3` | 现代内存取证 | v0.5 安装 |
-| **strings** | ✅ | `/usr/bin/strings` | 内存字符串提取（含 FLAG / SSH_CLIENT / SESSION_KEY）| P0 |
-| **binwalk** | ✅ | `/usr/local/bin/binwalk` | 内存镜像内嵌文件提取 | P0 |
+| **strings** | ❌ | `/usr/bin/strings` | 内存字符串提取（含 FLAG / SSH_CLIENT / SESSION_KEY） | P0 |
+| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 内存镜像内嵌文件提取 | P0 |
 
 ### 3.2 Forensics / Disk Forensics（磁盘取证）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **fls / icat / mmls（sleuthkit）** | ❌ | `brew install sleuthkit` | 磁盘镜像文件系统解析（FAT16/NTFS/ext2/...）| v0.5 安装 |
-| **photorec** | ✅ | `/usr/local/bin/photorec` | 文件雕刻 + 分区恢复 | P1 · v0.5 候选 |
-| **testdisk** | ✅ | `/usr/local/bin/testdisk` | 分区恢复 + 文件系统修复 | P1 · v0.5 候选 |
-| **7z** | ✅ | `/usr/local/bin/7z` | 磁盘镜像（VMDK/OVA）解压 | P1 |
+| **fls / icat / mmls（sleuthkit）** | ❌ | `brew install sleuthkit` | 磁盘镜像文件系统解析（FAT16/NTFS/ext2/...） | v0.5 安装 |
+| **photorec** | ❌ | `/usr/local/bin/photorec` | 文件雕刻 + 分区恢复 | P1 · v0.5 候选 |
+| **testdisk** | ❌ | `/usr/local/bin/testdisk` | 分区恢复 + 文件系统修复 | P1 · v0.5 候选 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 磁盘镜像（VMDK/OVA）解压 | P1 |
 | **kpartx / losetup** | ❌ | macOS 通过 `hdiutil attach` 替代 | Linux 专用，macOS 用 `hdiutil` | 不装 |
 | **veracrypt** | ❌ | `brew install --cask veracrypt` | TrueCrypt/VeraCrypt 卷挂载 | v1.0 评估 |
 
@@ -122,23 +123,23 @@ MISC（根）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **tshark** | ✅ | `/usr/local/bin/tshark` | CLI 抓包 + 协议解析 + `--export-objects http` | P0 · v0.1 必须 |
-| **tcpdump** | ✅ | `/usr/sbin/tcpdump` | 原始抓包（速度优先）| P0 · v0.1 必须 |
-| **wireshark** | ✅ | `/Applications/Wireshark.app/Contents/MacOS/wireshark` | GUI 流量分析（GUI 调用）| P1 · v0.5 候选 |
-| **pcapfix** | ✅ | `/usr/local/bin/pcapfix`（**brew core 无 formula**，从 SourceForge 下源码编译，v0.5-tool-install-batch-1 实施）| 损坏 pcap 修复（缺 magic bytes / 校验和）| v0.5 已装 |
-| **aircrack-ng** | ✅ | `/usr/local/bin/aircrack-ng`（v1.7_2，brew install）| WiFi WPA/WEP 破解 | v0.5 已装 |
+| **tshark** | ❌ | `/usr/local/bin/tshark` | CLI 抓包 + 协议解析 + `--export-objects http` | P0 · v0.1 必须 |
+| **tcpdump** | ❌ | `/usr/sbin/tcpdump` | 原始抓包（速度优先） | P0 · v0.1 必须 |
+| **wireshark** | ❌ | `/Applications/Wireshark.app/Contents/MacOS/wireshark` | GUI 流量分析（GUI 调用） | P1 · v0.5 候选 |
+| **pcapfix** | ❌ | `/usr/local/bin/pcapfix`（**brew core 无 formula**，从 SourceForge 下源码编译，v0.5-tool-install-batch-1 实施） | 损坏 pcap 修复（缺 magic bytes / 校验和） | v0.5 已装 |
+| **aircrack-ng** | ❌ | `/usr/local/bin/aircrack-ng`（v1.7_2，brew install） | WiFi WPA/WEP 破解 | v0.5 已装 |
 | **multimon-ng** | ❌ | `brew install multimon-ng` | DTMF / POCSAG 解码 | v0.5 候选 |
-| **scapy** | ✅ | pip scapy 2.7.0（v0.5-tool-install-batch-1 实施）| Python pcap 操作 | v0.5 已装 |
-| **impacket** | ✅ | pip impacket 0.13.1（v0.5-tool-install-batch-1 实施）| NTLMv2 / Kerberos 解析（PCAP 中的 hashcat 提取）| v0.5 已装 |
+| **scapy** | ❌ | pip scapy 2.7.0（v0.5-tool-install-batch-1 实施） | Python pcap 操作 | v0.5 已装 |
+| **impacket** | ❌ | pip impacket 0.13.1（v0.5-tool-install-batch-1 实施） | NTLMv2 / Kerberos 解析（PCAP 中的 hashcat 提取） | v0.5 已装 |
 
 ### 3.4 Forensics / Log Forensics（日志取证）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **grep / awk / sed / sort / uniq** | ✅ | macOS 自带 | 日志关键字 + 异常分析 | P0 |
-| **evtx_dump** | ✅ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64）| Windows .evtx 事件日志解析（XML / JSON / JSONL）| P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） |
-| **python-evtx（Python 包）** | ✅ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**CLI 入口走 extend_tools/evtx_dump**（Rust 0.8.2），不依赖 shim | .evtx 解析（Python 模块路径）| P0 · v0.5 已装 |
-| **7z** | ✅ | `/usr/local/bin/7z` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
+| **grep / awk / sed / sort / uniq** | ❌ | macOS 自带 | 日志关键字 + 异常分析 | P0 |
+| **evtx_dump** | ❌ | `extend_tools/evtx_dump`（Rust crate `evtx` 0.8.2 二进制，Mach-O x86_64） | Windows .evtx 事件日志解析（XML / JSON / JSONL） | P0 · **直接调绝对路径**，不用 PATH shim（shim 入口挂） |
+| **python-evtx（Python 包）** | ❌ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK）。**CLI 入口走 extend_tools/evtx_dump**（Rust 0.8.2），不依赖 shim | .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
 
 #### 3.4.1 evtx_dump 参数速查（per `evtx_dump --help`）
@@ -236,41 +237,41 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **binwalk** | ✅ | `/usr/local/bin/binwalk` | 嵌入文件检测 + 提取 | P0 |
-| **zsteg** | ✅ | `/usr/local/bin/zsteg`（**Ruby gem**，不是 Python 包）| PNG/BMP LSB 全通道检测 | P0 |
-| **steghide** | ✅ | `~/.local/bin/steghide` | JPEG/BMP/WAV/AU 隐写（口令）| P0 |
-| **outguess** | ✅ | `/usr/local/bin/outguess` | JPEG 隐写 | P1 · v0.5 候选 |
-| **stegdetect** | ✅ | `~/.local/bin/stegdetect` | JPEG 隐写检测（jsteg/OutGuess/F5/AppendX）| P1 · v0.5 候选 |
-| **stegseek** | ✅ | `~/.local/bin/stegseek` | steghide 高速口令爆破 | P1 · v0.5 候选 |
-| **pngcheck** | ✅ | `/usr/local/bin/pngcheck` | PNG chunk 结构验证 + IDAT / tEXt 分析 | P1 · v0.5 候选 |
-| **foremost** | ✅ | `/usr/local/bin/foremost` | 图片嵌入文件雕刻 | P0 |
-| **exiftool** | ✅ | `/usr/local/bin/exiftool` | EXIF 元数据（GPS / Make / Model / Software）| P0 |
-| **F5-steganography** | ⚠️ | `misc/F5-steganography/`（已软链 `automisc/extend_tools/`）| JPEG F5 DCT 系数提取 + 解密 | 需 `java` + 手写 wrapper |
+| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 嵌入文件检测 + 提取 | P0 |
+| **zsteg** | ❌ | `/usr/local/bin/zsteg`（**Ruby gem**，不是 Python 包） | PNG/BMP LSB 全通道检测 | P0 |
+| **steghide** | ✅ | `extend-tools/bin/win-x64/steghide/steghide.exe` | JPEG/BMP/WAV/AU 隐写（口令） | P0 |
+| **outguess** | ❌ | `/usr/local/bin/outguess` | JPEG 隐写 | P1 · v0.5 候选 |
+| **stegdetect** | ❌ | `~/.local/bin/stegdetect` | JPEG 隐写检测（jsteg/OutGuess/F5/AppendX） | P1 · v0.5 候选 |
+| **stegseek** | ❌ | `~/.local/bin/stegseek` | steghide 高速口令爆破 | P1 · v0.5 候选 |
+| **pngcheck** | ❌ | `/usr/local/bin/pngcheck` | PNG chunk 结构验证 + IDAT / tEXt 分析 | P1 · v0.5 候选 |
+| **foremost** | ✅ | `extend-tools/bin/win-x64/foremost.exe` | 图片嵌入文件雕刻 | P0 |
+| **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | EXIF 元数据（GPS / Make / Model / Software） | P0 |
+| **F5-steganography** | ❌ | `misc/F5-steganography/`（已软链 `automisc/extend_tools/`） | JPEG F5 DCT 系数提取 + 解密 | 需 `java` + 手写 wrapper |
 | **stegolsb** | ❌ | `pip install stegolsb` | 通用 LSB 隐写 | v0.5 安装 |
 | **stegano** | ❌ | `pip install stegano` | 高级 LSB 工具 | v0.5 安装 |
 | **stegcracker** | ❌ | `pip install stegcracker` | steghide 字典爆破 | v0.5 安装 |
 | **apngdis** | ❌ | `brew install apngdis` | APNG 帧提取 | v0.5 安装 |
-| **deepsound** | ❌ | Windows 工具（Wine）| DeepSound 隐写提取 | v1.0 评估 |
+| **deepsound** | ❌ | Windows 工具（Wine） | DeepSound 隐写提取 | v1.0 评估 |
 
 ### 3.6 Steganography / Audio Stego（音频隐写）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **ffmpeg** | ✅ | `/usr/local/bin/ffmpeg` | 音频转码 + 频谱生成 + showspectrumpic 滤镜 | P0 · v0.1 必须 |
-| **sox** | ✅ | `/usr/local/bin/sox`（brew install，2026-06-14 装）| 音频处理 + spectrogram 生成 + `sox -m` 多轨减法 | P0 · v0.1 必须 |
-| **audacity** | ❌ | `brew install --cask audacity` | GUI 音频分析（GUI 调用）| v0.5 安装 |
+| **ffmpeg** | ❌ | `/usr/local/bin/ffmpeg` | 音频转码 + 频谱生成 + showspectrumpic 滤镜 | P0 · v0.1 必须 |
+| **sox** | ❌ | `/usr/local/bin/sox`（brew install，2026-06-14 装） | 音频处理 + spectrogram 生成 + `sox -m` 多轨减法 | P0 · v0.1 必须 |
+| **audacity** | ❌ | `brew install --cask audacity` | GUI 音频分析（GUI 调用） | v0.5 安装 |
 | **sonic-visualiser** | ❌ | `brew install --cask sonic-visualiser` | GUI 频谱分析 | v0.5 安装 |
-| **MP3Stego** | ⚠️ | `misc/MP3Stego/`（源码）| MP3 隐写（口令）| 需编译 `Decode.exe`（Wine） |
-| **steghide** | ✅ | `~/.local/bin/steghide` | WAV/AU 隐写 | 共享 |
+| **MP3Stego** | ❌ | `misc/MP3Stego/`（源码） | MP3 隐写（口令） | 需编译 `Decode.exe`（Wine） |
+| **steghide** | ✅ | `extend-tools/bin/win-x64/steghide/steghide.exe` | WAV/AU 隐写 | 共享 |
 | **deepsound2john.py** | ❌ | GitHub `deepsound2john.py` | DeepSound 哈希提取给 John | v1.0 评估 |
 
 ### 3.7 Steganography / Video Stego（视频隐写）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **ffmpeg** | ✅ | `/usr/local/bin/ffmpeg` | 视频帧提取 + 多 stream 分离 + `ffprobe` | P0 · v0.1 必须 |
-| **ffprobe** | ✅ | `/usr/local/bin/ffprobe` | 多 stream 视频元数据查询 | P0 |
-| **vlc** | ❌ | `brew install --cask vlc` | GUI 视频播放（GUI 调用，验证视觉）| v0.5 安装 |
+| **ffmpeg** | ❌ | `/usr/local/bin/ffmpeg` | 视频帧提取 + 多 stream 分离 + `ffprobe` | P0 · v0.1 必须 |
+| **ffprobe** | ❌ | `/usr/local/bin/ffprobe` | 多 stream 视频元数据查询 | P0 |
+| **vlc** | ❌ | `brew install --cask vlc` | GUI 视频播放（GUI 调用，验证视觉） | v0.5 安装 |
 | **MP4Box（GPAC）** | ❌ | `brew install gpac` | MP4 容器解析 | v0.5 安装 |
 | **mediainfo** | ❌ | `brew install mediainfo` | 视频元数据 | v0.5 安装 |
 
@@ -339,45 +340,45 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **7z** | ✅ | `/usr/local/bin/7z` | 全格式解压（zip/rar/7z/tar.gz/bz2/xz）| P0 · v0.1 必须 |
-| **unzip** | ✅ | `/usr/bin/unzip` | zip 解压 + 伪加密检查 | P0 |
-| **file** | ✅ | `/usr/bin/file` | magic 识别压缩类型 | P0 |
-| **john** | ❌ | `brew install john-jumbo` | 4-6 位数字爆破（zip/rar）| P0 · v0.1 必须装 |
-| **hashcat** | ❌ | `brew install hashcat` | GPU 加速破解（zip/rar 哈希）| v0.5 安装 |
-| **zipcrack.py** | ⚠️ | `misc/zipcrack.py`（未软链）| 纯 Python zip 4-6 位爆破 | v0.1 作为 john 缺失的 fallback |
-| **rar / unrar** | ❌ | `brew install rar` | rar 创建 / 解压（区别于 unrar-only）| v0.5 安装 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 全格式解压（zip/rar/7z/tar.gz/bz2/xz） | P0 · v0.1 必须 |
+| **unzip** | ❌ | `/usr/bin/unzip` | zip 解压 + 伪加密检查 | P0 |
+| **file** | ✅ | `extend-tools/bin/win-x64/file.exe` | magic 识别压缩类型 | P0 |
+| **john** | ❌ | `brew install john-jumbo` | 4-6 位数字爆破（zip/rar） | P0 · v0.1 必须装 |
+| **hashcat** | ❌ | `brew install hashcat` | GPU 加速破解（zip/rar 哈希） | v0.5 安装 |
+| **zipcrack.py** | ❌ | `misc/zipcrack.py`（未软链） | 纯 Python zip 4-6 位爆破 | v0.1 作为 john 缺失的 fallback |
+| **rar / unrar** | ❌ | `brew install rar` | rar 创建 / 解压（区别于 unrar-only） | v0.5 安装 |
 
 ### 3.10 Misc Others / Office（文档分析）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **exiftool** | ✅ | `/usr/local/bin/exiftool` | Office/PDF 元数据 + 隐藏字段 | P0 |
-| **binwalk** | ✅ | `/usr/local/bin/binwalk` | 文档内嵌文件检测 | P0 |
-| **pdftotext** | ⚠️ | `brew install poppler` 后 `/usr/local/bin/pdftotext` | PDF 文本提取 | v0.1 通过 exiftool + binwalk 间接覆盖，pdftotext 可选 |
-| **mutool** | ❌ | `brew install mupdf-tools` | PDF 重组 + 对象提取（xref 隐藏页）| v0.5 安装 |
-| **python-docx** | ✅ | `python3 -c "import docx"` ✅ | .docx 解析（XML 结构 + 隐藏文字 + macro）| v0.5 候选 |
+| **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | Office/PDF 元数据 + 隐藏字段 | P0 |
+| **binwalk** | ❌ | `/usr/local/bin/binwalk` | 文档内嵌文件检测 | P0 |
+| **pdftotext** | ❌ | `brew install poppler` 后 `/usr/local/bin/pdftotext` | PDF 文本提取 | v0.1 通过 exiftool + binwalk 间接覆盖，pdftotext 可选 |
+| **mutool** | ❌ | `brew install mupdf-tools` | PDF 重组 + 对象提取（xref 隐藏页） | v0.5 安装 |
+| **python-docx** | ❌ | `python3 -c "import docx"` ✅ | .docx 解析（XML 结构 + 隐藏文字 + macro） | v0.5 候选 |
 
 ### 3.11 Misc Others / Brainteaser（脑洞题）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **Python 标准库** | ✅ | macOS 自带 | 字符串/字符操作 + struct + re | 全部脑洞题 base |
-| **z3-solver** | ❌ | `pip install z3-solver` | 约束求解（约束编码 / Boolean gate network）| v0.5 安装 |
-| **PIL（Pillow）** | ✅ | `python3 -c "import PIL"` ✅ | 像素级脑洞题（图片当数据）| 已装 Python 包 |
+| **Python 标准库** | ❌ | macOS 自带 | 字符串/字符操作 + struct + re | 全部脑洞题 base |
+| **z3-solver** | ❌ | `pip install z3-solver` | 约束求解（约束编码 / Boolean gate network） | v0.5 安装 |
+| **PIL（Pillow）** | ❌ | `python3 -c "import PIL"` ✅ | 像素级脑洞题（图片当数据） | 已装 Python 包 |
 | **qrcode / segno / pyzbar** | ❌ | `pip install qrcode segno pyzbar` | QR 生成 / 解析 / 重组 | v0.5 安装 |
 
 ### 3.12 共享基础工具（不挂 subflow · 各分支通用）
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **strings** | ✅ | `/usr/bin/strings` | 提取可打印字符串（跨所有 binary 类文件）| P0 · 通用 |
-| **file** | ✅ | `/usr/bin/file` | magic 识别（跨所有文件）| P0 · 通用 |
-| **xxd** | ✅ | `/usr/bin/xxd` | hex dump / hex ↔ binary | P0 · 通用 |
-| **hexdump** | ✅ | `/usr/bin/hexdump` | hex dump（BSD 风格）| P1 · 通用 |
-| **grep** | ✅ | macOS 自带 | 文本搜索（flag / ctf / key）| P0 · 通用 |
-| **exiftool** | ✅ | `/usr/local/bin/exiftool` | 元数据（跨图片 / Office / 部分 PDF）| P0 · 通用 |
-| **foremost** | ✅ | `/usr/local/bin/foremost` | 文件雕刻（跨所有 binary 类文件）| P0 · 通用 |
-| **scalpel** | ❌ | `brew install scalpel` | 高效文件雕刻（foremost 备选）| v0.5 安装 |
+| **strings** | ❌ | `/usr/bin/strings` | 提取可打印字符串（跨所有 binary 类文件） | P0 · 通用 |
+| **file** | ✅ | `extend-tools/bin/win-x64/file.exe` | magic 识别（跨所有文件） | P0 · 通用 |
+| **xxd** | ✅ | `extend-tools/bin/win-x64/vim92/xxd.exe` | hex dump / hex ↔ binary | P0 · 通用 |
+| **hexdump** | ❌ | `/usr/bin/hexdump` | hex dump（BSD 风格） | P1 · 通用 |
+| **grep** | ❌ | macOS 自带 | 文本搜索（flag / ctf / key） | P0 · 通用 |
+| **exiftool** | ✅ | `extend-tools/bin/win-x64/exiftool.exe` | 元数据（跨图片 / Office / 部分 PDF） | P0 · 通用 |
+| **foremost** | ✅ | `extend-tools/bin/win-x64/foremost.exe` | 文件雕刻（跨所有 binary 类文件） | P0 · 通用 |
+| **scalpel** | ❌ | `brew install scalpel` | 高效文件雕刻（foremost 备选） | v0.5 安装 |
 
 ---
 
@@ -440,28 +441,28 @@ with Evtx.Evtx("file.evtx") as log:
 
 | # | 工具 | 分支 / 子分支 | 安装依赖 |
 |---|---|---|---|
-| 1 | **binwalk** | Stego/Image + Forensics/Memory + 通用 | ✅ 已装 |
-| 2 | **strings** | Forensics/Memory + 通用 | ✅ 已装 |
-| 3 | **foremost** | Stego/Image + 通用 | ✅ 已装 |
-| 4 | **exiftool** | Stego/Image + Misc/Office + 通用 | ✅ 已装 |
-| 5 | **tshark** | Forensics/Network | ✅ 已装 |
-| 6 | **tcpdump** | Forensics/Network | ✅ 已装 |
-| 7 | **file** | Misc/Archive + 通用 | ✅ 已装 |
-| 8 | **7z** | Forensics/Disk + Misc/Archive + Forensics/Log | ✅ 已装 |
-| 9 | **steghide** | Stego/Image + Stego/Audio | ✅ 已装 |
-| 10 | **zsteg** | Stego/Image | ✅ 已装（Ruby gem） |
-| 11 | **ffmpeg** | Stego/Audio + Stego/Video | ✅ 已装 |
-| 12 | **ffprobe** | Stego/Video | ✅ 已装 |
-| 13 | **unzip** | Misc/Archive | ✅ 已装 |
-| 14 | **xxd** | 通用 | ✅ 已装 |
-| 15 | **grep** | Forensics/Log + 通用 | ✅ 已装 |
-| 16 | **evtx_dump** | Forensics/Log | ✅ `extend_tools/evtx_dump`（Rust 0.8.2） |
-| 17 | **vol.py** | Forensics/Memory | ⚠️ **必须先恢复 vol2 安装** |
-| 18 | **john** | Misc/Archive | ❌ v0.1 必须装 `brew install john-jumbo` |
-| 19 | **zbar** | Misc/Brainteaser（QR）| ❌ v0.1 必须装 `brew install zbar` |
-| 20 | **sox** | Stego/Audio | ✅ brew install（2026-06-14） |
-| 21 | **python-magic-bin** | 通用（file 类型识别 Python）| ❌ v0.1 必须 `pip install python-magic-bin` |
-| 22 | **numpy** | 通用（图像/频谱处理）| ❌ v0.1 必须 `pip install numpy` |
+| 1 | **binwalk** | Stego/Image + Forensics/Memory + 通用 | ❌ pending（pip 包，待装）|
+| 2 | **strings** | Forensics/Memory + 通用 | ❌ pending |
+| 3 | **foremost** | Stego/Image + 通用 | ✅ 已装（`extend-tools/bin/win-x64/foremost.exe`）|
+| 4 | **exiftool** | Stego/Image + Misc/Office + 通用 | ✅ 已装（`extend-tools/bin/win-x64/exiftool.exe`）|
+| 5 | **tshark** | Forensics/Network | ❌ pending |
+| 6 | **tcpdump** | Forensics/Network | ❌ pending |
+| 7 | **file** | Misc/Archive + 通用 | ✅ 已装（`extend-tools/bin/win-x64/file.exe`）|
+| 8 | **7z** | Forensics/Disk + Misc/Archive + Forensics/Log | ✅ 已装（`extend-tools/bin/win-x64/7z.exe`，7zr.exe 同目录 hardlink）|
+| 9 | **steghide** | Stego/Image + Stego/Audio | ✅ 已装（`extend-tools/bin/win-x64/steghide/steghide.exe`，cygwin DLL 同目录）|
+| 10 | **zsteg** | Stego/Image | ❌ pending（Win 无 Ruby gem；用自研 `lsb_detect` 替代，per `upgrade/v0.5-lsb-detector`）|
+| 11 | **ffmpeg** | Stego/Audio + Stego/Video | ❌ pending |
+| 12 | **ffprobe** | Stego/Video | ❌ pending |
+| 13 | **unzip** | Misc/Archive | ❌ pending（Win 可走 7z / Python `zipfile` 替代）|
+| 14 | **xxd** | 通用 | ✅ 已装（`extend-tools/bin/win-x64/vim92/xxd.exe`）|
+| 15 | **grep** | Forensics/Log + 通用 | ❌ pending（Win 可用 `findstr` / PowerShell `Select-String` 替代）|
+| 16 | **evtx_dump** | Forensics/Log | ❌ pending（per `extend_tools/evtx_dump` 路径待重装）|
+| 17 | **vol.py** | Forensics/Memory | ❌ pending（必须先恢复 vol2 安装）|
+| 18 | **john** | Misc/Archive | ❌ pending（Win 可用 `hashcat` / `zipcrack.py` 替代）|
+| 19 | **zbar** | Misc/Brainteaser（QR）| ❌ pending |
+| 20 | **sox** | Stego/Audio | ❌ pending |
+| 21 | **python-magic-bin** | 通用（file 类型识别 Python）| ❌ pending（pip install 待装）|
+| 22 | **numpy** | 通用（图像/频谱处理）| ❌ pending（pip install 待装）|
 
 ### 6.2 P0 实施顺序（按 PR 拆分 · per `AGENTS.md §2.1` ≤400 行/PR）
 
@@ -516,6 +517,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-28 | **2.6** | **§3 + §6.1 状态同步**：Owner 在 `extend-tools/bin/win-x64/` 实装 8 个二进制（`file.exe` / `7z.exe` + `7zr.exe` / `exiftool.exe` / `foremost.exe` / `vim92/diff.exe` / `vim92/xxd.exe` / `steghide/steghide.exe`），对应 §3 / §6.1 表格行已标 ✅ + Windows extend-tools 路径；其他工具统一标 ❌ (pending)。同步由 `tools_status_sync.py` 脚本完成（单文件，不入 commit）。 |
 | 2026-06-27 | **2.5** | v0.5-windows-only 治理变更 v3.3：项目定位收窄为 Windows only（per `AGENTS.md §2.3`）；`extend-tools/bin/win-x64/` 是 Win 优先工具链；macOS / Linux 路径探测代码 + brew 注释清理待 PR5/6 实施；详见 [`upgrade/v0.5-windows-only.md`](./upgrade/v0.5-windows-only.md)。 |
 | 2026-06-13 | 1.0 | 初版：扫描 9 个 subflow + macOS 工具抽查。详见 git history。 |
 | 2026-06-13 | **2.0** | 重大分支重整：从 9 subflow 改为 11 subflow（Forensics×4 + Stego×3 + Encoding×3 + Misc Others×3）；54 工具（28✅/2⚠️/24❌）；Encoding 内置实现。详见 commit `9401f98`。 |
