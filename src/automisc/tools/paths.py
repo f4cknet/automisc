@@ -7,6 +7,9 @@ v0.5+ (multi-platform per AGENTS.md §2.3 v3.2):
     resolve_tool_binary(name) -> str | None
     1) 先查 PATH (macOS Homebrew / Windows 系统 PATH)
     2) fallback extend-tools/bin/<platform>/<name>{.exe} (Windows 下 manifest.yaml 自动装的 binary)
+    3) subdir fallback extend-tools/bin/<platform>/<name>/<name>{.exe}
+       (per fix-resolve-tool-binary-subdir, Cygwin runtime DLLs 依赖同目录
+        例如 steghide Cygwin build, 不能 flat 部署)
 
 返回 None 时, subprocess.run 自然 FileNotFoundError, _run_subprocess 兜底返回 exit 127.
 
@@ -60,10 +63,12 @@ def resolve_tool_binary(name: str) -> str | None:
 
     Lookup order:
     1. PATH (shutil.which) — macOS Homebrew / Windows system PATH
-    2. extend-tools/bin/<platform>/<name>.exe (Windows fallback)
+    2. extend-tools/bin/<platform>/<name>.exe (Windows flat fallback)
+    3. extend-tools/bin/<platform>/<name>/<name>.exe (Windows subdir fallback,
+       per fix-resolve-tool-binary-subdir, for Cygwin runtime tools like steghide)
 
     Args:
-        name: tool name (e.g. "binwalk" / "exiftool" / "tshark").
+        name: tool name (e.g. "binwalk" / "exiftool" / "steghide" / "tshark").
 
     Returns:
         Absolute path as string, or None if not found.
@@ -73,13 +78,21 @@ def resolve_tool_binary(name: str) -> str | None:
     if found:
         return found
 
-    # 2) extend-tools fallback
+    # 2) extend-tools fallback (flat layout, e.g. file/exiftool/7zr/foremost/binwalk)
     bindir = extend_tools_bin_dir()
     if bindir is None:
         return None
     candidate = bindir / f"{name}{exe_suffix()}"
     if candidate.exists():
         return str(candidate)
+
+    # 3) subdir fallback (per fix-resolve-tool-binary-subdir):
+    #    Cygwin runtime tools (e.g. steghide 0.5.1-cygwin) require DLLs
+    #    (cygwin1.dll + cyg*.dll) to be co-located with the .exe.
+    #    These cannot be deployed flat, so we look in <name>/<name>.exe
+    sub_candidate = bindir / name / f"{name}{exe_suffix()}"
+    if sub_candidate.exists():
+        return str(sub_candidate)
     return None
 
 

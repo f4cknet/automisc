@@ -9,6 +9,7 @@
 |---|---|---|---|---|
 | v0.5-gui-zip-full | `gui_zip_trigger_no_bruteforce` | v0.5-LSB-router-GUI | GUI `_maybe_trigger_zip_chain_from_binwalk` 走 `build_zip_chain_dag`（无 bruteforce）→ 真加密 zip 永远 fail | ✅ done (commit (待 push)) |
 | v0.5-base64-image-file-windows | `base64_image_file_windows` | v0.5-base64-image | `core/decoders/base64_image.py:_file_detect` 用 `shutil.which("file")` Win 端 None → 抛 "file 检测: (empty / no file command)"；改用 `resolve_tool_binary("file")` 走 extend-tools/bin/win-x64/file.exe fallback | ✅ done (commit (待 push)) |
+| v0.5-resolve-tool-binary-subdir | `resolve_tool_binary_subdir` | v0.5-stegseek-remove | `automisc/tools/paths.py:resolve_tool_binary` 只看 flat 布局 `bin/<name>.exe`，不查 subdir 布局 `bin/<name>/<name>.exe` → steghide Cygwin build (DLL 依赖必须同目录) Win 端永远找不到。修后 +8 单测从 skip 转 pass (SteghideAdapter 9 / SteghideCrackAction 8 / SteghideExtractAction 7 跑通) | ✅ done (commit (待 push)) |
 
 ---
 
@@ -19,3 +20,7 @@
 ## v0.5-base64-image-file-windows — base64-image decoder Win 端 file 命令找不到
 
 **详细记录**：[`upgrade/fix_base64_image_file_windows.md`](upgrade/fix_base64_image_file_windows.md)
+
+## v0.5-resolve-tool-binary-subdir — resolve_tool_binary 加 subdir fallback
+
+**详细记录**：[`upgrade/fix_resolve_tool_binary_subdir.md`](upgrade/fix_resolve_tool_binary_subdir.md)
