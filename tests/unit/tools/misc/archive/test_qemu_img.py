@@ -5,6 +5,10 @@ per Owner 2026-06-29 23:23 拍 B 升架构 (实战 v0.5-train-018 flag.vmdk):
 - 跟 sevenz / sevenz_extract 对偶
 - 双注册: get_tool("qemu_img") + get_tool("qemu_img_extract")
 
+per fix_qemu_img_friendly_error (2026-06-29 23:40 Owner 实战触发):
+- resolve_tool_binary 找不到 qemu-img → 友好 SP binary_not_found + 装命令提示, exit 127
+- 2 adapter 同样预检 (qemu_img_extract 写盘前预检, 不 mkdir 空目录)
+
 覆盖:
 - 注册: get_tool("qemu_img") → QemuImgAdapter
 - 注册: get_tool("qemu_img_extract") → QemuImgExtractAdapter
@@ -14,6 +18,9 @@ per Owner 2026-06-29 23:23 拍 B 升架构 (实战 v0.5-train-018 flag.vmdk):
 - qemu_img_extract 清空已有 extract_dir
 - qemu_img 用 resolve_tool_binary 找 qemu-img
 - qemu_img extract 失败兜底
+- qemu_img info 未装 → 友好 SP binary_not_found sev=2 + 装命令提示
+- qemu_img_extract 未装 → 同样 + 不写空目录
+- qemu_img info 装着: 走真 subprocess (exit 0 mock) 正常 emit vdisk_format SP
 """
 from __future__ import annotations
 
@@ -30,6 +37,23 @@ from automisc.tools.misc.archive.qemu_img_extract import QemuImgExtractAdapter
 # ---------- 是否装 qemu-img (PATH 找, per v0.5-qemu-img-extend-tools NSIS 装) ----------
 HAS_QEMU_IMG = shutil.which("qemu-img") is not None
 SKIP_REASON = "qemu-img CLI not installed (Owner 跑 install.ps1 装, 或手工 PATH 注册)"
+
+
+# ---------- autouse: 默认让 resolve_tool_binary 找到 (per fix_qemu_img_friendly_error
+#           pre-flight 要走通才能测业务逻辑; 真找不到的 SP 单独测)
+
+@pytest.fixture(autouse=True)
+def _patch_resolve_tool_binary_finds(monkeypatch):
+    """默认 autouse: resolve_tool_binary 找得到 qemu-img (per fix_qemu_img_friendly_error
+    pre-flight 需 mock 才能让 _run_subprocess 路径走到 — 否则 auto-run 实战
+    '未装' 路径拦路返回 127, 测不到业务逻辑 SP).
+    """
+    from automisc.tools import paths as paths_mod
+    fake_qemu_path = r"C:\Program Files\qemu\qemu-img.exe"
+    monkeypatch.setattr(
+        paths_mod, "resolve_tool_binary",
+        lambda name: fake_qemu_path if name == "qemu-img" else None,
+    )
 
 
 # ---------- 注册 ----------
@@ -69,6 +93,10 @@ class TestQemuImgInfo:
 
     def test_qemu_img_info_vmdk_format_suspicious_point(self, monkeypatch):
         """mock qemu-img info 输出含 'file format: vmdk' → SP vdisk_format sev=3."""
+        from automisc.tools import paths as paths_mod
+        fake_qemu_path = r"C:\Program Files\qemu\qemu-img.exe"
+        monkeypatch.setattr(paths_mod, "resolve_tool_binary", lambda name: fake_qemu_path if name == "qemu-img" else None)
+
         a = QemuImgAdapter()
         mock_output = (
             "image: flag.vmdk\n"
@@ -94,6 +122,9 @@ class TestQemuImgInfo:
 
     def test_qemu_img_info_unsupported_format_returns_toolresult(self, monkeypatch):
         """qemu-img info 不支持的格式 → exit 1, 不 panic, 返回 ToolResult."""
+        from automisc.tools import paths as paths_mod
+        monkeypatch.setattr(paths_mod, "resolve_tool_binary", lambda name: r"C:\fake\qemu-img.exe")
+
         a = QemuImgAdapter()
         monkeypatch.setattr(
             a, "_run_subprocess",
@@ -150,7 +181,9 @@ class TestQemuImgExtractConvert:
 
         def mock_subprocess(cmd, timeout=None):
             # cmd 应该是 [qemu-img, convert, -f, vmdk, -O, raw, <input>, <output>]
-            assert cmd[0].endswith("qemu-img") or cmd[0] == "qemu-img"
+            # cmd[0] 在 NSIS 装环境是 'C:\\Program Files\\qemu\\qemu-img.exe',
+            # 测试环境 mock 'C:\\fake\\qemu-img.exe', endswith 兼容两种
+            assert cmd[0].endswith("qemu-img") or cmd[0].endswith("qemu-img.exe")
             assert cmd[1] == "convert"
             assert cmd[2] == "-f"
             assert cmd[3] == "vmdk"
@@ -216,6 +249,91 @@ class TestQemuImgExtractConvert:
         # 没 vdisk_extracted SP (没成功)
         ext_sps = [sp for sp in result.suspicious_points if sp.category == "vdisk_extracted"]
         assert len(ext_sps) == 0
+
+
+# ---------- fix_qemu_img_friendly_error 实战兜底 ----------
+
+class TestQemuImgBinaryNotFound:
+    """per fix_qemu_img_friendly_error (Owner 2026-06-29 23:40 实战触发):
+    resolve_tool_binary 找不到 qemu-img → 友好 SP binary_not_found + 中文装命令提示,
+    而不是 raw FileNotFoundError 英文崩。
+    """
+
+    def test_info_emits_binary_not_found_sp_when_missing(self, monkeypatch):
+        """qemu-img 未装: emit SP binary_not_found (sev=2) + 中文 stderr + install.ps1 提示."""
+        from automisc.tools import paths as paths_mod
+        monkeypatch.setattr(paths_mod, "resolve_tool_binary", lambda name: None)
+
+        a = QemuImgAdapter()
+        # _run_subprocess 不应被调 (pre-flight 拦在前)
+        def fail_if_called(*a, **kw):
+            raise AssertionError("不应走到 _run_subprocess, 预检就该 return")
+
+        monkeypatch.setattr(a, "_run_subprocess", fail_if_called)
+
+        result = a.run("/fake/flag.vmdk")
+        assert result.exit_code == 127
+        # SP binary_not_found sev=2
+        nf_sps = [sp for sp in result.suspicious_points if sp.category == "binary_not_found"]
+        assert len(nf_sps) == 1, f"应有 1 条 binary_not_found SP, 实际 {len(nf_sps)}"
+        assert nf_sps[0].severity == 2
+        # stderr 中文 + 装命令 (不是 raw [WinError 2])
+        assert "qemu-img" in result.stderr
+        assert "未找到" in result.stderr
+        assert "install.ps1" in result.stderr
+        assert "WinError" not in result.stderr
+        # install_hint metadata (per 后续 v0.5+ GUI 一键装按钮用)
+        assert result.metadata.get("binary_required") == "qemu-img"
+        assert "install.ps1" in result.metadata.get("install_hint", "")
+
+    def test_extract_emits_binary_not_found_sp_when_missing(self, monkeypatch, tmp_path):
+        """qemu_img_extract 未装: 同样友好兜底 + 不 mkdir 空目录."""
+        from automisc.tools import paths as paths_mod
+        monkeypatch.setattr(paths_mod, "resolve_tool_binary", lambda name: None)
+
+        input_vmdk = tmp_path / "flag.vmdk"
+        input_vmdk.write_bytes(b"fake vmdk\n")
+
+        b = QemuImgExtractAdapter()
+        def fail_if_called(*a, **kw):
+            raise AssertionError("extract 不应走到 _run_subprocess, 预检就该 return")
+
+        monkeypatch.setattr(b, "_run_subprocess", fail_if_called)
+
+        result = b.run(str(input_vmdk))
+        assert result.exit_code == 127
+        nf_sps = [sp for sp in result.suspicious_points if sp.category == "binary_not_found"]
+        assert len(nf_sps) == 1
+        # 不应该有 vdisk_extracted SP (没真跑 convert)
+        ext_sps = [sp for sp in result.suspicious_points if sp.category == "vdisk_extracted"]
+        assert len(ext_sps) == 0
+
+    def test_info_falls_through_when_binary_found(self, monkeypatch):
+        """qemu-img 装着: 走真 _run_subprocess, 不 emit binary_not_found, 正常 emit vdisk_format."""
+        from automisc.tools import paths as paths_mod
+        fake_qemu_path = r"C:\Program Files\qemu\qemu-img.exe"
+        monkeypatch.setattr(paths_mod, "resolve_tool_binary", lambda name: fake_qemu_path if name == "qemu-img" else None)
+
+        mock_output = (
+            "image: flag.vmdk\n"
+            "file format: vmdk\n"
+            "virtual size: 3.0G\n"
+        )
+
+        a = QemuImgAdapter()
+        monkeypatch.setattr(
+            a, "_run_subprocess",
+            lambda cmd, timeout=None: (0, mock_output, "", 100),
+        )
+
+        result = a.run("/fake/flag.vmdk")
+        assert result.exit_code == 0
+        # 没 binary_not_found SP
+        nf_sps = [sp for sp in result.suspicious_points if sp.category == "binary_not_found"]
+        assert len(nf_sps) == 0
+        # 有 vdisk_format SP
+        fmt_sps = [sp for sp in result.suspicious_points if sp.category == "vdisk_format"]
+        assert len(fmt_sps) == 1
 
 
 # ---------- e2e: 真实 qemu-img CLI (前提: 已装, 跨平台 skip) ----------

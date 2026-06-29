@@ -27,7 +27,13 @@ class QemuImgAdapter(ToolAdapter):
     def run(self, file_path: str) -> ToolResult:
         # v0.5-qemu-img-adapter: 走 resolve_tool_binary (per v0.5-platform-extend-tools 模式)
         from automisc.tools.paths import resolve_tool_binary
-        qemu_img_bin = self.binary_path or resolve_tool_binary("qemu-img") or "qemu-img"
+        qemu_img_bin = self.binary_path or resolve_tool_binary("qemu-img")
+
+        # fix_qemu_img_friendly_error (2026-06-29 23:40 Owner 实战触发):
+        #   qemu-img 未装 → 不写 FileNotFoundError 英文崩, 而是 emit 友好 SP + 装命令提示
+        #   (实战 1 道同类不升架构, per AGENTS §5.2; 仅改 adapter 层, 不动 base.py 普适)
+        if not qemu_img_bin:
+            return _binary_not_found_result(self.name, file_path, binary_name="qemu-img")
 
         cmd = [qemu_img_bin, "info", file_path]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd, timeout=self.default_timeout)
@@ -67,6 +73,57 @@ class QemuImgAdapter(ToolAdapter):
             stderr=stderr,
             suspicious_points=suspicious,
         )
+
+
+def _binary_not_found_result(
+    tool_name: str, file_path: str, *, binary_name: str
+) -> ToolResult:
+    """fix_qemu_img_friendly_error helper: binary 未装 友好 SP + 装命令提示。
+
+    实战触发 (2026-06-29 23:39 Owner 跑 flag.vmdk auto-run):
+        exit_code 127 + stderr = `[WinError 2] 系统找不到指定的文件。` + 0 SP
+        → Owner GUI 看不懂, 没法自助装。
+
+    修法: 友好中文 stderr + 1 SP ``binary_not_found`` (sev=2 warning) +
+          ``install_hint`` 装命令 (per upgrade/v0.5-qemu-img-extend-tools.md).
+    Reuse: qemu_img_extract 同样调, 写盘前预检 (避免 mkdir 空目录后跑崩).
+
+    Args:
+        tool_name: adapter name (e.g. "qemu_img" / "qemu_img_extract")
+        file_path: 用户拖入文件, 仅用于 SP context
+        binary_name: 缺失的 binary 名称 (e.g. "qemu-img")
+
+    Returns:
+        ToolResult(exit=127, stderr=友好提示, suspicious_points=[binary_not_found SP])
+    """
+    stderr_msg = (
+        f"binary '{binary_name}' 未找到 (exit 127)\n"
+        f"提示: 跑 `pwsh ./extend-tools/install.ps1` 静默装 {binary_name}; "
+        f"完成后重试。详见 upgrade/v0.5-qemu-img-extend-tools.md"
+    )
+    return ToolResult(
+        tool_name=tool_name,
+        exit_code=127,
+        stdout="",
+        stderr=stderr_msg,
+        suspicious_points=[SuspiciousPoint(
+            id="",
+            tool_name=tool_name,
+            file_path=file_path,
+            category="binary_not_found",
+            offset=None,
+            matched_pattern=f"{binary_name} 未安装 (exit 127)",
+            severity=2,  # warning: 功能不可用, 不是文件恶意
+            suggested_action=(
+                f"跑 `pwsh ./extend-tools/install.ps1` 静默装 {binary_name}; "
+                f"或 GUI 工具栏点 '🖼️ qemu-img 转换' 之前先装"
+            ),
+        )],
+        metadata={
+            "binary_required": binary_name,
+            "install_hint": "pwsh ./extend-tools/install.ps1",
+        },
+    )
 
 
 __all__ = ["QemuImgAdapter"]

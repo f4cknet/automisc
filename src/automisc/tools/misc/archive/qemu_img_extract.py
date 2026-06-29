@@ -13,6 +13,8 @@ from automisc.core.result import ToolResult
 from automisc.core.suspicious import SuspiciousPoint, scan_output_for_suspicious
 from automisc.tools.base import ToolAdapter
 from automisc.core.utils.output_path import extract_dir_for
+# fix_qemu_img_friendly_error: 共享 _binary_not_found_result helper (per qemu_img.py)
+from automisc.tools.misc.archive.qemu_img import _binary_not_found_result
 
 
 @register_tool
@@ -30,7 +32,13 @@ class QemuImgExtractAdapter(ToolAdapter):
     def run(self, file_path: str) -> ToolResult:
         # v0.5-qemu-img-adapter: 走 resolve_tool_binary
         from automisc.tools.paths import resolve_tool_binary
-        qemu_img_bin = self.binary_path or resolve_tool_binary("qemu-img") or "qemu-img"
+        qemu_img_bin = self.binary_path or resolve_tool_binary("qemu-img")
+
+        # fix_qemu_img_friendly_error (2026-06-29 23:40 Owner 实战触发):
+        #   qemu-img 未装 → 不 mkdir 空目录, 不跑 convert 崩, 直接 emit 友好 SP
+        #   (写盘前预检, 避免 Path.mkdir() 后 subprocess FileNotFoundError 残留空目录)
+        if not qemu_img_bin:
+            return _binary_not_found_result(self.name, file_path, binary_name="qemu-img")
 
         # 1. 准备 output 目录 (per v0.5-output-samedir)
         extract_dir = extract_dir_for(file_path, purpose="qemu_img_raw")
