@@ -130,6 +130,9 @@ platforms:
             - `diff`: extend-tools/bin/win-x64/vim92/diff.exe (file/diff tool, 不走 Unix `diff`)
             - `xxd`: extend-tools/bin/win-x64/vim92/xxd.exe (通用 hex dump)
             - `vim`: extend-tools/bin/win-x64/vim92/vim.exe (GUI 调用或脚本编辑)
+          paths.py:resolve_tool_binary 异名 subdir fallback
+          (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner) 自动
+          扫 bindir/*/xxd.exe 找到 vim92/xxd.exe, 不需要 explicit entry.
 
     pip_packages:
       # 1 Python package (pip install by install.ps1)

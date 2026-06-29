@@ -157,6 +157,123 @@ class TestResolveToolBinarySubdir:
         assert result is None
 
 
+# ---------- resolve_tool_binary: 异名 subdir fallback (per v0.5-extend-tools-subdir-flexible) ----------
+
+class TestResolveToolBinaryFlexibleSubdir:
+    """异名 subdir 布局 (e.g. vim92/xxd.exe / vim92/diff.exe) 走通配扫描 fallback.
+
+    背景: v0.5-platform-extend-tools 原始 subdir fallback 只看 <name>/<name>.exe (e.g. steghide/steghide.exe).
+    v0.5-extend-tools-subdir-flexible (2026-06-29) 扩展: 扫 bindir 下所有 1 层 subdir,
+    找 <subdir>/<name>{.exe}, 支持 vim92/xxd.exe / vim92/diff.exe 等异名 subdir 部署.
+    """
+
+    def test_xxd_in_vim92_subdir_resolved(self):
+        """Win 端 xxd 在 vim92/ subdir, 修复后应能找到 (前提: extend-tools 已装 vim92)."""
+        if sys.platform != "win32":
+            pytest.skip("vim92 subdir 部署仅 Win 端有意义")
+        xxd_path = paths.resolve_tool_binary("xxd")
+        if xxd_path is None:
+            pytest.skip("xxd not installed (vim92 没装到 extend-tools/bin/win-x64/vim92/)")
+        p = Path(xxd_path)
+        assert p.name == "xxd.exe"
+        assert p.parent.name == "vim92", (
+            f"应走异名 subdir 布局 <bin>/vim92/xxd.exe, 实际: {p}"
+        )
+
+    def test_diff_in_vim92_subdir_resolved(self):
+        """Win 端 diff 在 vim92/ subdir, 修复后应能找到."""
+        if sys.platform != "win32":
+            pytest.skip("vim92 subdir 部署仅 Win 端有意义")
+        diff_path = paths.resolve_tool_binary("diff")
+        if diff_path is None:
+            pytest.skip("diff not installed (vim92 没装到 extend-tools/bin/win-x64/vim92/)")
+        p = Path(diff_path)
+        assert p.name == "diff.exe"
+        assert p.parent.name == "vim92", (
+            f"应走异名 subdir 布局 <bin>/vim92/diff.exe, 实际: {p}"
+        )
+
+    def test_flexible_subdir_layout(self, tmp_path):
+        """手动构造 test 场景: 临时目录里只放异名 subdir 布局 (vim92/xxd.exe), 验证 fallback."""
+        import automisc.tools.paths as paths_mod
+
+        # 临时结构: <tmp>/win-x64/vim92/xxd.exe (异名 subdir, 不叫 xxd/)
+        fake_bindir = tmp_path / "win-x64"
+        fake_subdir = fake_bindir / "vim92"  # 异名
+        fake_subdir.mkdir(parents=True)
+        fake_exe = fake_subdir / ("xxd.exe" if sys.platform == "win32" else "xxd")
+        fake_exe.write_text("# fake xxd binary")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
+            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
+
+            result = paths_mod.resolve_tool_binary("xxd")
+        assert result == str(fake_exe), (
+            f"异名 subdir fallback 应返回 {fake_exe}, 实际: {result}"
+        )
+
+    def test_flexible_subdir_does_not_recurse(self, tmp_path):
+        """异名 subdir 扫描**不**递归 (避免 vim92/runtime/xxd.exe 误匹配)."""
+        import automisc.tools.paths as paths_mod
+
+        # 临时结构: <tmp>/win-x64/vim92/runtime/xxd.exe (应该**不**找到, 因为不递归)
+        fake_bindir = tmp_path / "win-x64"
+        fake_subdir = fake_bindir / "vim92" / "runtime"  # 2 层 subdir
+        fake_subdir.mkdir(parents=True)
+        deep_exe = fake_subdir / ("xxd.exe" if sys.platform == "win32" else "xxd")
+        deep_exe.write_text("# fake xxd at depth 2")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
+            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
+
+            result = paths_mod.resolve_tool_binary("xxd")
+        assert result is None, (
+            f"2 层 subdir 不应递归找到 {deep_exe}, 实际: {result}"
+        )
+
+    def test_flexible_subdir_does_not_match_dotdirs(self, tmp_path):
+        """异名 subdir 扫描跳过隐藏目录 (.git 等)."""
+        import automisc.tools.paths as paths_mod
+
+        # 临时结构: <tmp>/win-x64/.git/xxd.exe (隐藏目录, 应跳过)
+        fake_bindir = tmp_path / "win-x64"
+        fake_hidden = fake_bindir / ".git"
+        fake_hidden.mkdir(parents=True)
+        hidden_exe = fake_hidden / ("xxd.exe" if sys.platform == "win32" else "xxd")
+        hidden_exe.write_text("# fake xxd in .git")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
+            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
+
+            result = paths_mod.resolve_tool_binary("xxd")
+        assert result is None, (
+            f"隐藏目录不应被扫描, 实际: {result}"
+        )
+
+    def test_steghide_legacy_subdir_still_works(self, tmp_path):
+        """旧 <name>/<name>.exe 兼容路径仍 OK (回归, 不被新通配破坏)."""
+        import automisc.tools.paths as paths_mod
+
+        # 临时结构: <tmp>/win-x64/steghide/steghide.exe (旧兼容)
+        fake_bindir = tmp_path / "win-x64"
+        fake_subdir = fake_bindir / "steghide"
+        fake_subdir.mkdir(parents=True)
+        fake_exe = fake_subdir / ("steghide.exe" if sys.platform == "win32" else "steghide")
+        fake_exe.write_text("# fake steghide binary")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
+            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
+
+            result = paths_mod.resolve_tool_binary("steghide")
+        assert result == str(fake_exe), (
+            f"旧 <name>/<name> 兼容应仍 OK, 实际: {result}"
+        )
+
+
 # ---------- list_extend_tools ----------
 
 class TestListExtendTools:

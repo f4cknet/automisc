@@ -41,7 +41,12 @@ class SteghideAudioAdapter(ToolAdapter):
     default_timeout = 30.0
 
     def run(self, file_path: str) -> ToolResult:
-        cmd = [self.binary_path or "steghide", "info", file_path]
+        # v0.5-extend-tools-subdir-flexible (2026-06-29 Owner 22:07 拍板): steghide 在
+        # extend-tools/bin/win-x64/steghide/steghide.exe (Cygwin build, subdir 部署),
+        # 裸 "steghide" 走 PATH 找不到, 改走 resolve_tool_binary 自动找 (per v0.5-platform-extend-tools PR2 pattern)
+        from automisc.tools.paths import resolve_tool_binary
+        steghide_bin = self.binary_path or resolve_tool_binary("steghide") or "steghide"
+        cmd = [steghide_bin, "info", file_path]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []

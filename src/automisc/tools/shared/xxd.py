@@ -47,7 +47,12 @@ class XxdAdapter(ToolAdapter):
 
     def run(self, file_path: str) -> ToolResult:
         # -l 256: 只 dump 前 256 字节，避免大文件爆炸
-        cmd = [self.binary_path or "xxd", "-l", "256", file_path]
+        # v0.5-extend-tools-subdir-flexible (2026-06-29 Owner 22:07 拍板): xxd 在
+        # extend-tools/bin/win-x64/vim92/xxd.exe (异名 subdir, vim 9.2 整包),
+        # 裸 "xxd" 走 PATH 找不到, 改走 resolve_tool_binary 自动找 (per v0.5-platform-extend-tools PR2 pattern)
+        from automisc.tools.paths import resolve_tool_binary
+        xxd_bin = self.binary_path or resolve_tool_binary("xxd") or "xxd"
+        cmd = [xxd_bin, "-l", "256", file_path]
         exit_code, stdout, stderr, duration_ms = self._run_subprocess(cmd)
 
         suspicious: list[SuspiciousPoint] = []

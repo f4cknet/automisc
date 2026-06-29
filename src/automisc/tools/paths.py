@@ -93,6 +93,21 @@ def resolve_tool_binary(name: str) -> str | None:
     sub_candidate = bindir / name / f"{name}{exe_suffix()}"
     if sub_candidate.exists():
         return str(sub_candidate)
+
+    # 4) 异名 subdir fallback (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner):
+    #    vim92/ 整包包含 vim.exe / diff.exe / xxd.exe + 同目录 winpty64.dll + cyg*.dll
+    #    依赖同目录, 不能 flat 部署. 扫 bindir 下所有 1 层 subdir 找 <subdir>/<name>.exe
+    #    不递归 (避免 vim92/runtime/xxd.exe 等误匹配)
+    try:
+        for sub in bindir.iterdir():
+            if not sub.is_dir() or sub.name.startswith("."):
+                continue
+            sub_other = sub / f"{name}{exe_suffix()}"
+            if sub_other.exists():
+                return str(sub_other)
+    except OSError:
+        # bindir 不存在 / 权限问题, fallback 到 None
+        pass
     return None
 
 
