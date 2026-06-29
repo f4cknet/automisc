@@ -34,20 +34,32 @@ from automisc.tools.misc.archive.qemu_img import QemuImgAdapter
 from automisc.tools.misc.archive.qemu_img_extract import QemuImgExtractAdapter
 
 
-# ---------- 是否装 qemu-img (PATH 找, per v0.5-qemu-img-extend-tools NSIS 装) ----------
-HAS_QEMU_IMG = shutil.which("qemu-img") is not None
-SKIP_REASON = "qemu-img CLI not installed (Owner 跑 install.ps1 装, 或手工 PATH 注册)"
+# ---------- 是否装 qemu-img (走 resolve_tool_binary 4 级 fallback, per v0.5-extend-tools-subdir-flexible) ----------
+# 不再用 shutil.which (仅 PATH), 因为 Owner 可手工装 extend-tools/bin/win-x64/qemu/qemu-img.exe
+# (异名 subdir fallback, 第 4 级), 不强制 PATH 注册 (NSIS 装才自动加 PATH)
+from automisc.tools.paths import resolve_tool_binary as _resolve_tool_binary
+HAS_QEMU_IMG = _resolve_tool_binary("qemu-img") is not None
+SKIP_REASON = (
+    "qemu-img CLI not installed. "
+    "修法: 装到 extend-tools/bin/win-x64/qemu/qemu-img.exe (手工 copy 也行, "
+    "paths.py 第 4 级 fallback 异名 subdir 会找到) 或跑 install.ps1 NSIS 静默装 C:\\Program Files\\qemu + PATH"
+)
 
 
 # ---------- autouse: 默认让 resolve_tool_binary 找到 (per fix_qemu_img_friendly_error
 #           pre-flight 要走通才能测业务逻辑; 真找不到的 SP 单独测)
 
 @pytest.fixture(autouse=True)
-def _patch_resolve_tool_binary_finds(monkeypatch):
+def _patch_resolve_tool_binary_finds(monkeypatch, request):
     """默认 autouse: resolve_tool_binary 找得到 qemu-img (per fix_qemu_img_friendly_error
     pre-flight 需 mock 才能让 _run_subprocess 路径走到 — 否则 auto-run 实战
     '未装' 路径拦路返回 127, 测不到业务逻辑 SP).
+
+    跳过 TestQemuImgE2E (走真 CLI, 必须用真 binary 路径; mock 喂的 fake path
+    会让 subprocess Popen 抛 FileNotFoundError).
     """
+    if "real_binary" in request.node.name:
+        return  # e2e 用真 binary, 不 mock
     from automisc.tools import paths as paths_mod
     fake_qemu_path = r"C:\Program Files\qemu\qemu-img.exe"
     monkeypatch.setattr(

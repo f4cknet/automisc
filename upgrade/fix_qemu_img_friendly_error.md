@@ -117,6 +117,30 @@ def test_info_falls_through_to_subprocess_when_binary_found():
 - 回归 tests/unit/tools/misc/archive/ 全过
 - 实战: owner GUI 跑 `🖼️ qemu-img 探测 (info)` flag.vmdk → stderr 输出 `binary 'qemu-img' 未找到... 跑 pwsh ./extend-tools/install.ps1...` 友好提示
 
+### 3.2 ✅ Owner 实战装完 (per 2026-06-30 00:15)
+
+**装法**: Owner 手工装 `extend-tools/bin/win-x64/qemu/qemu-img.exe` v11.0.50
+(URL `qemu-w64-setup-2025.05.12.exe` install.ps1 失效 — Stefan Weil 站点
+2026-04-22 后改命名 11.0.0 后的 installer `qemu-w64-setup-2026*.exe` 链路
+需要 install.ps1 §82 URL 更新, **实战 ≥3 道同类再评估升架构** 不并入本 fix)
++ 走 `paths.py` 第 4 级异名 subdir fallback 自动找到 (extend-tools/bin/win-x64/
+  下任何 1 层 subdir/<name>.exe), 不需要 PATH 注册.
+
+**e2e 激活验证**:
+- `test_qemu_img.py::TestQemuImgE2E::test_qemu_img_info_real_binary_does_not_panic` 从 skip → PASS (13/13 全过)
+- fixture autouse 加 `if "real_binary" in request.node.name: return` 让 e2e 走真 binary
+- `HAS_QEMU_IMG` 改用 `resolve_tool_binary` 而非 `shutil.which` (paths.py 4 级 fallback 一致)
+
+**实战命令验证** (per Owner 反馈"你继续"):
+```
+> qemu-img --version
+qemu-img version 11.0.50 (v11.0.0-12631-g54e84cdc7a)
+> python -c "from automisc.tools.paths import resolve_tool_binary; print(resolve_tool_binary('qemu-img'))"
+D:\hacktools\misc\automisc-fresh\extend-tools\bin\win-x64\qemu\qemu-img.exe
+> python -m pytest tests\unit\tools\misc\archive\test_qemu_img.py
+========================= 13 passed in 0.14s ========================
+```
+
 ## 4. 影响
 
 - 0 真实二进制依赖（qemu-img 不装也能跑 auto-run，友好提示代替崩溃）
