@@ -487,11 +487,17 @@ class MainWindow(QMainWindow):
 
         # 2. 清空 output (核心: per Owner 2026-06-14 "每次有新的 input 就要清空原来的 output")
         self.output_view.clear()
+        # 2.1 清空 journal (v0.5-journal-clear-on-new-file, per Owner 2026-06-29 21:53 拍板):
+        #     之前拖图跑过的 SP 残留在 journal_panel, 拖新文件时一起清, 避免跨文件误读
+        #     (实战触发: Owner 拖 zip 看到 steghide (auto FAIL) 段, 误以为是这次跑的;
+        #      实际是上次拖 jpg 留下的 journal 累积)
+        #     注意: Core journal (core/journal.py) 仍持续累积, 跨 session 审计用 (per v0.5-roadmap §5)
+        self.journal_panel.clear()
         # 清完留下 [cleared] 标记, 但 read-only 模式不便用户编辑 — 同时切到可编辑
         # 实际上用户拖入新文件后通常不会马上编辑, 保持 read-only 即可
         # 仍打 [cleared] 标记保留线索
         self.output_view.append_text(
-            f"[新文件] {file_path.name}  (v0.5-clear-on-new-file 已清空旧 output)"
+            f"[新文件] {file_path.name}  (v0.5-clear-on-new-file 已清空旧 output + journal)"
         )
 
         self.current_file = file_path
