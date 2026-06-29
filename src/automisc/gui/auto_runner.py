@@ -80,8 +80,9 @@ FIND_SUSPICIOUS_ARCHIVE_TOOLS = [
 FIND_SUSPICIOUS_BINARY_TOOLS = [
     "file",
     "strings",
-    "binwalk",    # 探测 (不 -e)
+    "binwalk",
     "exiftool",
+    "qemu_img",  # v0.5-qemu-img-adapter (Owner 23:23 拍 B): info 探测归探测, 可挂 auto-run
 ]
 
 

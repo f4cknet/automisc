@@ -42,7 +42,8 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
         "sox",
         "steghide_audio",
     ],
-    "Misc/Archive (PR5)": ["sevenz_extract", "unzip", "john", "zip_classify"],
+    "Misc/Archive (PR5)": ["sevenz_extract", "unzip", "john", "zip_classify",
+                            "qemu_img", "qemu_img_extract"],  # v0.5-qemu-img-adapter (Owner 23:23 拍 B 升架构)
     "Forensics/Log (PR6)": ["grep", "evtx_dump"],
     "Misc/Brainteaser (PR8)": ["zbar"],
     "Forensics/Memory (PR7)": ["vol"],
@@ -110,6 +111,8 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "lsb_tool": "🎨 PNG LSB 隐写分析",  # v0.5-lsb-tool-unify Phase 4: 3 mode 统一入口 (替代 lsb_extract + lsb_bytes)
     "bruteforce_rar": "🔨 RAR 暴力破解 (4-6 位)",
     "sevenz_extract": "📦 7z 解压",  # v0.5-sevenz-extract Owner 2026-06-20 19:48
+    "qemu_img": "🖼️ qemu-img 探测 (info)",  # v0.5-qemu-img-adapter Owner 2026-06-29 23:23 拍 B
+    "qemu_img_extract": "🖼️ qemu-img 转换 (vmdk→raw)",  # v0.5-qemu-img-adapter
     "decoder:base64-image": "🔓 Base64 → 图片",
     # v0.5-cn-display (per Owner 22:39): 中文 display
     "decoder:hex-ascii": "🔢 16 进制转文本",
@@ -166,6 +169,7 @@ ADAPTER_TOOLS: set[str] = {
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
     "sevenz", "sevenz_extract", "unzip", "john", "zip_classify",
+    "qemu_img", "qemu_img_extract",  # v0.5-qemu-img-adapter Owner 2026-06-29 23:23 拍 B
     "grep", "evtx_dump",
     "zbar",
     "vol",
