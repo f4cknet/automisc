@@ -110,6 +110,27 @@ platforms:
             4) 装完后 pyzbar import 即可加载 libzbar-64.dll, 报 "Could not find module" 错误消失.
           不需要 PATH 注册, 跟 libzbar-64.dll 同目录即可被 LoadLibrary 找到.
 
+      qemu-img:
+        version: "9.1.0"  # TODO: install.ps1 首次下载后回填 (Owner 装时定)
+        # QEMU Win NSIS installer (Stefan Weil 维护 qemu.weilnetz.de).
+        # 装到 C:\Program Files\qemu\qemu-img.exe (默认 NSIS 路径), 500MB+ 全 setup
+        # 装完 (含 qemu-system GUI tools, 实战不用), qemu-img.exe 在 PATH.
+        # 实战 v0.5-train-018: vmdk 走 qemu-img convert, 7z 26.02 不支持 vmdk.
+        # **不**复制到 extend-tools/ (避免 500MB+ 复制); paths.py 走 shutil.which("qemu-img") 优先,
+        # 命中 C:\Program Files\qemu\qemu-img.exe. 如果 setup 没自动加 PATH, Owner 手工:
+        #   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\qemu", "User")
+        url: "https://qemu.weilnetz.de/w64/qemu-w64-setup-2025.05.12.exe"  # TODO: URL confirm
+        sha256: ""  # TODO: install.ps1 首次下载后回填
+        available: true
+        notes: |
+          qemu-img Win NSIS installer.
+          install.ps1 Stage 1 调 setup.exe /S 静默装 (NSIS standard /S flag).
+          装完路径: C:\Program Files\qemu\qemu-img.exe.
+          NSIS installer 自动把 C:\Program Files\qemu\ 加到系统 PATH (per QEMU 官方 install guide).
+          实战: vmdk -> qemu-img convert -f vmdk -O raw flag.vmdk flag.raw.
+          关联: v0.5-train-018 (vmdk 实战触发), v0.5-sevenz-extract doc-fix 2026-06-29 (7z 不支持 vmdk).
+          0 extend-tools/ 占用 (不复制, 走系统 PATH).
+
       vim92:
         version: "9.2.0"
         # Vim 官方 Windows installer (vim-win32-installer on GitHub).
