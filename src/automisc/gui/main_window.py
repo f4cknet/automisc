@@ -465,10 +465,13 @@ class MainWindow(QMainWindow):
 
         行为:
         1. 停止之前还在跑的 runner (auto_run / tool / chain / decoder)
+        1.1 **v0.5-fix-find-suspicious-race-condition**: 强 kill 旧 adapter 嵌套 subprocess
+            (e.g. 旧 steghide 30s timeout), 避免 race condition 段在新 output 区
         2. **清空 output 区** (避免旧文件信息残留)
+        2.1 **v0.5-journal-clear-on-new-file**: 清空 journal_panel (避免跨文件误读)
         3. 设 current_file
         4. 跑 FileRouter 拿推荐
-        5. auto-run 开启则启动 AutoRunner
+        5. auto-run 开启则启动 FindSuspiciousRunner
         """
         # 1. 停所有 runner
         for runner in (
@@ -484,6 +487,19 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
                 runner.wait(2000)
+
+        # 1.1 v0.5-fix-find-suspicious-race-condition: 强 kill 旧 adapter 嵌套 subprocess
+        #   (per Owner 2026-06-29 22:57 拍板 A)
+        #   拖 jpg 跑 picture pool 含 steghide (30s timeout) → 立即拖 zip → 旧 steghide
+        #   subprocess 仍在 background 跑 (subprocess.run 同步阻塞, stop flag 不响应)
+        #   → 30s 后 emit tool_finished 写新 output 区, 误读为当前文件
+        #   修: orchestrator.kill_last_subprocess() 强 terminate (terminate 1s → kill 兜底)
+        #   先调 (在 clear output 之前), 让旧工具段不写入新 output
+        try:
+            self.core.kill_last_subprocess()
+        except Exception:
+            # kill 失败不阻塞新文件选择 (race condition 兜底)
+            pass
 
         # 2. 清空 output (核心: per Owner 2026-06-14 "每次有新的 input 就要清空原来的 output")
         self.output_view.clear()

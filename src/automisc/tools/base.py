@@ -79,6 +79,11 @@ class ToolAdapter(ABC):
 
     子类实现：
     - ``run(file_path: str) -> ToolResult``
+
+    v0.5-fix-find-suspicious-race-condition (per Owner 2026-06-29 22:57 拍板 A):
+    - 持有嵌套 subprocess handle (`_current_proc`), 允许 orchestrator 强 terminate
+    - 拖新文件时清旧 subprocess, 避免旧 steghide 30s timeout 段在 archive pool 之后
+      写入新 output 区 (race condition)
     """
 
     name: str = ""
@@ -88,6 +93,11 @@ class ToolAdapter(ABC):
 
     # subprocess 默认超时（秒）；adapter 可在 run() 内覆盖
     default_timeout: float = 30.0
+
+    # v0.5-fix-find-suspicious-race-condition: 当前 adapter 持有的 Popen handle
+    # (None = 没在跑). orchestrator._last_adapter 持有, run_tool 入口先 _terminate_current_proc
+    # idempotent 清旧. 详见 upgrade/v0.5-fix-find-suspicious-race-condition.md
+    _current_proc: subprocess.Popen | None = None
 
     # ---- 工具可达性 ----
 
@@ -114,7 +124,7 @@ class ToolAdapter(ABC):
         *,
         timeout: float | None = None,
     ) -> tuple[int, str, str, int]:
-        """subprocess 包装（跨平台 PATH + stderr 分离 + 超时）。
+        """subprocess 包装（跨平台 PATH + stderr 分离 + 超时 + race protection）。
 
         Returns:
             ``(exit_code, stdout, stderr, duration_ms)``
@@ -126,7 +136,16 @@ class ToolAdapter(ABC):
         v0.5-platform-extend-tools (per Owner 2026-06-27 治理变更):
             - macOS: 显式追加 Homebrew 路径 (Apple Silicon + Intel)
             - Windows / Linux: 不动 (用系统 PATH + venv Scripts/ + extend-tools/bin/<platform>/)
+
+        v0.5-fix-find-suspicious-race-condition (per Owner 2026-06-29 22:57 拍板 A):
+            - 用 subprocess.Popen 替代 subprocess.run, 持有 handle (self._current_proc)
+            - 允许 orchestrator._terminate_current_proc() 强 terminate (拖新文件时清旧)
+            - run() 入口先 _terminate_current_proc() idempotent (重入保护, 旧 adapter 实例复用)
         """
+        # 重入保护: 旧 adapter 实例可能复用 (per v0.1.1 ToolAdapter 单例模式),
+        # 跑新工具前先清旧 subprocess, 避免 2 个 Popen 同时跑
+        self._terminate_current_proc()
+
         effective_timeout = timeout if timeout is not None else self.default_timeout
         start = time.monotonic()
 
@@ -141,30 +160,40 @@ class ToolAdapter(ABC):
             if homebrew_paths not in current_path:
                 env["PATH"] = f"{homebrew_paths}:{current_path}"
 
+        proc: subprocess.Popen | None = None
         try:
-            # 不传 text=True → 拿 bytes, 手动 decode (避免默认 utf-8 strict 抛错)
-            proc = subprocess.run(
+            # Popen 持有 handle → allow 强 terminate (vs subprocess.run 同步阻塞)
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                timeout=effective_timeout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 env=env,
-                check=False,
             )
+            self._current_proc = proc
+            try:
+                stdout_bytes, stderr_bytes = proc.communicate(timeout=effective_timeout)
+            except subprocess.TimeoutExpired:
+                # v0.5-fix-find-suspicious-race-condition: 超时强 kill (之前只等)
+                proc.kill()
+                proc.wait()
+                duration_ms = int((time.monotonic() - start) * 1000)
+                return (
+                    124,
+                    "",
+                    f"subprocess timeout after {effective_timeout}s",
+                    duration_ms,
+                )
+            self._current_proc = None
             duration_ms = int((time.monotonic() - start) * 1000)
-            stdout = _decode_output_bytes(proc.stdout)
-            stderr = _decode_output_bytes(proc.stderr)
+            stdout = _decode_output_bytes(stdout_bytes)
+            stderr = _decode_output_bytes(stderr_bytes)
             return proc.returncode, stdout, stderr, duration_ms
-        except subprocess.TimeoutExpired:
-            duration_ms = int((time.monotonic() - start) * 1000)
-            return (
-                124,  # 与 `timeout` CLI 工具一致
-                "",
-                f"subprocess timeout after {effective_timeout}s",
-                duration_ms,
-            )
         except FileNotFoundError as e:
             duration_ms = int((time.monotonic() - start) * 1000)
             return 127, "", f"executable not found: {e}", duration_ms
+        finally:
+            # 清理 handle (正常完成 / 异常 都清)
+            self._current_proc = None
 
     def _run_subprocess_with_input(
         self,
@@ -180,6 +209,9 @@ class ToolAdapter(ABC):
 
         输出解码: 同 _run_subprocess, 多编码 fallback.
         """
+        # v0.5-fix-find-suspicious-race-condition: 同 _run_subprocess, Popen + handle
+        self._terminate_current_proc()
+
         effective_timeout = timeout if timeout is not None else self.default_timeout
         start = time.monotonic()
 
@@ -193,31 +225,76 @@ class ToolAdapter(ABC):
             if homebrew_paths not in current_path:
                 env["PATH"] = f"{homebrew_paths}:{current_path}"
 
+        proc: subprocess.Popen | None = None
         try:
-            # 不传 text=True → bytes mode
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                input=input_text,
-                capture_output=True,
-                timeout=effective_timeout,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 env=env,
-                check=False,
             )
+            self._current_proc = proc
+            try:
+                stdout_bytes, stderr_bytes = proc.communicate(
+                    input=input_text.encode("utf-8", errors="replace"),
+                    timeout=effective_timeout,
+                )
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                duration_ms = int((time.monotonic() - start) * 1000)
+                return (
+                    124,
+                    "",
+                    f"subprocess timeout after {effective_timeout}s",
+                    duration_ms,
+                )
+            self._current_proc = None
             duration_ms = int((time.monotonic() - start) * 1000)
-            stdout = _decode_output_bytes(proc.stdout)
-            stderr = _decode_output_bytes(proc.stderr)
+            stdout = _decode_output_bytes(stdout_bytes)
+            stderr = _decode_output_bytes(stderr_bytes)
             return proc.returncode, stdout, stderr, duration_ms
-        except subprocess.TimeoutExpired:
-            duration_ms = int((time.monotonic() - start) * 1000)
-            return (
-                124,
-                "",
-                f"subprocess timeout after {effective_timeout}s",
-                duration_ms,
-            )
         except FileNotFoundError as e:
             duration_ms = int((time.monotonic() - start) * 1000)
             return 127, "", f"executable not found: {e}", duration_ms
+        finally:
+            self._current_proc = None
+
+    def _terminate_current_proc(self) -> None:
+        """v0.5-fix-find-suspicious-race-condition: 强 kill 当前 adapter 持有的嵌套 subprocess (if any).
+
+        调用场景:
+        1. orchestrator.run_tool 入口 → 重入保护 (旧 adapter 实例复用, 跑新工具前先清)
+        2. main_window._on_new_file_selected → 拖新文件时清旧 subprocess (避免 30s timeout 段
+           在 archive pool 之后写入新 output 区)
+
+        实现: terminate() 给 1s 优雅, 然后 kill() 强杀 (Win process tree 不一定跟 terminate 走).
+        Idempotent: 多次调用不抛, 没 _current_proc 啥也不做.
+        """
+        if self._current_proc is None:
+            return
+        proc = self._current_proc
+        # 先 poll 一次, 已结束就不必 kill
+        if proc.poll() is not None:
+            self._current_proc = None
+            return
+        try:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                # terminate 1s 没响应 → 强 kill
+                try:
+                    proc.kill()
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    pass
+        except Exception:
+            # Popen 已经死了 / 权限问题 / etc → 静默
+            pass
+        finally:
+            self._current_proc = None
 
     # ---- 抽象方法 ----
 
