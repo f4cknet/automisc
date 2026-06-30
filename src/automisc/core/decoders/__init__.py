@@ -28,6 +28,14 @@ from automisc.core.decoders import base_convert  # noqa: F401, E402
 from automisc.core.decoders import coords_to_qr  # noqa: F401, E402
 from automisc.core.decoders import base_rot_decoders  # noqa: F401, E402  # v0.5-base-rot-decoders
 from automisc.core.decoders import cipher_decoders  # noqa: F401, E402  # v0.5-cipher-decoders (12 cipher + 2 placeholder)
+# fix_decoder_registry_pyc_magic (per Owner 2026-07-01 实战 flag.pyc):
+# v0.5-lsb-byte-stream-extract (magic_sniffer) + v0.5-pyc-magic-sniffer (pyc_decompiler)
+# 之前只在 __main__.py 显式 import 触发 CLI 路径, 漏了 __init__.py 这边
+# → GUI 路径走 `from automisc.core import decoders` 触发不到, DecodeRunner 报
+# "unknown decoder: pyc_decompiler" (同 main_window.py:14 注释里 coords-qr 同类 bug).
+# 修法: 在这里也 side-effect import, 让 GUI 启动时 registry 必含这 2 个.
+from automisc.core.decoders import magic_sniffer  # noqa: F401, E402  # v0.5-lsb-byte-stream-extract
+from automisc.core.decoders import pyc_decompiler  # noqa: F401, E402  # v0.5-pyc-magic-sniffer
 
 __all__ = [
     "DecoderSpec",
@@ -42,4 +50,6 @@ __all__ = [
     "coords_to_qr",
     "base_rot_decoders",
     "cipher_decoders",
+    "magic_sniffer",  # v0.5-lsb-byte-stream-extract
+    "pyc_decompiler",  # v0.5-pyc-magic-sniffer
 ]

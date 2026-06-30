@@ -45,7 +45,59 @@ EXPECTED_TEXT_ONLY_DECODERS = [
 EXPECTED_FILE_BASED_DECODERS = [
     "base64-image",  # 解 base64 编码的图片, 走 file
     "coords-qr",     # 解 QR PNG 文件, 走 file (override)
+    # v0.5-lsb-byte-stream-extract: 字节流 magic 嗅探, 走 file (per core/decoders/magic_sniffer.py:184)
+    "magic_sniffer",
+    # v0.5-pyc-magic-sniffer: pyc 反编译, 走 file (per core/decoders/pyc_decompiler.py:184)
+    "pyc_decompiler",
 ]
+
+
+# === fix_decoder_registry_pyc_magic: 回归测试 (per Owner 2026-07-01 实战 flag.pyc) ===
+#
+# 背景: v0.5-lsb-byte-stream-extract / v0.5-pyc-magic-sniffer 实施时, 新 decoder
+# 只在 __main__.py 加了显式 import 触发 CLI 路径, 漏了 __init__.py 这边.
+# → GUI 路径走 `from automisc.core import decoders` 触发不到 side-effect 注册
+# → DecodeRunner 报 "unknown decoder: pyc_decompiler" (跟 main_window.py:14
+#   注释里 coords-qr 同类 bug).
+# 修法: 在 __init__.py 加 2 行 side-effect import + 这里显式断言 registry 必含.
+EXPECTED_DECODERS_AFTER_REGISTRY_FIX = {
+    "magic_sniffer",   # v0.5-lsb-byte-stream-extract
+    "pyc_decompiler",  # v0.5-pyc-magic-sniffer
+}
+
+
+def test_registry_contains_magic_sniffer_and_pyc_decompiler():
+    """fix_decoder_registry_pyc_magic: registry 必须含 magic_sniffer + pyc_decompiler.
+
+    GUI 启动时 `from automisc.core import decoders` 触发 __init__.py 的 side-effect
+    import, 这 2 个 decoder 必须被注册, 否则 DecodeRunner 报 "unknown decoder".
+    """
+    for name in EXPECTED_DECODERS_AFTER_REGISTRY_FIX:
+        spec = get_decoder(name)
+        assert spec is not None, (
+            f"{name} 未注册到 registry (registry import 漏? 见 fix_decoder_registry_pyc_magic)"
+        )
+
+
+def test_decoder_init_side_effect_imports_v0_5_decoders():
+    """fix_decoder_registry_pyc_magic: `from automisc.core import decoders`
+    必须触发所有 v0.5+ decoder side-effect 注册 (含 magic_sniffer / pyc_decompiler).
+
+    模拟 GUI 启动路径 (main_window.py:21):
+        from automisc.core import decoders as _decoders
+    """
+    # 关键: 重新 import 触发 side-effect
+    import importlib
+    import automisc.core.decoders as dec_pkg
+    importlib.reload(dec_pkg)
+
+    from automisc.core.decoders.registry import get_decoder
+    for name in EXPECTED_DECODERS_AFTER_REGISTRY_FIX:
+        spec = get_decoder(name)
+        assert spec is not None, (
+            f"reload(decoders) 后 {name} 仍未注册, "
+            f"side-effect import 在 __init__.py 漏了 (regression)"
+        )
 
 
 def test_all_text_only_decoders_have_text_only_true():
