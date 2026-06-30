@@ -48,11 +48,14 @@ $binaries = @(
         post_extract = "exiftool_zip"
     },
     @{
-        name = "7zr"
-        version = "24.07"
-        url = "https://www.7-zip.org/a/7zr.exe"
-        target = "7zr.exe"
-        post_extract = "sevenz_link"
+        name = "7zip"
+        version = "23.01"
+        # 7-Zip 23.01 Windows x64 安装器 (NSIS, 1.5MB 安装器, 展开后 ~5MB).
+        # per v0.5-7z-layout-migrate (Owner 2026-06-30 21:53 拍板):
+        # 从 7zr standalone 1MB 切到完整安装, 部署到 extend-tools/bin/win-x64/7-Zip/ subdir.
+        url = "https://www.7-zip.org/a/7z2301-x64.exe"
+        target = "7-Zip\7z.exe"  # indicator path (skip check 命中这个)
+        post_extract = "sevenz_extract"
     },
     @{
         name = "foremost"
@@ -225,18 +228,24 @@ foreach ($tool in $binaries) {
                 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
                 Write-Host " OK" -ForegroundColor Green
             }
-            "sevenz_link" {
-                Move-Item $tmp $dest -Force
-                # Create 7z.exe hardlink (adapter uses '7z' name, standalone exe is '7zr')
-                $link = Join-Path $BinDir "7z.exe"
-                if (-not (Test-Path $link)) {
-                    $result = cmd /c mklink /H "$link" "$dest" 2>&1
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Host "[warn] mklink failed, copying instead" -ForegroundColor Yellow
-                        Copy-Item $dest $link -Force
-                    }
+            "sevenz_extract" {
+                # 7-Zip 23.01 NSIS 安装器 (/S 静默 + /D=<abs path> 自定义目录).
+                # per v0.5-7z-layout-migrate: 完整安装到 extend-tools/bin/win-x64/7-Zip/
+                # NSIS 限制: /D= 必须是绝对路径 + 目标目录不存在
+                $dest_dir = Join-Path $BinDir "7-Zip"
+                Write-Host "[install] $($tool.name) NSIS /S /D=$dest_dir ..." -NoNewline
+                # NSIS /D= 不能含尾部反斜杠
+                $dest_dir_clean = $dest_dir.TrimEnd('\')
+                $proc = Start-Process -FilePath $tmp -ArgumentList "/S", "/D=$dest_dir_clean" -Wait -PassThru -NoNewWindow
+                if ($proc.ExitCode -ne 0) {
+                    throw "7-Zip NSIS install exit code $($proc.ExitCode)"
                 }
-                Write-Host "[link] 7z.exe -> 7zr.exe" -ForegroundColor Green
+                $verify = Join-Path $dest_dir_clean "7z.exe"
+                if (-not (Test-Path $verify)) {
+                    throw "7-Zip installed but $verify not found (NSIS /D= 失败? 检查路径权限)"
+                }
+                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                Write-Host " OK" -ForegroundColor Green
             }
             "file_zip" {
                 # nscaife/file-windows zip: file.exe + libgnurx-0.dll + libmagic-1.dll +
