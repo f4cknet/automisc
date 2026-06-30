@@ -11,7 +11,7 @@ Owner 反馈:
 覆盖:
 - is_long_hex_text: 长度 + 偶数 + 全 hex 字符判定
 - detect_magic: PNG/JPG/GIF/ZIP/RAR/7z/GZ/BZ2/ELF/EXE/BMP/RIFF magic
-- route_hex_to_file: 写 /tmp + follow-up (zbar/unzip)
+- route_hex_to_file: 写 /tmp + follow-up (zbar/7z) (v0.5-unzip-remove: unzip → 7z)
 - strings adapter 集成: 长 hex (>= 200) 自动 trigger + 不打印 35000 字符; 短 hex 仍打印
 """
 from __future__ import annotations
@@ -334,3 +334,92 @@ class TestRouteHexToFileSamedir:
         from automisc.core.utils.output_path import is_in_tmp
         if not is_in_tmp(saved_path):
             Path(saved_path).unlink(missing_ok=True)
+
+
+# ---------- v0.5-unzip-remove: _run_7z fallback (替代 _run_unzip) ----------
+class TestRun7z:
+    """v0.5-unzip-remove: hex_router zip magic follow-up 改 7z (Win 已装 7z 26.02).
+    
+    替代原 _run_unzip 测试覆盖:
+    - _run_7z success: shutil.which("7z") 找到 + subprocess.run 成功
+    - _run_7z binary not found: shutil.which("7z") 返回 None
+    - _run_7z subprocess error: subprocess.run 抛 TimeoutExpired / OSError
+    """
+    def test_run_7z_success(self, tmp_path, monkeypatch):
+        """成功: 7z binary 找到 + 7z x -y -o<dir> <file> 跑通."""
+        from automisc.core.actions import hex_router
+        from automisc.core.actions.hex_router import _run_7z
+
+        # mock shutil.which("7z") 找到
+        monkeypatch.setattr(hex_router.shutil, "which", lambda name: "/fake/7z" if name == "7z" else None)
+        # mock subprocess.run 返回成功
+        fake_result = type("FakeResult", (), {
+            "stdout": "7-Zip [64] 26.02 : Copyright Igor Pavlov\n\nExtracting archive: test.zip\n",
+            "stderr": "",
+            "returncode": 0,
+        })()
+        monkeypatch.setattr(hex_router.subprocess, "run", lambda *a, **kw: fake_result)
+
+        out_path = tmp_path / "test.zip"
+        out_path.write_bytes(b"PK\x03\x04" + b"\x00" * 50)
+        stdout, stderr = _run_7z(out_path)
+        # stdout 应含 "extracted to" + 7z 输出
+        assert "extracted to" in stdout
+        assert "7-Zip" in stdout
+        assert stderr == ""
+
+    def test_run_7z_binary_not_found(self, tmp_path, monkeypatch):
+        """7z binary 不存在 (PATH 上找不到)."""
+        from automisc.core.actions import hex_router
+        from automisc.core.actions.hex_router import _run_7z
+
+        monkeypatch.setattr(hex_router.shutil, "which", lambda name: None)
+
+        out_path = tmp_path / "test.zip"
+        out_path.write_bytes(b"PK\x03\x04" + b"\x00" * 50)
+        stdout, stderr = _run_7z(out_path)
+        assert stdout == ""
+        assert "7z 未装" in stderr
+
+    def test_run_7z_subprocess_error(self, tmp_path, monkeypatch):
+        """subprocess.run 抛 TimeoutExpired -> 兜底返回 error 字符串."""
+        from automisc.core.actions import hex_router
+        from automisc.core.actions.hex_router import _run_7z
+
+        # mock shutil.which("7z") 找到
+        monkeypatch.setattr(hex_router.shutil, "which", lambda name: "/fake/7z" if name == "7z" else None)
+        # mock subprocess.run 抛 TimeoutExpired (用 hex_router.subprocess 引用)
+        def fake_run(*args, **kwargs):
+            raise hex_router.subprocess.TimeoutExpired(cmd=args[0] if args else "7z", timeout=kwargs.get("timeout", 60))
+        monkeypatch.setattr(hex_router.subprocess, "run", fake_run)
+
+        out_path = tmp_path / "test.zip"
+        out_path.write_bytes(b"PK\x03\x04" + b"\x00" * 50)
+        stdout, stderr = _run_7z(out_path)
+        assert stdout == ""
+        assert "TimeoutExpired" in stderr
+        assert "7z" in stderr
+
+    def test_route_zip_calls_run_7z_in_follow_up(self, tmp_path, monkeypatch):
+        """end-to-end: route_hex_to_file(zipped hex, follow_up=True) 走 _run_7z."""
+        from automisc.core.actions import hex_router
+        from automisc.core.actions.hex_router import route_hex_to_file
+
+        called = {"count": 0}
+
+        def fake_run_7z(p):
+            called["count"] += 1
+            return f"fake 7z extracted {p}", ""
+
+        monkeypatch.setattr(hex_router, "_run_7z", fake_run_7z)
+
+        zip_header = "504b0304140000000800"
+        hex_text = zip_header + "00" * 100  # 208 chars
+        result = route_hex_to_file(hex_text, follow_up=True)
+        assert result.file_type == "archive"
+        assert result.ext == "zip"
+        # follow_up_stdout 应含 fake 7z 输出
+        assert "fake 7z extracted" in result.follow_up_stdout
+        assert called["count"] == 1
+        # cleanup
+        Path(result.output_path).unlink(missing_ok=True)

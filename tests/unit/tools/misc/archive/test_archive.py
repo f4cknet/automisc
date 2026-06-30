@@ -6,7 +6,6 @@ import pytest
 from automisc.core.registry import get_tool
 from automisc.tools.misc.archive.john import JohnAdapter
 from automisc.tools.misc.archive.sevenz import SevenZipAdapter
-from automisc.tools.misc.archive.unzip import UnzipAdapter
 
 
 NORMAL_ZIP = "tests/fixtures/sample_archive_flag.zip"
@@ -44,27 +43,6 @@ def test_sevenz_handles_non_archive(tmp_path):
     result = a.run(str(bad))
     # 7z 会报错（exit ≠ 0），但不 panic
     assert result.exit_code != 0 or len(result.suspicious_points) >= 0
-
-
-# === unzip ===
-
-def test_unzip_adapter_is_registered():
-    a = get_tool("unzip")
-    assert isinstance(a, UnzipAdapter)
-
-
-def test_unzip_normal_zip_extracts_file_count(normal_zip):
-    a = UnzipAdapter()
-    result = a.run(normal_zip)
-    assert result.is_success
-    meta = [sp for sp in result.suspicious_points if sp.category == "archive_meta"]
-    assert any("archive contains" in sp.matched_pattern for sp in meta)
-
-
-def test_unzip_handles_missing_file(tmp_path):
-    a = UnzipAdapter()
-    result = a.run(str(tmp_path / "ghost.zip"))
-    assert result.exit_code != 0
 
 
 # === john ===
