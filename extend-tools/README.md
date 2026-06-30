@@ -8,7 +8,7 @@
 
 ## 这是啥？
 
-AutoMisc 的 GUI 在 macOS 上 `automisc-gui` 直接跑就行（Homebrew 装工具）。在 Windows 上没有 brew，本目录**自带 4 个核心 binary** 让 Owner 跑 `pwsh ./extend-tools/install.ps1` 一次就齐活。
+AutoMisc 的 GUI 在 macOS 上 `automisc-gui` 直接跑就行（Homebrew 装工具）。在 Windows 上没有 brew，本目录**自带 5 个核心 binary** 让 Owner 跑 `pwsh ./extend-tools/install.ps1` 一次就齐活。
 
 ## 目录布局
 
@@ -41,7 +41,7 @@ pwsh ./extend-tools/install.ps1
 |---|---|---|---|
 | **binwalk** | 扫描嵌入文件（per magic bytes） | [ReFirmLabs GitHub release](https://github.com/ReFirmLabs/binwalk/releases) | ~5MB |
 | **exiftool** | 提取 EXIF / Office / PDF metadata | [exiftool.org](https://exiftool.org) standalone | ~10MB |
-| **7zr** | 通用归档 (zip/7z/rar/tar/gz/bz2/xz 等 30+ 格式) | [7-zip.org](https://www.7-zip.org) 独立版 | ~1MB |
+| **7-Zip** | 通用归档 (zip/7z/rar/tar/gz/bz2/xz 等 30+ 格式) | [7-zip.org](https://www.7-zip.org) 完整安装 | ~5MB |
 | **foremost** | 按 magic bytes 雕刻并分离嵌入文件 | [raddyfiy/foremost](https://github.com/raddyfiy/foremost) 第三方 fork | ~1MB |
 
 ## Windows 限制（已知 gap）
@@ -79,8 +79,12 @@ A: 单个工具失败不影响其他；最终汇总报告。手动下：复制 m
 A: 检查 `<tool>.exe` 是否在 `extend-tools/bin/win-x64/`；再跑一次 `automisc tools list` 看 adapter 是否注册（registry 层 vs binary 层是两回事）
 
 **Q: 7z adapter 找不到 binary**
-A: `bin/win-x64/7zr.exe` 是 7-Zip 独立版文件名；adapter 期望 `7z.exe`。`install.ps1` 会自动建 symlink `7z.exe → 7zr.exe`，如果失败手动：`cmd /c "mklink 7z.exe 7zr.exe"`（在 win-x64 目录里）
+A: `7-Zip 完整安装包` 部署到 `bin/win-x64/7-Zip/` subdir；adapter 期望 `7z.exe`，由 `paths.py:resolve_tool_binary` 走异名 subdir fallback 命中 `7-Zip/7z.exe`（per `v0.5-extend-tools-subdir-flexible`）。如果 `install.ps1` 失败手动：下 [7z2301-x64.exe](https://www.7-zip.org/a/7z2301-x64.exe) 安装到 `<repo>/extend-tools/bin/win-x64/7-Zip/`，或 `cmd /c "7z2301-x64.exe /S /D=<abs path to 7-Zip>"`
 
 ## 跟治理的关系
 
 本目录是 **AGENTS.md §2.3 macOS only → multi-platform** 治理变更的产物（per §8 治理变更流程）。提案见 [`upgrade/v0.5-platform-extend-tools.md`](../upgrade/v0.5-platform-extend-tools.md)。
+
+**变更历史**：
+- 2026-06-27 — v0.5-platform-extend-tools 治理变更初始落地
+- 2026-06-30 — v0.5-7z-layout-migrate: 7z binary 从 `7zr.exe` standalone 1MB 切到 7-Zip 23.01 完整安装包（`bin/win-x64/7-Zip/7z.exe`），per Owner 拍板。详见 [`upgrade/v0.5-7z-layout-migrate.md`](../upgrade/v0.5-7z-layout-migrate.md)。

@@ -115,7 +115,7 @@ MISC（根）
 | **fls / icat / mmls（sleuthkit）** | ❌ | `brew install sleuthkit` | 磁盘镜像文件系统解析（FAT16/NTFS/ext2/...） | v0.5 安装 |
 | **photorec** | ❌ | `/usr/local/bin/photorec` | 文件雕刻 + 分区恢复 | P1 · v0.5 候选 |
 | **testdisk** | ❌ | `/usr/local/bin/testdisk` | 分区恢复 + 文件系统修复 | P1 · v0.5 候选 |
-| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 磁盘镜像（VMDK/OVA）解压 | P1 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7-Zip/7z.exe` | 磁盘镜像（VMDK/OVA）解压 | P1 |
 | **veracrypt** | ❌ | `brew install --cask veracrypt` | TrueCrypt/VeraCrypt 卷挂载 | v1.0 评估 |
 
 ### 3.3 Forensics / Network Forensics（流量取证）
@@ -137,7 +137,7 @@ MISC（根）
 |---|---|---|---|---|
 | **Select-String** | ✅ | PowerShell 内置 | 日志关键字 + 异常分析 | P0 |
 | **python-evtx（Python 包）** | ✅ | `pip install python-evtx` 0.8.1（已装，Python 模块 `import Evtx` OK + `requirements.txt` 第 12 行 pinned）。**adapter 走 python-evtx 路径**（src/automisc/tools/forensics/log/evtx_dump.py，结构化字段访问 + EventID scoring + 命令行关键字匹配）| .evtx 解析（Python 模块路径） | P0 · v0.5 已装 |
-| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7-Zip/7z.exe` | 解压 .evtx.bz2 / .log.tar.gz 等压缩日志 | 共享 |
 | **journalctl（macOS N/A）** | ❌ | Linux 专用 | systemd 日志 | 不装 |
 
 > **evtx_dump CLI** 不在本表（2026-06-28 决策：CLI 不走 install.ps1，adapter 走 python-evtx in-process）。决策依据 + 未来实战触发条件见 [`upgrade/v0.5-windows-evtx-dump.md`](./upgrade/v0.5-windows-evtx-dump.md) §6。
@@ -261,7 +261,7 @@ with Evtx.Evtx("file.evtx") as log:
 
 | 工具 | 状态 | 路径 / 安装 | 用途 | 备注 |
 |---|---|---|---|---|
-| **7z** | ✅ | `extend-tools/bin/win-x64/7z.exe` | 全格式解压（zip/rar/7z/tar.gz/bz2/xz） | P0 · v0.1 必须 |
+| **7z** | ✅ | `extend-tools/bin/win-x64/7-Zip/7z.exe` | 全格式解压（zip/rar/7z/tar.gz/bz2/xz） | P0 · v0.1 必须 |
 | **unzip** | ❌ | `/usr/bin/unzip` | zip 解压 + 伪加密检查 | P0 |
 | **file** | ✅ | `extend-tools/bin/win-x64/file.exe` | magic 识别压缩类型 | P0 |
 | **john** | ❌ | `brew install john-jumbo` | 4-6 位数字爆破（zip/rar） | P0 · v0.1 必须装 |
@@ -371,7 +371,7 @@ with Evtx.Evtx("file.evtx") as log:
 | 5 | **tshark** | Forensics/Network | ❌ pending |
 | 6 | **tcpdump** | Forensics/Network | ❌ pending |
 | 7 | **file** | Misc/Archive + 通用 | ✅ 已装（`extend-tools/bin/win-x64/file.exe`）|
-| 8 | **7z** | Forensics/Disk + Misc/Archive + Forensics/Log | ✅ 已装（`extend-tools/bin/win-x64/7z.exe`，7zr.exe 同目录 hardlink）|
+| 8 | **7z** | Forensics/Disk + Misc/Archive + Forensics/Log | ✅ 已装（`extend-tools/bin/win-x64/7-Zip/7z.exe`，23.01 完整安装，per `v0.5-7z-layout-migrate`）|
 | 9 | **steghide** | Stego/Image + Stego/Audio | ✅ 已装（`extend-tools/bin/win-x64/steghide/steghide.exe`，cygwin DLL 同目录）|
 | 10 | **zsteg** | Stego/Image | ❌ pending（Win 无 Ruby gem；用自研 `lsb_tool` 替代，per [`upgrade/v0.5-lsb-tool-unify.md`](./upgrade/v0.5-lsb-tool-unify.md)，3 mode 统一 LSB 工具 detect/extract/extract_bytes）|
 | 11 | **ffmpeg** | Stego/Audio + Stego/Video | ❌ pending |
