@@ -72,19 +72,6 @@ $binaries = @(
         url = "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
         target = "file.exe"
         post_extract = "file_zip"
-    },
-    @{
-        name = "qemu-img"
-        version = "9.1.0"  # TODO: install 时定 (per v0.5-qemu-img-extend-tools)
-        # QEMU Win NSIS installer (Stefan Weil 维护).
-        # 装到 C:\Program Files\qemu\qemu-img.exe (默认 NSIS 路径).
-        # 500MB+ 全 setup (含 qemu-system GUI), 实战只用 qemu-img (10MB).
-        # **不**复制到 extend-tools/bin/win-x64/ (避免 500MB+ 复制);
-        # paths.py 走 shutil.which("qemu-img") 优先, 命中 C:\Program Files\qemu\.
-        # 关联 v0.5-train-018 (vmdk 实战).
-        url = "https://qemu.weilnetz.de/w64/qemu-w64-setup-2025.05.12.exe"
-        target = $null  # 不复制
-        post_extract = "qemu_img_setup_silent"
     }
 )
 
@@ -275,29 +262,6 @@ foreach ($tool in $binaries) {
                 Remove-Item $extract_dir -Recurse -Force
                 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
                 Write-Host " OK" -ForegroundColor Green
-            }
-            "qemu_img_setup_silent" {
-                # v0.5-qemu-img-extend-tools (per v0.5-train-018 vmdk 实战):
-                # 静默装 QEMU NSIS installer 到 C:\Program Files\qemu\.
-                # **不**复制到 extend-tools/bin/win-x64/ (避免 500MB+ 复制).
-                # 实战 vmdk 走 qemu-img convert, 靠 PATH 找 (NSIS 自动加 PATH).
-                # 如果 setup 没自动加 PATH, Owner 手工:
-                #   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\qemu", "User")
-                $qemu_install_path = "C:\Program Files\qemu"
-                $installer = $tmp
-                Write-Host "[install] QEMU NSIS silent install to $qemu_install_path ..." -NoNewline
-                $proc = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -NoNewWindow
-                if ($proc.ExitCode -ne 0) {
-                    throw "QEMU setup.exe silent install failed, exit code: $($proc.ExitCode)"
-                }
-                if (-not (Test-Path "$qemu_install_path\qemu-img.exe")) {
-                    throw "QEMU installed but qemu-img.exe not found at $qemu_install_path"
-                }
-                Remove-Item $installer -Force -ErrorAction SilentlyContinue
-                Write-Host " OK" -ForegroundColor Green
-                Write-Host "[note] qemu-img in PATH (NSIS silent install), extend-tools/ 0 占用" -ForegroundColor Gray
-                Write-Host "[next] 验证: 'qemu-img --version' 跑通; 实战 'qemu-img convert -f vmdk -O raw flag.vmdk flag.raw'" -ForegroundColor Gray
-                Write-Host ""
             }
             default {
                 Move-Item $tmp $dest -Force
