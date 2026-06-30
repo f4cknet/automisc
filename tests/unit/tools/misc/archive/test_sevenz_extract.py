@@ -258,10 +258,12 @@ class TestSevenZipExtractIntegration:
         assert "sevenz" not in archive_tools, (
             f"sevenz 是探测类, 不应显示在 GUI menu (per Owner 20:03), got: {archive_tools}"
         )
-        # 跟 unzip / john / zip_classify 同一级 (操作类)
-        assert "unzip" in archive_tools  # owner 暂保留, 也算操作类入口
+        # 跟 john / zip_classify 同一级 (操作类) (v0.5-unzip-remove 删 unzip)
         assert "john" in archive_tools
         assert "zip_classify" in archive_tools
+        assert "unzip" not in archive_tools, (
+            "unzip 已删 (v0.5-unzip-remove), 不应在 GUI menu 显示"
+        )
 
     def test_sevenz_extract_in_adapter_tools_set(self):
         """ADAPTER_TOOLS 必须含 sevenz_extract (GUI 标记 ✓ 才会显示)."""

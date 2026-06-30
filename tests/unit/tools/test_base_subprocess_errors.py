@@ -229,7 +229,7 @@ def test_run_subprocess_handles_gbk_output(tmp_path: Path):
     assert "bV1g6t5wZDJif^J7" in out
 
 
-# ---------- 集成: 真 adapter (foremost --help / unzip -v) ----------
+# ---------- 集成: 真 adapter (foremost --help) ----------
 
 def test_foremost_adapter_help_does_not_crash():
     """foremost --help 输出含 binary 字符, 不应挂掉."""
@@ -244,18 +244,3 @@ def test_foremost_adapter_help_does_not_crash():
     ec, out, err, dur = a._run_subprocess(cmd)
     assert ec in (0, 1), f"unexpected exit code: {ec}"
     assert out or err, "foremost -h returned empty output"
-
-
-def test_unzip_adapter_help_does_not_crash():
-    """unzip -v 输出偶尔含非 UTF-8 字符, 不应挂掉."""
-    from automisc.tools.misc.archive.unzip import UnzipAdapter
-    import shutil
-
-    if not shutil.which("unzip"):
-        pytest.skip("unzip not installed")
-
-    a = UnzipAdapter()
-    cmd = ["unzip", "-v"]
-    ec, out, err, dur = a._run_subprocess(cmd)
-    assert ec == 0, f"unexpected exit: {ec}"
-    assert "UnZip" in out or "Zip" in out, f"unzip -v output unexpected: {out[:100]!r}"

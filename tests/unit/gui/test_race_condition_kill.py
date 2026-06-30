@@ -228,5 +228,5 @@ class TestMainWindowKillOnNewFile:
 # tools/_debug/repro_gui_drop2.py 端到端跑过 (per main session 22:32 验证),
 # 单测层拆"长 subprocess + 强 terminate" 行为更可靠 (见 TestOrchestratorKillLastSubprocess
 # 上面), 这里不重复. 端到端集成建议 GUI 实测 (Owner 22:32 实战确认) + repro_gui_drop2.py
-# 已有 5 tools 跑完 chain_finished = ['sevenz', 'unzip', 'zip_classify', 'file', 'strings']
+# 已有 4 tools 跑完 chain_finished = ['sevenz', 'zip_classify', 'file', 'strings']  # v0.5-unzip-remove 删 unzip
 # 0 steghide 段, 验证 race condition 修后行为正确.

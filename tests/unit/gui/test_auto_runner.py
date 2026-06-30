@@ -79,7 +79,7 @@ class TestBinwalkSuggest:
         assert "sevenz_extract" in suggests[0].matched_pattern
 
     def test_binwalk_rar_suggests_bruteforce(self):
-        """binwalk 命中 RAR → suggest 'unzip' / 'bruteforce_rar'."""
+        """binwalk 命中 RAR → suggest 'sevenz_extract' / 'bruteforce_rar' (v0.5-unzip-remove 删 unzip)."""
         sp = _make_sp("file_header", "RAR archive @ offset 0x200")
         suggests = _maybe_suggest("binwalk", [sp], "/tmp/x.png")
 

@@ -264,7 +264,8 @@ class TestFindSuspiciousSyncFunctions:
         from automisc.gui.auto_runner import find_suspicious_from_archive
 
         core = CoreOrchestrator()
-        # sample_text (txt) 走 archive pool 时 sevenz/unzip 适配器会失败 → 也算 OK
+        # sample_text (txt) 走 archive pool 时 sevenz/zip_classify 适配器会失败 → 也算 OK
+        # (v0.5-unzip-remove: 删 unzip, pool 现在 4 tools)
         results = find_suspicious_from_archive(core, str(sample_text))
         assert isinstance(results, list)
         # archive pool 4 个工具 (即使失败也返回结果, 或跑完 4 个)
