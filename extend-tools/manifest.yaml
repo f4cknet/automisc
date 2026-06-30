@@ -63,7 +63,7 @@ platforms:
             - Lang/ (i18n, 含 zh-CN)
           adapter 调 '7z' 命令, resolve_tool_binary 优先 PATH → extend-tools/bin/win-x64/7-Zip/7z.exe.
           注: macOS 端走 brew p7zip (PATH 优先命中), 不受影响.
-          实战: 7z 23.01 不支持 vmdk (per v0.5-train-018), vmdk 实战走 qemu-img convert.
+          实战: 7z 23.01 **实测支持 vmdk** (per v0.5-train-019), 走 `7z x flag.vmdk` 即可 (无需 qemu-img convert). v0.5-train-018 实战时 7z 26.02 不支持, 7z 24.x+ 引入 vmdk 回归.
 
       foremost:
         version: "1.5.7"
@@ -128,7 +128,8 @@ platforms:
         # QEMU Win NSIS installer (Stefan Weil 维护 qemu.weilnetz.de).
         # 装到 C:\Program Files\qemu\qemu-img.exe (默认 NSIS 路径), 500MB+ 全 setup
         # 装完 (含 qemu-system GUI tools, 实战不用), qemu-img.exe 在 PATH.
-        # 实战 v0.5-train-018: vmdk 走 qemu-img convert, 7z 26.02 不支持 vmdk.
+        # 实战 v0.5-train-018 (7z 26.02): vmdk 走 qemu-img convert (7z 26.02 不支持 vmdk).
+# v0.5-train-019 (7z 23.01): 7z 23.01 **实测支持 vmdk**, 走 `7z x flag.vmdk`, 不需 qemu-img convert.
         # **不**复制到 extend-tools/ (避免 500MB+ 复制); paths.py 走 shutil.which("qemu-img") 优先,
         # 命中 C:\Program Files\qemu\qemu-img.exe. 如果 setup 没自动加 PATH, Owner 手工:
         #   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\qemu", "User")
@@ -141,7 +142,7 @@ platforms:
           装完路径: C:\Program Files\qemu\qemu-img.exe.
           NSIS installer 自动把 C:\Program Files\qemu\ 加到系统 PATH (per QEMU 官方 install guide).
           实战: vmdk -> qemu-img convert -f vmdk -O raw flag.vmdk flag.raw.
-          关联: v0.5-train-018 (vmdk 实战触发), v0.5-sevenz-extract doc-fix 2026-06-29 (7z 不支持 vmdk).
+          关联: v0.5-train-018 (7z 26.02 实战), v0.5-train-019 (7z 23.01 实测反转, 7z 23.01 支持 vmdk), v0.5-sevenz-extract doc-fix 2026-06-29 (7z 26.02 不支持 vmdk 笔记已 doc-fix 2026-06-30).
           0 extend-tools/ 占用 (不复制, 走系统 PATH).
 
       vim92:
