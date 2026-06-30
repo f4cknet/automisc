@@ -88,6 +88,9 @@ $binaries = @(
 #          -> download v2.3.2 source zip + patch compat.py + pip install from source.
 # pyzbar: per v0.5-zbar-windows-install (2026-06-28 Owner 拍板).
 #         Win wheel 自带 zbar DLL, 替代 zbarimg subprocess (SourceForge 失效).
+# pyc 反编译三件套: per v0.5-pyc-deps-install (2026-07-01 Owner 实战 flag.pyc 触发).
+#                   xdis 拿 magic + version, uncompyle6 解 Py2.x, decompyle3 解 Py3.x,
+#                   dis fallback 走 builtin. 缺任一, pyc_decompiler decoder 跑不动.
 $pip_packages = @(
     @{
         name = "binwalk"
@@ -101,8 +104,43 @@ $pip_packages = @(
         version = "0.1.9"
         install_method = "pypi"
         # pyzbar 0.1.9 Win wheel 自带 libzbar-64.dll + libiconv.dll (per PyPI 主页)
-        # 装完即可 `from pyzbar.pyzbar import decode` 直接用, 无需再 pip 安装 zbar 库
+        # 装完即可 `from pyzbar.pyzbar import decode` 直接用, 无需再 pip 安装 zbar 库.
         notes = "v0.5-zbar-windows-install: 替代 zbarimg.exe subprocess (SourceForge 失效)"
+    },
+    @{
+        name = "xdis"
+        version = "6.1.7"
+        install_method = "pypi"
+        # xdis 6.1.7 (2026-07 PyPI latest in 6.1.x 系列): cross-version dis / load_module.
+        # pyc_decompiler 用 xdis.load_module 拿 magic_int + version (Py2.x/Py3.x 路由).
+        # 不装 → "xdis load_module failed: No module named 'xdis'" → decoder error.
+        #
+        # ⚠ 版本锁定原因: uncompyle6 3.9.3 要求 xdis<6.2.0, decompyle3 3.9.3 要求 xdis<6.3.
+        #   PyPI latest xdis 6.3.0 跟 uncompyle6 3.9.3 冲突 (ResolutionImpossible).
+        #   共同兼容范围是 xdis 6.1.x (6.1.1 ~ 6.1.7).
+        #
+        # ⚠ Python 3.13+ 兼容性: xdis 6.1.x 的 wheel 标注 Requires-Python<3.13,
+        #   实际在 3.13.6 上能跑 (Owner 2026-07-01 实战验证),
+        #   Stage 2 pypi 分支会自动加 --ignore-requires-python 跳过 wheel 元数据检查.
+        notes = "v0.5-pyc-deps-install: pyc_decompiler decoder 依赖 (锁 6.1.7 兼容 uncompyle6<6.2.0)"
+    },
+    @{
+        name = "uncompyle6"
+        version = "3.9.3"
+        install_method = "pypi"
+        # uncompyle6 3.9.3 (2026-07 PyPI latest): Py2.x .pyc 反编译到源码.
+        # 仅 Py2.x 路径走 (per core/decoders/pyc_decompiler.py:137-141)
+        # 依赖 xdis<6.2.0 + spark-parser<1.9.2 — 跟 xdis 6.1.7 锁定兼容
+        notes = "v0.5-pyc-deps-install: pyc_decompiler Py2.x 反编译 (uncompyle6)"
+    },
+    @{
+        name = "decompyle3"
+        version = "3.9.3"
+        install_method = "pypi"
+        # decompyle3 3.9.3 (2026-07 PyPI latest): Py3.x .pyc 反编译到源码.
+        # 仅 Py3.x 路径走 (per core/decoders/pyc_decompiler.py:142-146)
+        # 依赖 xdis<6.3 + spark-parser<1.9.2 — 跟 xdis 6.1.7 锁定兼容
+        notes = "v0.5-pyc-deps-install: pyc_decompiler Py3.x 反编译 (decompyle3)"
     }
 )
 
@@ -378,8 +416,17 @@ def _imp_load_source(name, path):
 
         } elseif ($pkg.install_method -eq "pypi") {
             # pyzbar (and future PyPI-only packages): just pip install
-            Write-Host "[pip install] $($pkg.name) v$($pkg.version) ..." -NoNewline
-            & python -m pip install --proxy $ProxyUrl --quiet "$($pkg.name)==$($pkg.version)"
+            # v0.5-pyc-deps-install: Python 3.13+ 检测 — xdis 6.1.x wheel 标 Requires-Python<3.13,
+            # 但 3.13.6 实测能跑 (Owner 2026-07-01 验证). Py 3.13+ 加 --ignore-requires-python.
+            $py_ver = & python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+            $ignore_py_arg = ""
+            if ($py_ver -and ([version]$py_ver).Major -ge 3 -and ([version]$py_ver).Minor -ge 13) {
+                $ignore_py_arg = "--ignore-requires-python"
+                Write-Host "[py3.13+] $($pkg.name) v$($pkg.version) (with --ignore-requires-python) ..." -NoNewline
+            } else {
+                Write-Host "[pip install] $($pkg.name) v$($pkg.version) ..." -NoNewline
+            }
+            & python -m pip install --proxy $ProxyUrl --quiet $ignore_py_arg "$($pkg.name)==$($pkg.version)"
             if ($LASTEXITCODE -ne 0) {
                 throw "pip install failed with exit $LASTEXITCODE"
             }
