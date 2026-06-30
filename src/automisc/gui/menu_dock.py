@@ -5,7 +5,7 @@
 - Stego/Image (PR2) — steghide (per v0.5-stegseek-remove 替代 stegseek, per v0.5-lsb-tool-bitplane-preview-matrix: zsteg 已删, lsb_tool 替代)
 - Forensics/Network (PR3) — tshark / tcpdump
 - Stego/Audio+Video (PR4) — ffmpeg_audio / ffprobe / ffmpeg_video / sox / steghide_audio
-- Misc/Archive (PR5) — sevenz_extract / unzip / john / zip_classify (sevenz 是探测类, GUI 不显示, per Owner 20:03)
+- Misc/Archive (PR5) — sevenz_extract / john / zip_classify (sevenz 是探测类, GUI 不显示, per Owner 20:03; v0.5-unzip-remove 删 unzip)
 - Forensics/Log (PR6) — grep / evtx_dump
 - Misc/Brainteaser (PR8) — zbar
 - Forensics/Memory (PR7) — vol
@@ -42,8 +42,8 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
         "sox",
         "steghide_audio",
     ],
-    "Misc/Archive (PR5)": ["sevenz_extract", "unzip", "john", "zip_classify",
-                            "qemu_img", "qemu_img_extract"],  # v0.5-qemu-img-adapter (Owner 23:23 拍 B 升架构)
+    "Misc/Archive (PR5)": ["sevenz_extract", "john", "zip_classify",
+                            "qemu_img", "qemu_img_extract"],  # v0.5-qemu-img-adapter (Owner 23:23 拍 B 升架构); v0.5-unzip-remove 删 unzip
     "Forensics/Log (PR6)": ["grep", "evtx_dump"],
     "Misc/Brainteaser (PR8)": ["zbar"],
     "Forensics/Memory (PR7)": ["vol"],
@@ -168,7 +168,7 @@ ADAPTER_TOOLS: set[str] = {
     "steghide",
     "tshark", "tcpdump",
     "ffmpeg_audio", "ffprobe", "ffmpeg_video", "sox", "steghide_audio",
-    "sevenz", "sevenz_extract", "unzip", "john", "zip_classify",
+    "sevenz", "sevenz_extract", "john", "zip_classify",  # v0.5-unzip-remove 删 unzip
     "qemu_img", "qemu_img_extract",  # v0.5-qemu-img-adapter Owner 2026-06-29 23:23 拍 B
     "grep", "evtx_dump",
     "zbar",
