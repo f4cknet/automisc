@@ -350,8 +350,11 @@ class TestRun7z:
         from automisc.core.actions import hex_router
         from automisc.core.actions.hex_router import _run_7z
 
-        # mock shutil.which("7z") 找到
-        monkeypatch.setattr(hex_router.shutil, "which", lambda name: "/fake/7z" if name == "7z" else None)
+        # mock resolve_tool_binary("7z") 返回 fake path
+        monkeypatch.setattr(
+            "automisc.tools.paths.resolve_tool_binary",
+            lambda name: "/fake/7z" if name == "7z" else None,
+        )
         # mock subprocess.run 返回成功
         fake_result = type("FakeResult", (), {
             "stdout": "7-Zip [64] 26.02 : Copyright Igor Pavlov\n\nExtracting archive: test.zip\n",
@@ -369,11 +372,14 @@ class TestRun7z:
         assert stderr == ""
 
     def test_run_7z_binary_not_found(self, tmp_path, monkeypatch):
-        """7z binary 不存在 (PATH 上找不到)."""
-        from automisc.core.actions import hex_router
+        """7z binary 不存在 (resolve_tool_binary 返回 None)."""
         from automisc.core.actions.hex_router import _run_7z
 
-        monkeypatch.setattr(hex_router.shutil, "which", lambda name: None)
+        # mock resolve_tool_binary("7z") 返回 None
+        monkeypatch.setattr(
+            "automisc.tools.paths.resolve_tool_binary",
+            lambda name: None,
+        )
 
         out_path = tmp_path / "test.zip"
         out_path.write_bytes(b"PK\x03\x04" + b"\x00" * 50)
@@ -386,8 +392,11 @@ class TestRun7z:
         from automisc.core.actions import hex_router
         from automisc.core.actions.hex_router import _run_7z
 
-        # mock shutil.which("7z") 找到
-        monkeypatch.setattr(hex_router.shutil, "which", lambda name: "/fake/7z" if name == "7z" else None)
+        # mock resolve_tool_binary("7z") 找到
+        monkeypatch.setattr(
+            "automisc.tools.paths.resolve_tool_binary",
+            lambda name: "/fake/7z" if name == "7z" else None,
+        )
         # mock subprocess.run 抛 TimeoutExpired (用 hex_router.subprocess 引用)
         def fake_run(*args, **kwargs):
             raise hex_router.subprocess.TimeoutExpired(cmd=args[0] if args else "7z", timeout=kwargs.get("timeout", 60))

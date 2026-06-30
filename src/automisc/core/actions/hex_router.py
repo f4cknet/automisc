@@ -172,7 +172,10 @@ def _run_7z(p: Path) -> tuple[str, str]:
 
     Returns (stdout, stderr).
     """
-    sevenz_bin = shutil.which("7z")
+    # v0.5-platform-extend-tools: 走 resolve_tool_binary 优先 PATH → extend-tools/bin/win-x64/
+    # 原 _run_unzip 直接 shutil.which 在 Win 上找不到 (没装 unzip)
+    from automisc.tools.paths import resolve_tool_binary
+    sevenz_bin = resolve_tool_binary("7z")
     if not sevenz_bin:
         return "", "7z 未装"
     try:
