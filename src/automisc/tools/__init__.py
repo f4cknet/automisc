@@ -39,11 +39,10 @@ from automisc.tools.steganography.video import ffprobe  # noqa: F401
 from automisc.tools.forensics.network import tcpdump  # noqa: F401
 from automisc.tools.forensics.network import tshark  # noqa: F401
 
-# misc/archive/ 的 5 个 adapter（v0.1.0b-PR5 + v0.5-zip-verdict-pool + v0.5-sevenz-extract）
+# misc/archive/ 的 4 个 adapter（v0.1.0b-PR5 + v0.5-zip-verdict-pool + v0.5-sevenz-extract; v0.5-unzip-remove 删 unzip）
 from automisc.tools.misc.archive import john  # noqa: F401
 from automisc.tools.misc.archive import sevenz  # noqa: F401
 from automisc.tools.misc.archive import sevenz_extract  # noqa: F401  # v0.5-sevenz-extract Owner 2026-06-20 19:48
-from automisc.tools.misc.archive import unzip  # noqa: F401
 from automisc.tools.misc.archive import zip_classify  # noqa: F401  # v0.5-zip-verdict-pool Owner 2026-06-20 14:13
 
 # forensics/log/ 的 2 个 adapter（v0.1.0b-PR6）
