@@ -274,56 +274,9 @@ class TestResolveToolBinaryFlexibleSubdir:
         )
 
 
-# ---------- resolve_tool_binary: qemu-img Win NSIS install (per v0.5-qemu-img-extend-tools) ----------
-
-class TestResolveToolBinaryQemuImg:
-    """v0.5-qemu-img-extend-tools: qemu-img 装到 C:\\Program Files\\qemu\\ (NSIS silent install),
-    不复制到 extend-tools/. paths.py 走 shutil.which("qemu-img") 优先, 命中系统 PATH.
-
-    测试覆盖:
-    - resolve_tool_binary("qemu-img") 不抛 (idempotent)
-    - 没装时返回 None (跟其他工具行为一致)
-    - 装了 (PATH 含) 时返回 PATH 路径 (e2e 测试, owner 跑 install.ps1 后实测)
-    """
-
-    def test_qemu_img_resolve_no_install_returns_none(self, tmp_path):
-        """没装 qemu-img (extend-tools/ 空 + PATH mock) → resolve_tool_binary 返回 None."""
-        import automisc.tools.paths as paths_mod
-
-        fake_bindir = tmp_path / "win-x64"
-        fake_bindir.mkdir(parents=True)
-
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
-            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
-            # mock shutil.which 返回 None (PATH 无 qemu-img)
-            import shutil as _shutil
-            mp.setattr(_shutil, "which", lambda name: None)
-
-            result = paths_mod.resolve_tool_binary("qemu-img")
-        assert result is None, (
-            f"没装 qemu-img 应返回 None, 实际: {result}"
-        )
-
-    def test_qemu_img_resolve_finds_in_path(self, tmp_path):
-        """qemu-img 在 PATH → resolve_tool_binary 返回 PATH 路径 (e2e mock)."""
-        import automisc.tools.paths as paths_mod
-
-        fake_bindir = tmp_path / "win-x64"
-        fake_bindir.mkdir(parents=True)
-        # mock 一个假 qemu-img 在 PATH
-        fake_qemu_path = r"C:\Program Files\qemu\qemu-img.exe"
-
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(paths_mod, "extend_tools_bin_dir", lambda: fake_bindir)
-            mp.setattr(paths_mod, "exe_suffix", lambda: ".exe" if sys.platform == "win32" else "")
-            import shutil as _shutil
-            mp.setattr(_shutil, "which", lambda name: fake_qemu_path if name == "qemu-img" else None)
-
-            result = paths_mod.resolve_tool_binary("qemu-img")
-        assert result == fake_qemu_path, (
-            f"qemu-img 在 PATH 应返回 PATH 路径, 实际: {result}"
-        )
+# v0.5-qemu-img-remove (per Owner 2026-06-30 22:16 反转 v0.5-qemu-img-adapter):
+# 删 qemu_img + qemu_img_extract adapter, paths.py:resolve_tool_binary("qemu-img") 仍 work
+# (没人调, dead code, 留 v0.5+ 评估). 测试也跟着删 (per AGENTS §5.2 单题打补丁陷阱).
 
 
 # ---------- list_extend_tools ----------
