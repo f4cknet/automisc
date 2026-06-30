@@ -26,7 +26,7 @@
    - `7f454c46` -> ELF (binary)
    - `4d5a` -> PE/exe (binary)
 3. 写 raw bytes 到 /tmp/automisc_<magic>_<rand>.<ext>
-4. 触发对应后续 (zbar / unzip / unrar / 7z / file)
+4. 触发对应后续 (zbar / 7z / file) (v0.5-unzip-remove: unzip Win 不可用, zip magic 走 7z)
 5. 返回 HexRouterResult (magic, ext, output_path, decoded / extracted info)
 
 **触发条件**:
@@ -34,7 +34,7 @@
 - hex 长度 > 200 字符 (per Owner "低于 200 字符的 hex, 你打印给我, 我自己处理")
 - auto-run 看到这种"超长 hex" 不打印到 GUI (避免 35000 字符撑爆窗口), 直接 trigger 本 action
 
-macOS 依赖: zbarimg / unzip / unrar / 7z (任一 magic 命中时调)
+macOS 依赖: zbarimg / 7z (任一 magic 命中时调) (v0.5-unzip-remove: unzip 删除, zip 走 7z)
 """
 from __future__ import annotations
 
@@ -63,9 +63,9 @@ _MAGIC_TABLE: Final[list[tuple[bytes, str, str, str]]] = [
     (b"\xff\xd8\xff", "jpg", "image", "zbarimg 扫 QR / barcode"),
     (b"GIF87a", "gif", "image", "zbarimg 扫 QR / barcode"),
     (b"GIF89a", "gif", "image", "zbarimg 扫 QR / barcode"),
-    (b"PK\x03\x04", "zip", "archive", "unzip 提取"),
-    (b"PK\x05\x06", "zip", "archive", "unzip 提取 (空 zip)"),
-    (b"PK\x07\x08", "zip", "archive", "unzip 提取 (spanned)"),
+    (b"PK\x03\x04", "zip", "archive", "7z x 提取 (v0.5-unzip-remove: 替代 unzip)"),
+    (b"PK\x05\x06", "zip", "archive", "7z 提取 (空 zip)"),
+    (b"PK\x07\x08", "zip", "archive", "7z 提取 (spanned)"),
     (b"Rar!\x1a\x07\x00", "rar", "archive", "unrar / unar 提取"),
     (b"Rar!\x1a\x07\x01\x00", "rar5", "archive", "unrar 5+ 提取"),
     (b"7z\xbc\xaf\x27\x1c", "7z", "archive", "7z x 提取"),
@@ -167,17 +167,21 @@ def _run_zbar(p: Path) -> tuple[str, str]:
         return "", f"zbarimg {type(e).__name__}: {e}"
 
 
-def _run_unzip(p: Path) -> tuple[str, str]:
-    """unzip 提取, 返回 (stdout, stderr)."""
-    unzip = shutil.which("unzip")
-    if not unzip:
-        return "", "unzip 未装"
+def _run_7z(p: Path) -> tuple[str, str]:
+    """7z x 提取 (per v0.5-unzip-remove: 替代 unzip Win 不可用).
+
+    Returns (stdout, stderr).
+    """
+    sevenz_bin = shutil.which("7z")
+    if not sevenz_bin:
+        return "", "7z 未装"
     try:
-        # 提取到 /tmp/<zipstem>_extracted_<ts>/
-        extract_dir = p.parent / f"{p.stem}_extracted_{int(time.time())}"
+        # 提取到 <p.parent>/<p.stem>_7z_extracted_<ts>/
+        extract_dir = p.parent / f"{p.stem}_7z_extracted_{int(time.time())}"
         extract_dir.mkdir(parents=True, exist_ok=True)
+        # 7z x -y -o<dir> <file> (per sevenz_extract.py 命令模板)
         r = subprocess.run(
-            [unzip, "-o", str(p), "-d", str(extract_dir)],
+            [sevenz_bin, "x", "-y", f"-o{extract_dir}", str(p)],
             capture_output=True,
             text=True,
             timeout=60,
@@ -187,7 +191,7 @@ def _run_unzip(p: Path) -> tuple[str, str]:
             r.stderr.strip(),
         )
     except (subprocess.TimeoutExpired, OSError) as e:
-        return "", f"unzip {type(e).__name__}: {e}"
+        return "", f"7z {type(e).__name__}: {e}"
 
 
 def route_hex_to_file(
@@ -254,7 +258,7 @@ def route_hex_to_file(
         if file_type == "image":
             fu_stdout, fu_stderr = _run_zbar(out_path)
         elif file_type == "archive" and ext in ("zip",):
-            fu_stdout, fu_stderr = _run_unzip(out_path)
+            fu_stdout, fu_stderr = _run_7z(out_path)
         # 其他 archive 类型 (rar/7z/gz/bz2) 等 v0.5+ 实施 unrar/7z/gunzip
 
     return HexRouterResult(

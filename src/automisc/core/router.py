@@ -77,8 +77,8 @@ EXTENSION_ROUTES: dict[str, list[tuple[str, str, int]]] = {
         ("tshark", "PCAP-NG 协议解析", 8),
         ("tcpdump", "PCAP-NG", 6),
     ],
-    # 压缩 (Archive)
-    ".zip": [("sevenz", "ZIP 完整性 + 伪加密检测", 10), ("unzip", "ZIP 列表 + 提取", 8), ("john", "ZIP 密码爆破", 5)],
+    # 压缩 (Archive) — v0.5-unzip-remove: unzip 删, sevenz top-1 覆盖列表+伪加密检测
+    ".zip": [("sevenz", "ZIP 完整性 + 伪加密检测", 10), ("john", "ZIP 密码爆破", 5)],
     ".7z": [("sevenz", "7z 完整性", 10), ("john", "7z 密码爆破", 5)],
     ".rar": [("sevenz", "RAR 完整性", 10), ("john", "RAR 密码爆破", 5)],
     ".tar": [("sevenz", "TAR 列表", 10)],
