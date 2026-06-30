@@ -72,7 +72,6 @@ FIND_SUSPICIOUS_TRAFFIC_TOOLS = [
 ]
 FIND_SUSPICIOUS_ARCHIVE_TOOLS = [
     "sevenz",        # 7z l 列表 (不实际解压)
-    "unzip",         # unzip -l 列表 (不实际解压)
     "zip_classify",  # ZIP per-entry 伪/真/clear 分类 + 自动解压 clear (v0.5-zip-verdict-pool)
     "file",
     "strings",
@@ -143,10 +142,10 @@ _SUGGEST_MAP: dict[str, tuple[str, str]] = {
         "auto_run_suggest",
         "📦 binwalk 命中 7z, 建议手工跑 sevenz_extract (Tools 菜单)",
     ),
-    # binwalk 命中 RAR → 建议 unzip 或 bruteforce_rar
+    # binwalk 命中 RAR → 建议 sevenz_extract 或 bruteforce_rar (v0.5-unzip-remove 删 unzip)
     "binwalk:file_header_rar": (
         "auto_run_suggest",
-        "📦 binwalk 命中 RAR, 建议手工跑 unzip 或 bruteforce_rar (Tools 菜单)",
+        "📦 binwalk 命中 RAR, 建议手工跑 sevenz_extract 或 bruteforce_rar (Tools 菜单)",
     ),
     # binwalk 命中 pyc → 建议 pyc_decompiler
     "binwalk:file_header_pyc": (
@@ -316,7 +315,8 @@ def find_suspicious_from_traffic(core: CoreOrchestrator, file_path: str) -> list
 def find_suspicious_from_archive(core: CoreOrchestrator, file_path: str) -> list[ToolResult]:
     """压缩包专用探测器 (zip/7z/rar/tar/gz).
 
-    跑 [sevenz / unzip / file / strings] — 纯探测 (列表不实际解压).
+    跑 [sevenz / zip_classify / file / strings] — 纯探测 (列表不实际解压).
+    (v0.5-unzip-remove: 删 unzip, sevenz + zip_classify + zipfile 自研完全替代)
     **不**跑 john (爆破) — 留给 GUI 工具栏.
     """
     results: list[ToolResult] = []
