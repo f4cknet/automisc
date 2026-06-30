@@ -14,10 +14,13 @@
 # - post_extract: 解压后处理（zip 才有, rename / 解嵌套）
 # - available: false = 该平台暂无方案
 
-version: "1.1"
+version: "1.2"
+# 最后更新: 2026-06-30 (per v0.5-7z-layout-migrate 部署布局调整)
+# - 改: 7zr 1MB standalone (24.07) → 7zip 完整安装 23.01 (per Owner 2026-06-30 21:53 拍板)
+#   部署到 extend-tools/bin/win-x64/7-Zip/ subdir (异名 subdir, resolve_tool_binary
+#   异名 fallback 命中 7-Zip/7z.exe, per v0.5-extend-tools-subdir-flexible)
 # 最后更新: 2026-06-28 (per v0.5-zbar-windows-install manifest 同步)
 # - 新增: steghide (Cygwin 构建), vim92 (Vim Win32 installer 整包)
-# - 备注: 7z.exe 是 7zr.exe 的 hardlink, manifest 仍只列 7zr
 # - 注: evtx_dump CLI 暂不加入 manifest (per v0.5-windows-evtx-dump §6 决策:
 #   adapter 用 python-evtx 0.8.1, CLI 0 调用; 实战 ≥3 道同类再升架构 per AGENTS §5.2)
 # - v0.5-zbar-windows-install (2026-06-28 23:00 Owner 拍板):
@@ -41,16 +44,26 @@ platforms:
           zip_contains: "exiftool(-k).exe"
           rename_to: "exiftool.exe"
 
-      7zr:
-        version: "24.07"
-        url: "https://www.7-zip.org/a/7zr.exe"
-        sha256: "56B8CC9F4971CEF253644FAFE54063ED7FDCA551D4DEE0F8C6BAA81B855ACD72"  # 2026-06-27 install.ps1 算出
+      7zip:
+        version: "23.01"
+        # 7-Zip 23.01 Windows x64 安装器 (NSIS, 1.5MB 安装器, 展开后 ~5MB).
+        # per v0.5-7z-layout-migrate (Owner 2026-06-30 21:53 拍板):
+        # 从 7zr standalone 1MB 切到完整安装, 部署到 extend-tools/bin/win-x64/7-Zip/ subdir.
+        # 异名 subdir 7-Zip (不是 7z), resolve_tool_binary 走 v0.5-extend-tools-subdir-flexible
+        # 异名 subdir fallback 命中 7-Zip/7z.exe.
+        url: "https://www.7-zip.org/a/7z2301-x64.exe"
+        sha256: ""  # TODO: install.ps1 首次下载后回填 (per Owner 手工装时算出)
         available: true
         notes: |
-          7-Zip 独立版 (不需安装器), 单文件.
-          adapter 用 '7z' 名 (兼容 macOS brew 装的 p7zip).
-          extend-tools 里实际文件名是 '7zr.exe', install.ps1 / Owner 手工建 7z.exe hardlink,
-          adapter 调 '7z' 命令, adapter 解析时优先 extend-tools/bin/win-x64/7z.exe.
+          7-Zip 23.01 (x64) 完整安装包 (2023-06-20 release).
+          部署到 extend-tools/bin/win-x64/7-Zip/ subdir (异名 subdir):
+            - 7z.exe (主 CLI)
+            - 7z.dll / 7zFM.exe / 7zG.exe (GUI + SFX + 文件管理器)
+            - 7-zip.chm / History.txt / License.txt / readme.txt
+            - Lang/ (i18n, 含 zh-CN)
+          adapter 调 '7z' 命令, resolve_tool_binary 优先 PATH → extend-tools/bin/win-x64/7-Zip/7z.exe.
+          注: macOS 端走 brew p7zip (PATH 优先命中), 不受影响.
+          实战: 7z 23.01 不支持 vmdk (per v0.5-train-018), vmdk 实战走 qemu-img convert.
 
       foremost:
         version: "1.5.7"
