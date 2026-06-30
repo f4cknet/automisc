@@ -81,8 +81,7 @@ FIND_SUSPICIOUS_BINARY_TOOLS = [
     "strings",
     "binwalk",
     "exiftool",
-    "qemu_img",  # v0.5-qemu-img-adapter (Owner 23:23 拍 B): info 探测归探测, 可挂 auto-run
-]
+]  # v0.5-qemu-img-remove 删 qemu_img (7z 23.01 实测支持 vmdk, 不需 qemu-img info)
 
 
 # v0.5-philosophy-rethink: 扩展名 → pool 名 (per owner 决策 1)
