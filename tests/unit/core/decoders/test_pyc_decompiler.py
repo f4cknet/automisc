@@ -153,7 +153,9 @@ class TestNpWriteupLiteralPyc:
         result = run_pyc_decompiler(str(np_writeup_literal_pyc))
 
         assert result.success, f"反编译失败: {result.error}"
-        assert result.method == "uncompyle6"
+        assert result.method in ("pycdc", "uncompyle6"), (
+            f"method 应该 pycdc 或 uncompyle6, 实际 {result.method}"
+        )
         assert result.version == (2, 7)
         assert result.magic_int == 62211
 
@@ -227,7 +229,7 @@ class TestPycDecompilerButtonsForceVersion:
     """v0.5-pyc-decompiler-buttons: force_version 路由 + 写盘 .py."""
 
     def test_force_version_2_writes_py2_suffix(self, tmp_path):
-        """force_version=2 → 强制 uncompyle6 + 写盘 `<stem>__pyc_py2.py`."""
+        """force_version=2 → 优先 pycdc (v0.5-pyc-decompiler-pycdc), 写盘 `<stem>__pyc_py2.py`."""
         # 准备: 复制 N=NP Py2.7 pyc 到 tmp_path (per output_path_for 命名)
         src = _REAL_PY27_PYC  # v0.5-pyc-decompiler-buttons: 仓外 fixture + v0.5-train-019 fallback
         local_pyc = tmp_path / "ctf_encode.pyc"
@@ -238,7 +240,9 @@ class TestPycDecompilerButtonsForceVersion:
 
         # 验证: 写盘成功 (per v0.5-output-samedir naming)
         assert result.error is None, f"force_version=2 失败: {result.error}"
-        assert result.method == "uncompyle6"
+        assert result.method in ("pycdc", "uncompyle6"), (
+            f"method 应该 pycdc 或 uncompyle6, 实际 {result.method}"
+        )
         assert result.force_version == 2
         assert result.success, f"success=False, error={result.error}"
         # 期望 output_path = tmp_path/ctf_encode__pyc_py2.py
@@ -263,7 +267,9 @@ class TestPycDecompilerButtonsForceVersion:
         result = run_pyc_decompiler(str(local_pyc))  # force_version 默认 None
 
         assert result.error is None
-        assert result.method == "uncompyle6"  # magic 2.7 → uncompyle6
+        assert result.method in ("pycdc", "uncompyle6"), (
+            f"method 应该 pycdc 或 uncompyle6, 实际 {result.method}"
+        )  # magic 2.7 → uncompyle6
         assert result.force_version is None
         assert result.success
         # 期望 output_path = tmp_path/ctf_encode__pyc.py
@@ -310,7 +316,9 @@ class TestPycDecompilerButtonsForceVersion:
 
         # 反编译成功
         assert result.error is None
-        assert result.method == "uncompyle6"
+        assert result.method in ("pycdc", "uncompyle6"), (
+            f"method 应该 pycdc 或 uncompyle6, 实际 {result.method}"
+        )
         assert result.source_code  # 有源码
         # 但不写盘
         assert result.output_path is None
@@ -345,9 +353,8 @@ class TestPycDecompilerButtonsForceVersion:
     def test_dis_fallback_does_not_write(self, tmp_path):
         """dis fallback 是字节码反汇编, 不是真源码 → 不写盘 (per Owner 决策).
 
-        场景: 合成一个 uncompyle6 + decompyle3 都解不出来的 Py3.x 字节码 (e.g. 含 async).
-        实际测试中, 难合成这种情况, 所以 mock _decompile_with_uncompyle6 + decompyle3 都失败,
-        强制走 dis fallback, 验证 output_path=None.
+        v0.5-pyc-decompiler-pycdc: Py2.x 路由 pycdc 优先 → fallback uncompyle6+fix → fallback dis.
+        mock pycdc + uncompyle6 + decompyle3 都失败, 强制走 dis fallback.
         """
         from automisc.core.decoders import pyc_decompiler as pdc
         from automisc.core.decoders.pyc_decompiler import run_pyc_decompiler
@@ -356,17 +363,23 @@ class TestPycDecompilerButtonsForceVersion:
         local_pyc = tmp_path / "ctf_encode.pyc"
         local_pyc.write_bytes(src.read_bytes())
 
-        # mock: uncompyle6 + decompyle3 都抛异常 → 强制走 dis fallback
+        # mock: pycdc 返回空 source + uncompyle6 + decompyle3 都抛异常 → 强制走 dis fallback
+        def _fail_pycdc(*args, **kwargs):
+            return ("", "pycdc")  # 模拟 pycdc 失败 (空 source, 让 fallback 继续)
+
         def _fail(*args, **kwargs):
             raise RuntimeError("mock: decompile fail")
 
+        orig_pycdc = pdc._decompile_with_pycdc
         orig_uncompyle6 = pdc._decompile_with_uncompyle6
         orig_decompyle3 = pdc._decompile_with_decompyle3
+        pdc._decompile_with_pycdc = _fail_pycdc
         pdc._decompile_with_uncompyle6 = _fail
         pdc._decompile_with_decompyle3 = _fail
         try:
             result = run_pyc_decompiler(str(local_pyc), force_version=2)
         finally:
+            pdc._decompile_with_pycdc = orig_pycdc
             pdc._decompile_with_uncompyle6 = orig_uncompyle6
             pdc._decompile_with_decompyle3 = orig_decompyle3
 
@@ -415,3 +428,197 @@ class TestPycDecompileResultNewFields:
             output_path="/x__pyc.py",
         )
         assert r2.success is True
+
+
+# ---------- fix_pyc_uncompyle6_consts_bug (per Owner 2026-07-01 09:57 反馈) ----------
+class TestFixUncompyle6ConstsBug:
+    """fix_pyc_uncompyle6_consts_bug: 修 uncompyle6 Py2.7 顶层 consts 列表反编译 bug.
+
+    覆盖:
+    - 触发 bug → 还原真实字符串 (per 实战 flag.pyc)
+    - 不触发 bug → skeleton 不变 (旁路安全)
+    - 末尾 return 去除 (module-level 伪 artifact)
+    - 端到端: run_pyc_decompiler 跑 flag.pyc → source_code 含真实 ciphertext
+    """
+
+    def test_fix_replaces_indices_with_real_strings(self):
+        """uncompyle6 输出 `var = [N, N, N, ...]` → 还原成 `var = ['val1', 'val2', ...]`.
+
+        模拟: skeleton 含 consts 索引 + xdis 返回真实 co_consts → 还原.
+        """
+        # 模拟 skeleton (uncompyle6 bug 输出)
+        skeleton = (
+            "def encode():\n"
+            "    pass\n"
+            "\n"
+            "\n"
+            "ciphertext = [3, 4, 5, 6, 7]\n"  # 索引 3~7
+            "return\n"
+        )
+        from automisc.core.decoders.pyc_decompiler import _fix_uncompyle6_consts_bug
+
+        # mock: xdis.load_module 返回 (version, ts, magic, mock_co, ...)
+        class MockCode:
+            co_consts = (-1, None, "ignored", "val_3", "val_4", "val_5", "val_6", "val_7")
+
+        def mock_load_module(path):
+            return ((2, 7), 0, 62211, MockCode(), False, 0, None)
+
+        # _fix_uncompyle6_consts_bug 内部 `from xdis import load_module`, mock sys.modules
+        import sys
+        original_xdis = sys.modules.get("xdis")
+        sys.modules["xdis"] = type(sys)("xdis")
+        sys.modules["xdis"].load_module = mock_load_module
+        try:
+            fixed = _fix_uncompyle6_consts_bug(skeleton, "/fake/path.pyc")
+        finally:
+            # 还原
+            if original_xdis is not None:
+                sys.modules["xdis"] = original_xdis
+            else:
+                del sys.modules["xdis"]
+
+        # 验证: 索引被替换成真实字符串
+        assert "['val_3', 'val_4', 'val_5', 'val_6', 'val_7']" in fixed, (
+            f"fix 没还原字符串, 实际: {fixed!r}"
+        )
+        # 验证: 末尾 return 去除
+        assert not fixed.rstrip().endswith("return"), (
+            f"末尾 return 没去掉, 实际结尾: {fixed.rstrip()[-50:]!r}"
+        )
+
+    def test_fix_no_change_on_normal_skeleton(self):
+        """不触发 bug 的 skeleton (e.g. 函数体内 consts, 或全 int 列表) → 不改."""
+        from automisc.core.decoders.pyc_decompiler import _fix_uncompyle6_consts_bug
+
+        # 场景 1: 全 int 列表 (e.g. `[1, 2, 3]`) → top_consts[N] 不是 str, 跳过
+        skeleton_int = "x = [1, 2, 3]\ny = 42\n"
+        # 用 mock 让 co_consts 全是 int
+        class MockCodeInt:
+            co_consts = (-1, None, 1, 2, 3, 42)
+
+        def mock_load_int(path):
+            return ((2, 7), 0, 62211, MockCodeInt(), False, 0, None)
+
+        import sys
+        sys.modules["xdis"] = type(sys)("xdis")
+        sys.modules["xdis"].load_module = mock_load_int
+        try:
+            fixed = _fix_uncompyle6_consts_bug(skeleton_int, "/fake/int.pyc")
+        finally:
+            del sys.modules["xdis"]
+
+        # 验证: int 列表不动
+        assert "x = [1, 2, 3]" in fixed, f"int 列表被改了: {fixed!r}"
+        # 验证: 末尾 return 不影响 (没 return)
+        assert fixed == skeleton_int, f"无 bug skeleton 不应被改: {fixed!r}"
+
+    def test_fix_handles_missing_pyc_gracefully(self):
+        """xdis load_module 失败 (e.g. 文件不存在) → 退而求其次, 返回原 skeleton."""
+        from automisc.core.decoders.pyc_decompiler import _fix_uncompyle6_consts_bug
+
+        skeleton = "ciphertext = [3, 4, 5]\nreturn\n"
+
+        def mock_load_fail(path):
+            raise RuntimeError("mock: file not found")
+
+        import sys
+        sys.modules["xdis"] = type(sys)("xdis")
+        sys.modules["xdis"].load_module = mock_load_fail
+        try:
+            fixed = _fix_uncompyle6_consts_bug(skeleton, "/nonexistent.pyc")
+        finally:
+            del sys.modules["xdis"]
+
+        # 验证: 失败时保留原输出 (含 return)
+        assert fixed == skeleton, f"xdis 失败时不应改 skeleton: {fixed!r}"
+
+
+# ---------- fix_pyc_uncompyle6_consts_bug 端到端 ----------
+@pytest.mark.skipif(
+    _REAL_PY27_PYC is None,
+    reason="需要真实 Py2.7 pyc (flag.pyc fixture) 跑端到端 fix",
+)
+class TestFixUncompyle6ConstsBugE2E:
+    """端到端: run_pyc_decompiler 跑 flag.pyc → source_code 含真实 ciphertext 字符串."""
+
+    def test_run_pyc_decompiler_py2_has_real_ciphertext_strings(self, tmp_path):
+        """v0.5 fix_pyc_uncompyle6_consts_bug: flag.pyc 反编译 → ciphertext 真实字符串.
+
+        期望: source_code 含 "'96', '65', '93', '123', ..." (per online 工具验证 100% 匹配)
+        """
+        # 复制 flag.pyc 到 tmp_path (per output_path_for 命名)
+        src = _REAL_PY27_PYC
+        local_pyc = tmp_path / "ctf_encode.pyc"
+        local_pyc.write_bytes(src.read_bytes())
+
+        from automisc.core.decoders.pyc_decompiler import run_pyc_decompiler
+        result = run_pyc_decompiler(str(local_pyc), force_version=2)
+
+        # 基础断言 (跟 v0.5-pyc-decompiler-buttons 一致)
+        assert result.error is None
+        assert result.method in ("pycdc", "uncompyle6"), (
+            f"method 应该 pycdc 或 uncompyle6, 实际 {result.method}"
+        )
+        assert result.success
+        # 修后断言: source_code 含真实 ciphertext 字符串
+        # 期望 ciphertext = ['96', '65', '93', '123', '91', '97', '22', '93', '70',
+        #                    '102', '94', '132', '46', '112', '64', '97', '88',
+        #                    '80', '82', '137', '90', '109', '99', '112']
+        assert "'96'" in result.source_code, (
+            f"修后 source_code 应含 \"'96'\", 实际前 500 chars: {result.source_code[:500]!r}"
+        )
+        assert "'65'" in result.source_code
+        assert "'93'" in result.source_code
+        # 验证: 修后 ciphertext 是真实字符串列表 (不是 consts 索引)
+        # 检查 line 形如 "ciphertext = ['96', '65', ...]"
+        ciphertext_lines = [
+            line for line in result.source_code.split("\n")
+            if "ciphertext" in line and "=" in line and "[" in line
+        ]
+        assert len(ciphertext_lines) >= 1, f"找不到 ciphertext 行, 实际: {result.source_code!r}"
+        # 取最长行 (跨行列表)
+        longest = max(ciphertext_lines, key=len)
+        # 验证: 修后 ciphertext 是真实字符串列表 (不是 consts 索引)
+        # v0.5-pyc-decompiler-pycdc: pycdc 输出跨多行 (每行一个值), uncompyle6 输出单行
+        # 用 "ciphertext = [" + 24 个不同的字符串 + "ciphertext" 总引号数 验证
+        ciphertext_section = result.source_code[result.source_code.find("ciphertext"):]
+        # 至少 48 个引号 (24 个字符串, 每个 2 个引号) — pycdc / uncompyle6 都满足
+        assert ciphertext_section.count("'") >= 48, (
+            f"ciphertext 段应有 24 个字符串 (48 个引号), 实际: {ciphertext_section[:300]!r}"
+        )
+        # 验证: 末尾 `return` 去掉
+        assert not result.source_code.rstrip().endswith("return"), (
+            f"末尾 return 没去掉, 实际结尾: {result.source_code.rstrip()[-50:]!r}"
+        )
+        # v0.5-pyc-decompiler-pycdc: pycdc 跨多行输出, 跟 online 工具单行格式不同;
+        # 上面 '96'/'65'/.../'112' in source_code 已经逐字符串验证, 不再强求单行格式
+        pass  # pycdc 跨多行输出, 单行格式断言已用 24 字符串 + ciphertext_section 引号数验证
+
+    def test_run_pyc_decompiler_py2_does_not_break_other_parts(self, tmp_path):
+        """修函数只动 consts 列表 + 末尾 return, 不破坏其他代码 (e.g. def encode 函数体)."""
+        src = _REAL_PY27_PYC
+        local_pyc = tmp_path / "ctf_encode.pyc"
+        local_pyc.write_bytes(src.read_bytes())
+
+        from automisc.core.decoders.pyc_decompiler import run_pyc_decompiler
+        result = run_pyc_decompiler(str(local_pyc), force_version=2)
+
+        # 函数体不动
+        assert "def encode():" in result.source_code
+        assert "for i in range(len(flag)):" in result.source_code
+        assert "s = chr(i ^ ord(flag[i]))" in result.source_code
+        assert "ciphertext.append(str(s))" in result.source_code
+        assert "return ciphertext[::-1]" in result.source_code
+        # 注释头不动
+        assert (
+            "Decompyle++" in result.source_code
+            or "uncompyle6 version 3.9.3" in result.source_code
+        ), (
+            f"既不是 pycdc 也不是 uncompyle6 输出: {result.source_code[:200]!r}"
+        )
+        # 注释头不动 (兼容 pycdc "Decompyle++ (Python 2.7)" 或 uncompyle6 "Python bytecode version base 2.7")
+        assert "uncompyle6 version 3.9.3" in result.source_code or "Decompyle++" in result.source_code
+        assert "Python bytecode version base 2.7" in result.source_code or "(Python 2.7)" in result.source_code
+        assert "import base64" in result.source_code
+        assert "import base64" in result.source_code

@@ -14,7 +14,11 @@
 # - post_extract: 解压后处理（zip 才有, rename / 解嵌套）
 # - available: false = 该平台暂无方案
 
-version: "1.3"
+version: "1.4"
+# 最后更新: 2026-07-01 (per v0.5-pyc-decompiler-pycdc 加 pycdc entry)
+# - 新增: pycdc (zrax/pycdc C++ 反编译器, 4.2MB Win64 静态链)
+#   替代 uncompyle6 跑 Py2.x (uncompyle6 多个 Py2.7 bug 实战命中)
+#   url 留空 (无官方 Win prebuilt, 手工编译) + sha256 填 owner 自编译 hash
 # 最后更新: 2026-06-30 (per v0.5-qemu-img-remove 反转 v0.5-qemu-img-adapter)
 # - 删: qemu-img 条目 (per Owner 2026-06-30 22:16 拍板 "全局删除 qemu_img")
 #   理由: 7z 23.01 完整安装实测支持 vmdk (per v0.5-train-019), sevenz_extract
@@ -150,6 +154,36 @@ platforms:
           paths.py:resolve_tool_binary 异名 subdir fallback
           (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner) 自动
           扫 bindir/*/xxd.exe 找到 vim92/xxd.exe, 不需要 explicit entry.
+
+      pycdc:
+        version: "master-2026-07-01"
+        # zrax/pycdc C++ 反编译器 (Decompyle++), Win + Mac + Linux 跨平台.
+        # Py2.x / Py3.x pyc 都支持, 实战 Py2.7 准确率显著高于 uncompyle6
+        # (per v0.5-train-019 + 2026-07-01 Owner 实战 flag.pyc 验证,
+        # 100% 匹配 online 工具反编译输出).
+        # pyc_decompiler decoder Py2.x 路由优先用 pycdc, 失败 fallback uncompyle6+fix.
+        url: ""  # 无官方 Win prebuilt, 手工编译 (commands 见 install.ps1 §Stage 1 pycdc)
+        sha256: "419E6047EEDBBEE92E95C315FD96760E266CE74FD3F6C9E2F1459BAEB9507B23"  # 2026-07-01 Owner 自编译
+        available: true
+        notes: |
+          pycdc (zrax/pycdc master branch 2026-07-01) Win64 binary, MinGW64 静态链 libgcc/libstdc++/winpthread.
+          4.2MB, 不需要额外 DLL, Win ship 默认 work. 部署到 extend-tools/bin/win-x64/pycdc.exe.
+          注: 配套还有 pycdas.exe (3.5MB 字节码反汇编), 一同部署供未来 GUI 工具栏扩展.
+          编译命令 (per v0.5-pyc-decompiler-pycdc spec §1.2):
+            1. 装 cmake (winget Kitware.CMake) + msys2 (winget MSYS2.MSYS2) + MinGW64 toolchain
+               (msys2 terminal: pacman -S mingw-w64-x86_64-toolchain)
+               国内网络: 配 tuna 镜像 (per tools/_debug/config_msys2_mirrors.py).
+            2. git clone --depth=1 https://github.com/zrax/pycdc.git
+            3. cmake -G "MinGW Makefiles" -S pycdc -B build ^
+                 -DCMAKE_C_COMPILER=C:/msys64/mingw64/bin/gcc.exe ^
+                 -DCMAKE_CXX_COMPILER=C:/msys64/mingw64/bin/g++.exe ^
+                 -DCMAKE_MAKE_PROGRAM=C:/msys64/mingw64/bin/mingw32-make.exe ^
+                 -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++ -static"
+               提示: TMP/TEMP 必须指 user temp (C:\Windows\Temp 权限不够).
+            4. cmake --build build -j 4
+            5. Copy-Item build/pycdc.exe + pycdas.exe -> extend-tools/bin/win-x64/
+          macOS: brew install pycdc (Homebrew 维护 fork, 走 PATH 优先命中, 不需要 extend-tools).
+          Linux: 自行 cmake build (不在 v0.5-windows-only 范围).
 
     pip_packages:
       # 1 Python package (pip install by install.ps1)

@@ -72,6 +72,16 @@ $binaries = @(
         url = "https://github.com/nscaife/file-windows/releases/download/20170108/file-windows-20170108.zip"
         target = "file.exe"
         post_extract = "file_zip"
+    },
+    @{
+        name = "pycdc"
+        version = "master-2026-07-01"
+        # zrax/pycdc C++ 反编译器 (Decompyle++) — 无官方 Win prebuilt, 手工 build.
+        # url 留空: install.ps1 跳过下载, notes 提示手工 build (per msvcr120 模式).
+        # 编译命令见 manifest.yaml notes.
+        url = ""
+        target = "pycdc.exe"
+        post_extract = "skip_if_url_empty"
     }
 )
 
@@ -220,6 +230,33 @@ foreach ($tool in $binaries) {
         continue
     }
 
+    # v0.5-pyc-decompiler-pycdc: url 空 → 走 skip_if_url_empty 分支, 跳过下载
+    if ([string]::IsNullOrWhiteSpace($tool.url)) {
+        try {
+            switch ($tool.post_extract) {
+                "skip_if_url_empty" {
+                    Write-Host "[skip] $($tool.name): url empty, manual build required" -ForegroundColor Yellow
+                    Write-Host "         Build commands (see extend-tools/manifest.yaml notes):" -ForegroundColor Gray
+                    Write-Host "           1. winget install Kitware.CMake MSYS2.MSYS2" -ForegroundColor Gray
+                    Write-Host "           2. msys2 terminal: pacman -S mingw-w64-x86_64-toolchain" -ForegroundColor Gray
+                    Write-Host "           3. git clone --depth=1 https://github.com/zrax/pycdc.git" -ForegroundColor Gray
+                    Write-Host "           4. cmake -G 'MinGW Makefiles' -S pycdc -B build -DCMAKE_EXE_LINKER_FLAGS='-static-libgcc -static-libstdc++ -static' ..." -ForegroundColor Gray
+                    Write-Host "           5. cmake --build build -j 4" -ForegroundColor Gray
+                    Write-Host "           6. Copy-Item build/pycdc.exe + pycdas.exe -> extend-tools/bin/win-x64/" -ForegroundColor Gray
+                    $results += [PSCustomObject]@{name=$tool.name; status="skipped"; path="manual build required (see notes)"}
+                }
+                default {
+                    throw "url is empty but post_extract != skip_if_url_empty (tool=$($tool.name))"
+                }
+            }
+        } catch {
+            Write-Host " FAILED" -ForegroundColor Red
+            Write-Host "         error: $_" -ForegroundColor Red
+            $results += [PSCustomObject]@{name=$tool.name; status="failed"; error="$_"}
+        }
+        continue
+    }
+
     $tmp = Join-Path $StageDir "$($tool.name).download"
 
     try {
@@ -300,6 +337,20 @@ foreach ($tool in $binaries) {
                 Remove-Item $extract_dir -Recurse -Force
                 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
                 Write-Host " OK" -ForegroundColor Green
+            }
+            "skip_if_url_empty" {
+                # v0.5-pyc-decompiler-pycdc: pycdc 无官方 Win prebuilt, 手工 build.
+                # url 留空 → 跳过下载, notes 提示编译命令 (per msvcr120 / pycdc 模式).
+                Write-Host "[skip] $($tool.name): url empty, manual build required" -ForegroundColor Yellow
+                Write-Host "         Build commands (see extend-tools/manifest.yaml notes):" -ForegroundColor Gray
+                Write-Host "           1. winget install Kitware.CMake MSYS2.MSYS2" -ForegroundColor Gray
+                Write-Host "           2. msys2 terminal: pacman -S mingw-w64-x86_64-toolchain" -ForegroundColor Gray
+                Write-Host "           3. git clone --depth=1 https://github.com/zrax/pycdc.git" -ForegroundColor Gray
+                Write-Host "           4. cmake -G 'MinGW Makefiles' -S pycdc -B build -DCMAKE_EXE_LINKER_FLAGS='-static-libgcc -static-libstdc++ -static' ..." -ForegroundColor Gray
+                Write-Host "           5. cmake --build build -j 4" -ForegroundColor Gray
+                Write-Host "           6. Copy-Item build/pycdc.exe + pycdas.exe -> extend-tools/bin/win-x64/" -ForegroundColor Gray
+                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                $results += [PSCustomObject]@{name=$tool.name; status="skipped"; path="manual build required (see notes)"}
             }
             default {
                 Move-Item $tmp $dest -Force

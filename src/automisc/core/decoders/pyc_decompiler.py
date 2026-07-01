@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import dis
 import io
+import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -72,11 +74,133 @@ class PycDecompileResult:
 
 
 def _decompile_with_uncompyle6(file_path: str) -> tuple[str, str]:
-    """Py2.x 反编译, 返回 (source_code, method)."""
+    """Py2.x 反编译, 返回 (source_code, method).
+
+    fix_pyc_uncompyle6_consts_bug (per 2026-07-01 Owner 反馈): 反编译后调
+    `_fix_uncompyle6_consts_bug` 修 Py2.7 顶层 consts 列表 bug (uncompyle6 把
+    consts 索引当值输出, 真实字符串要去 xdis co.co_consts 查).
+    """
     import uncompyle6
     out = io.StringIO()
     uncompyle6.decompile_file(file_path, out)
-    return out.getvalue(), "uncompyle6"
+    skeleton = out.getvalue()
+    # 修 bug (per 实战 flag.pyc 命中, 2026-07-01 xdis inspect 验证 100% 匹配)
+    fixed = _fix_uncompyle6_consts_bug(skeleton, file_path)
+    return fixed, "uncompyle6"
+
+
+def _decompile_with_pycdc(file_path: str) -> tuple[str, str]:
+    """Py2.x 反编译 (v0.5-pyc-decompiler-pycdc), 走 pycdc C++ 反编译器.
+
+    **优先于 uncompyle6** (per Owner 2026-07-01 10:08 拍板 B 方案):
+    - pycdc 是 C++ 写的 Decompyle++ (zrax/pycdc), 独立实现
+    - 不依赖 uncompyle6 的 Py3 解析路径, 实战 Py2.7 准确率显著高于 uncompyle6
+    - 解决 uncompyle6 已知 bug: consts 索引 / lambda / closure / yield / 复杂控制流
+
+    Args:
+        file_path: .pyc 文件路径
+
+    Returns:
+        (source_code, "pycdc") - 成功
+        ("", "pycdc") - 失败 (binary 缺失 / subprocess 失败 / timeout)
+                          让 caller fallback 到 uncompyle6+fix
+    """
+    from automisc.tools.paths import resolve_tool_binary
+    pycdc = resolve_tool_binary("pycdc")
+    if not pycdc:
+        # binary 缺失 (extend-tools 没装 / PATH 也没) → fallback
+        return "", "pycdc"
+    try:
+        result = subprocess.run(
+            [pycdc, file_path],
+            capture_output=True,
+            text=True,
+            timeout=30,  # 30s 防止复杂 pyc 卡死
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout, "pycdc"
+        # returncode != 0 / 空输出 → 失败
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        # subprocess 异常 (timeout / binary 突然消失 / 权限) → 失败
+        pass
+    return "", "pycdc"
+
+
+# 顶层 "var = [N, N, N, ...]" 模式 (只含 int, 没字符串)
+# uncompyle6 bug 触发的特征: 列表元素全在 [0, N-1] 范围 (consts 索引)
+_TOP_LEVEL_INT_LIST_RE = re.compile(
+    r"^(\w+)\s*=\s*\[\s*((?:\d+\s*,\s*)*\d+)\s*\]\s*$",
+    re.MULTILINE,
+)
+# 末尾独立行 "return" (module-level 伪 artifact, uncompyle6 Py2.7 已知 issue)
+_TRAILING_RETURN_RE = re.compile(r"^return\s*$", re.MULTILINE)
+
+
+def _fix_uncompyle6_consts_bug(skeleton: str, file_path: str) -> str:
+    """修 uncompyle6 Py2.7 顶层 consts 列表反编译 bug (fix_pyc_uncompyle6_consts_bug).
+
+    **bug 现象** (per v0.5-train-019 实战 + 2026-07-01 Owner 反馈):
+    - uncompyle6 把 `ciphertext = ['96', '65', ...]` 反编译成 `ciphertext = [3, 4, 5, ...]`
+    - 输出是 `co_consts` 索引, 真实字符串要去 `co.co_consts` 查
+    - 末尾还多 `return` (module-level 伪 artifact)
+
+    **根因** (per 2026-07-01 xdis inspect):
+    - uncompyle6 Py2.7 module-level LOAD_CONST 反汇编 bug
+    - 修复: xdis `co.co_consts` 含真实字符串, 按 LOAD_CONST 顺序还原
+
+    **修法**:
+    1. xdis 拿 co.co_consts (顶层 code object 的真实 consts)
+    2. 正则解析 skeleton 里 "var = [N, N, N, ...]" 模式 (顶层 module-level)
+    3. 对每个匹配: 查 co_consts[N] 拿真实值
+    4. 全是 str → 替换成 'val1', 'val2', ... (单引号 per Python 2 repr)
+    5. 末尾 `return` 去掉 (独立行)
+
+    Args:
+        skeleton: uncompyle6 反编译输出 (含 bug 的源码)
+        file_path: pyc 文件路径 (供 xdis load_module 读 code object)
+
+    Returns:
+        修后 source code (跟 online 工具反编译输出 100% 一致, per xdis inspect 验证).
+    """
+    # 1. 拿 xdis co.co_consts (顶层 code object 的真实 consts)
+    try:
+        from xdis import load_module
+        _version, _ts, _magic, co, *_ = load_module(file_path)
+        top_consts = co.co_consts
+    except Exception:
+        # xdis 失败 (e.g. 损坏 pyc) → 退而求其次, 返回 uncompyle6 原输出
+        return skeleton
+
+    def _replace_int_list(m: re.Match) -> str:
+        """正则替换回调: 解析 "var = [N, N, N, ...]" → 查 co_consts → 还原字符串."""
+        var_name = m.group(1)
+        indices_str = m.group(2)
+        try:
+            indices = [int(x.strip()) for x in indices_str.split(",") if x.strip()]
+        except ValueError:
+            return m.group(0)  # 解析失败, 保留原输出
+
+        # 2. 查 top_consts[N] 拿真实值
+        try:
+            real_values = [top_consts[i] for i in indices]
+        except IndexError:
+            return m.group(0)  # 索引越界, 跳过
+
+        # 3. 全是 str 才替换 (其他类型可能本身正确, 避免破坏)
+        if not real_values or not all(isinstance(v, str) for v in real_values):
+            return m.group(0)
+
+        # 4. 替换成 'val1', 'val2', ... (单引号, per Python 2 repr 风格)
+        quoted = ", ".join(repr(v) for v in real_values)
+        return f"{var_name} = [{quoted}]"
+
+    # 5. 顶层 consts 列表替换
+    fixed = _TOP_LEVEL_INT_LIST_RE.sub(_replace_int_list, skeleton)
+
+    # 6. 末尾 `return` 去掉 (module-level 伪 artifact)
+    fixed = _TRAILING_RETURN_RE.sub("", fixed)
+
+    return fixed
 
 
 def _decompile_with_decompyle3(file_path: str) -> tuple[str, str]:
@@ -192,21 +316,28 @@ def run_pyc_decompiler(
 
     if force_version == 2:
         # 强制 py2, 跳过 magic
-        try:
-            source, method = _decompile_with_uncompyle6(file_path)
-        except Exception as e:  # noqa: BLE001
-            err = f"uncompyle6 failed (force_version=2): {e}"
+        # v0.5-pyc-decompiler-pycdc: Py2.x 优先 pycdc, 失败 fallback uncompyle6+fix
+        source, method = _decompile_with_pycdc(file_path)
+        if not source:
+            # pycdc 不可用/失败 → fallback uncompyle6+fix
+            try:
+                source, method = _decompile_with_uncompyle6(file_path)
+            except Exception as e:  # noqa: BLE001
+                err = f"uncompyle6 fallback failed (force_version=2): {e}"
     elif force_version == 3:
-        # 强制 py3, 跳过 magic
+        # 强制 py3, 跳过 magic (pycdc 不参与 Py3.x 路由, 走 decompyle3)
         try:
             source, method = _decompile_with_decompyle3(file_path)
         except Exception as e:  # noqa: BLE001
             err = f"decompyle3 failed (force_version=3): {e}"
     elif is_py2:
-        try:
-            source, method = _decompile_with_uncompyle6(file_path)
-        except Exception as e:  # noqa: BLE001
-            err = f"uncompyle6 failed: {e}"
+        # v0.5-pyc-decompiler-pycdc: Py2.x 优先 pycdc, 失败 fallback uncompyle6+fix
+        source, method = _decompile_with_pycdc(file_path)
+        if not source:
+            try:
+                source, method = _decompile_with_uncompyle6(file_path)
+            except Exception as e:  # noqa: BLE001
+                err = f"uncompyle6 fallback failed: {e}"
     elif is_py3:
         try:
             source, method = _decompile_with_decompyle3(file_path)
@@ -228,9 +359,10 @@ def run_pyc_decompiler(
     # - 写盘条件: source 非空 (反编译出源码) + write_output=True
     # - 不写盘: 失败 / dis fallback / write_output=False
     # - 命名: `<stem>__pyc[_pyN].py` (per v0.5-output-samedir `output_path_for`)
+    # v0.5-pyc-decompiler-pycdc: 写盘 method 含 "pycdc" (Py2.x 走 pycdc 也算成功反编译)
     output_path: Optional[str] = None
-    if source and write_output and method in ("uncompyle6", "decompyle3"):
-        # 写盘 (只有 uncompyle6/decompyle3 成功才写, dis fallback 是字节码不算"成功反编译源码")
+    if source and write_output and method in ("uncompyle6", "decompyle3", "pycdc"):
+        # 写盘 (只有 uncompyle6/decompyle3/pycdc 成功才写, dis fallback 是字节码不算"成功反编译源码")
         try:
             purpose = _purpose_for_force(force_version)
             if output_dir:
