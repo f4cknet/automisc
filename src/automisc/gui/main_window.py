@@ -1043,6 +1043,13 @@ class MainWindow(QMainWindow):
         - 其他 decoder (e.g. base64-image): 仍走 current_file (file 模式)
         - 之前 menu 触发 hex-ascii 把 current_file (e.g. 233KB meihuai.jpg) 当 hex 解
           触发卡死 + 乱码, 因为 hex-ascii 是给"短 hex 串"设计的
+
+        v0.5-pyc-decompiler-buttons (2026-07-01 per Owner 09:02):
+        - 解析 menu_dock entry 后缀 `:py2` / `:py3` → 提取 force_version
+        - `decoder:pyc_decompiler:py2` → effective_name="pyc_decompiler", force_version=2
+        - `decoder:pyc_decompiler:py3` → effective_name="pyc_decompiler", force_version=3
+        - `decoder:pyc_decompiler` (auto) → effective_name="pyc_decompiler", force_version=None
+        - display_name 保留原值给 status / output 用 (含 :py2/:py3 后缀, 调试更清晰)
         """
         if self._decode_runner and self._decode_runner.isRunning():
             self.statusBar().showMessage("前一个 decoder 还在跑，请稍等…")
@@ -1053,6 +1060,20 @@ class MainWindow(QMainWindow):
         if self._runner and self._runner.isRunning():
             self.statusBar().showMessage("前一个 tool 还在跑，请稍等…")
             return
+
+        # v0.5-pyc-decompiler-buttons: 解析 menu_dock entry 后缀 `:py2` / `:py3`
+        # menu_dock._on_item_clicked 收到 tool_name = "decoder:pyc_decompiler:py2" (含前缀)
+        # → 剥前缀 "decoder:" 后 name = "pyc_decompiler:py2" → 传到这里
+        # 解析后 effective_name 调 get_decoder, force_version 透传 DecodeRunner
+        display_name = decoder_name  # 保留原值, status / output 显示用
+        effective_name = decoder_name
+        force_version: Optional[int] = None
+        if decoder_name.endswith(":py2"):
+            force_version = 2
+            effective_name = decoder_name[:-len(":py2")]
+        elif decoder_name.endswith(":py3"):
+            force_version = 3
+            effective_name = decoder_name[:-len(":py3")]
 
         # v0.5-hex-ascii-fix + v0.5-coords-qr + v0.5-base-rot-decoders:
         # text-based decoders 走 input 区
@@ -1073,17 +1094,17 @@ class MainWindow(QMainWindow):
         # extract_base_candidate 抽不到 8 字符坐标, 兜底到 'CSV text' (file 工具把坐标串判成 CSV).
         # 修: coords-qr 且 current_file 存在 -> 走 file 模式让 runner read_text(file_path).
         from automisc.core.decoders.registry import get_decoder
-        spec = get_decoder(decoder_name)
+        spec = get_decoder(effective_name)  # v0.5-pyc-decompiler-buttons: 解析 :py2/:py3 后缀后用 effective_name 查 spec
         is_text_based = bool(spec and spec.text_only)
 
         # coords-qr 特殊: 有 current_file 时走 file 模式 (override)
-        if decoder_name == "coords-qr" and self.current_file is not None:
+        if effective_name == "coords-qr" and self.current_file is not None:  # v0.5-pyc-decompiler-buttons: 用 effective_name
             is_text_based = False  # 走 file 模式分支
 
         # v0.5-base-rot-decoders: base64-custom 是 interactive
         # 触发时弹 QInputDialog 让用户输入 64 字符表
         custom_table: str | None = None
-        if decoder_name == "base64-custom":
+        if effective_name == "base64-custom":  # v0.5-pyc-decompiler-buttons: 用 effective_name
             from PySide6.QtWidgets import QInputDialog
             custom_table, ok = QInputDialog.getText(
                 self,
@@ -1168,10 +1189,11 @@ class MainWindow(QMainWindow):
             # v0.5-base-rot-decoders: 传 custom_table 给 DecodeRunner
             # DecodeRunner inspect 自动识别 runner 签名中的 custom_table 参数
             self._decode_runner = DecodeRunner(
-                decoder_name=decoder_name,
+                decoder_name=effective_name,  # v0.5-pyc-decompiler-buttons: 解析 :py2/:py3 后缀
                 text=candidate,
                 out_dir=out_dir,
                 custom_table=custom_table,  # 仅 base64-custom 用，其他 decoder 忽略
+                force_version=force_version,  # v0.5-pyc-decompiler-buttons: pyc_decompiler 强制版本 (None=auto / 2=py2 / 3=py3)
             )
         else:
             # 传统 file-based decoder (e.g. base64-image / coords-qr with current_file)
@@ -1199,8 +1221,9 @@ class MainWindow(QMainWindow):
                     self.output_view.append_text(f"  [!] read_text failed: {e}\n")
 
             self._decode_runner = DecodeRunner(
-                decoder_name=decoder_name,
+                decoder_name=effective_name,  # v0.5-pyc-decompiler-buttons: 解析 :py2/:py3 后缀
                 file_path=str(self.current_file),
+                force_version=force_version,  # v0.5-pyc-decompiler-buttons: pyc_decompiler 强制版本 (None=auto / 2=py2 / 3=py3)
             )
 
         self._decode_runner.started_run.connect(self._on_decoder_started)

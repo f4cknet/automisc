@@ -95,8 +95,13 @@ TOOL_CATEGORIES: dict[str, list[str]] = {
     ],
     # v0.5-pyc-decompiler-gui (per Owner 06-21 11:54): Py2.x / Py3.x .pyc 反编译
     # Owner 决策: "大多数 pyc 反编译时 python2", 默认走 uncompyle6 (Py2.x)
+    # v0.5-pyc-decompiler-buttons (per Owner 2026-07-01 09:02): 加 2 强制版本按钮
+    # 工具栏 3 按钮共存: auto (按 magic) / 强制 py2 (uncompyle6) / 强制 py3 (decompyle3)
+    # 后缀 `:py2` / `:py3` 携带 force_version 参数, main_window 解析后传 DecodeRunner
     "🐍 反编译工具 (v0.5-pyc-decompiler-gui)": [
-        "decoder:pyc_decompiler",  # Py2.x uncompyle6 / Py3.x decompyle3 / dis fallback
+        "decoder:pyc_decompiler",        # auto (按 magic 自动判断)
+        "decoder:pyc_decompiler:py2",    # 强制 Python 2 (uncompyle6)
+        "decoder:pyc_decompiler:py3",    # 强制 Python 3 (decompyle3)
     ],
 }
 
@@ -144,7 +149,10 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     "decoder:hex-dec":   "🔢 16 进制转 10 进制",
     "decoder:ascii-bin": "🔤 文本转 2 进制",
     # v0.5-pyc-decompiler-gui (per Owner 06-21 11:54): 默认 Python 2 反编译
-    "decoder:pyc_decompiler": "🐍 Pyc 反编译 (默认 Python 2)",
+    # v0.5-pyc-decompiler-buttons (per Owner 2026-07-01 09:02): 改显示名 + 加 2 强制按钮
+    "decoder:pyc_decompiler": "🐍 Pyc 反编译 (自动判版本)",
+    "decoder:pyc_decompiler:py2": "🐍 Pyc 反编译 (强制 Python 2)",
+    "decoder:pyc_decompiler:py3": "🐍 Pyc 反编译 (强制 Python 3)",
 }
 
 

@@ -11,6 +11,11 @@
   (而不是把 current_file 当 hex 解, 之前会 233KB meihuai.jpg 触发卡死 + 乱码)
 - `text` 优先于 `file_path`
 
+**v0.5-pyc-decompiler-buttons (2026-07-01)**:
+- 加 `force_version` kwarg 透传 (per `inspect.signature` 自动 kwargs 机制, 跟 custom_table 风格一致)
+- main_window 解析 menu_dock entry 后缀 `:py2` / `:py3` → 传 `force_version=2/3` 给 DecodeRunner
+- pyc_decompiler 的 `run()` 接 `force_version` 走强制 uncompyle6/decompyle3 路由
+
 **信号**：
 - finished_with_result(decoder_name, file_path, result)
 - failed_with_error(decoder_name, error)
@@ -37,6 +42,13 @@ class DecodeRunner(QThread):
         runner.finished_with_result.connect(self._on_done)
         runner.failed_with_error.connect(self._on_err)
         runner.start()
+
+        # 强制版本 (v0.5-pyc-decompiler-buttons)
+        runner = DecodeRunner(
+            decoder_name="pyc_decompiler",
+            file_path="/Challenge/flag.pyc",
+            force_version=2,  # 强制 uncompyle6
+        )
     """
 
     finished_with_result = Signal(str, str, object)  # decoder_name, file_path, result
@@ -52,6 +64,7 @@ class DecodeRunner(QThread):
         keep: bool = False,
         custom_table: str | None = None,
         hint_bytes: int | None = None,
+        force_version: Optional[int] = None,  # v0.5-pyc-decompiler-buttons: 强制反编译版本 (None/2/3)
         parent=None,
     ):
         super().__init__(parent)
@@ -62,6 +75,7 @@ class DecodeRunner(QThread):
         self.keep = keep
         self.custom_table = custom_table  # v0.5-base-rot-decoders: base64-custom 用
         self.hint_bytes = hint_bytes  # v0.5-base-rot-decoders: base64-stego 用
+        self.force_version = force_version  # v0.5-pyc-decompiler-buttons: pyc_decompiler 强制版本
         self._result: Optional[Any] = None
         self._error: Optional[str] = None
 
@@ -94,6 +108,9 @@ class DecodeRunner(QThread):
             # v0.5-base-rot-decoders PR3: base64-stego 用 hint_bytes
             if "hint_bytes" in valid_kwargs and self.hint_bytes is not None:
                 kwargs["hint_bytes"] = self.hint_bytes
+            # v0.5-pyc-decompiler-buttons: pyc_decompiler 用 force_version (None=auto / 2=py2 / 3=py3)
+            if "force_version" in valid_kwargs and self.force_version is not None:
+                kwargs["force_version"] = self.force_version
 
             result = spec.run(**kwargs)
             self._result = result

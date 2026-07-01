@@ -8,3 +8,10 @@
 *.raw
 *.zip
 *.png
+*.pyc
+*.vmdk
+*.img
+*.dd
+*.E01
+*.evtx
+*.pcap.0
