@@ -14,7 +14,15 @@
 # - post_extract: 解压后处理（zip 才有, rename / 解嵌套）
 # - available: false = 该平台暂无方案
 
-version: "1.4"
+version: "1.5"
+# 最后更新: 2026-07-01 (per v0.5-trid-toolbar 加 trid entry)
+# - 新增: trid (TrID/32 v2.24 文件类型签名识别器, 108KB + 5.8MB defs 包)
+#   Owner 手工部署到 extend-tools/bin/win-x64/TrID/ (异名 subdir),
+#   paths.py 异名 subdir fallback (per v0.5-extend-tools-subdir-flexible)
+#   自动命中 TrID/trid.exe + TrID/triddefs.trd (13783 signatures, 完全离线).
+#   url 留空: 不走 install.ps1 自动下载, notes 提示手工从 mark0.net/TrID 下载.
+# - 跑法: adapter 显式 -d:<abs_triddefs.trd_path> 锁本地 defs (避免在线拉 defs
+#   违反 STRUCTURE §1 完全离线定位)
 # 最后更新: 2026-07-01 (per v0.5-pyc-decompiler-pycdc 加 pycdc entry)
 # - 新增: pycdc (zrax/pycdc C++ 反编译器, 4.2MB Win64 静态链)
 #   替代 uncompyle6 跑 Py2.x (uncompyle6 多个 Py2.7 bug 实战命中)
@@ -154,6 +162,40 @@ platforms:
           paths.py:resolve_tool_binary 异名 subdir fallback
           (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner) 自动
           扫 bindir/*/xxd.exe 找到 vim92/xxd.exe, 不需要 explicit entry.
+
+      trid:
+        version: "2.24"
+        # TrID/32 v2.24 (M.Pontello, 2003-16), 基于 binary signature pattern 的
+        # 文件类型识别器 (跟 file/libmagic 互补 — file 看 magic bytes, trid 看
+        # data frequency signature, 输出 N 个候选 + 概率).
+        # Win 上手工部署到 extend-tools/bin/win-x64/TrID/ subdir (异名 subdir):
+        #   - trid.exe (108KB, CLI, Win32 PE)
+        #   - triddefs.trd (5.8MB, 13783 signatures, 完全本地 defs 包)
+        # paths.py:resolve_tool_binary 异名 subdir fallback
+        # (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner) 自动
+        # 扫 bindir/*/trid.exe 找到 TrID/trid.exe, 不需要 explicit entry.
+        # adapter 显式 -d:<abs_triddefs.trd_path> 锁本地 defs (避免 trid 默认
+        # 从 mark0.net 在线拉 defs, 违反 STRUCTURE §1 完全离线定位).
+        url: ""  # 不走 install.ps1 自动下载 (手工部署, 跟 pycdc/msvcr120 模式一致)
+        sha256: "D8C91EE0720759D44AAC1DC16F9B400DA5FD259748AEFBCA5A549329396D2483"  # trid.exe 2026-07-01 Owner 装 hash
+        available: true
+        notes: |
+          TrID/32 v2.24 (Marco Pontello, 2003-2016) Win32 CLI.
+          官网: https://mark0.net/soft-trid-e.html (download 包含 trid.exe + triddefs.trd)
+          Win release zip ~5MB (含 defs 包); 单独 trid.exe ~108KB + defs ~5.8MB 解压分开下载.
+          部署到 extend-tools/bin/win-x64/TrID/:
+            - trid.exe (Win32 PE, 108KB)
+            - triddefs.trd (~5.8MB, 13783 signatures)
+          triddefs.trd sha256: 454B7E5107FE0841E7773AA98B209AF4AAB79C2CB2F45D858A7D97EA0EC83F6F
+          adapter 用法:
+            - `trid`: extend-tools/bin/win-x64/TrID/trid.exe (异名 subdir TrID/ 自动命中)
+          invoke 模式: `trid -d:<abs_triddefs.trd_path> -n:5 <file>`
+          注: 不走 Win %PATH% (subdir 部署), paths.py 异名 fallback 自动命中.
+          实战 CTF 价值 (per v0.5-trid-toolbar §3):
+            - 扩展名伪装识别 (file 后缀 .png 但 trid 100% ZIP — sev=4 可疑)
+            - 跟 file adapter 互补 (file 单行定性, trid 多候选概率)
+            - 不进 auto-run 池 (per AGENTS §5.2 防单题打补丁, file 已在 shared 履行)
+          macOS 端: brew 不维护 trid (Ruby gem 类似 zsteg), v0.5-windows-only 不评估.
 
       pycdc:
         version: "master-2026-07-01"

@@ -74,6 +74,21 @@ $binaries = @(
         post_extract = "file_zip"
     },
     @{
+        name = "trid"
+        version = "2.24"
+        # TrID/32 v2.24 (Marco Pontello, 2003-2016) — Win 上手工部署, 不走 install.ps1
+        # 自动下载 (跟 pycdc/msvcr120 模式一致).
+        # url 留空 -> post_extract=skip_if_url_empty 跳过下载, notes 提示手工从
+        # mark0.net/TrID 下载 + 部署到 extend-tools/bin/win-x64/TrID/ (trid.exe + triddefs.trd).
+        # adapter 路径: paths.py 异名 subdir fallback 自动命中 TrID/trid.exe
+        # (per v0.5-extend-tools-subdir-flexible, 2026-06-29 Owner).
+        url = ""
+        # target 是 check path, 命中即 skip. extend-tools/bin/win-x64/TrID/trid.exe
+        # (异名 subdir layout, 不在顶层 flat).
+        target = "TrID\trid.exe"
+        post_extract = "skip_if_url_empty"
+    },
+    @{
         name = "pycdc"
         version = "master-2026-07-01"
         # zrax/pycdc C++ 反编译器 (Decompyle++) — 无官方 Win prebuilt, 手工 build.
@@ -219,7 +234,7 @@ if (-not $rust_installed) {
 Write-Host ""
 
 # ---- Stage 1: Download + extract binaries ----
-Write-Host "--- Stage 1: Binaries (4 tools) ---" -ForegroundColor Cyan
+Write-Host "--- Stage 1: Binaries (6 tools) ---" -ForegroundColor Cyan
 
 foreach ($tool in $binaries) {
     $dest = Join-Path $BinDir $tool.target

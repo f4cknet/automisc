@@ -43,6 +43,7 @@ pwsh ./extend-tools/install.ps1
 | **exiftool** | 提取 EXIF / Office / PDF metadata | [exiftool.org](https://exiftool.org) standalone | ~10MB |
 | **7-Zip** | 通用归档 (zip/7z/rar/tar/gz/bz2/xz 等 30+ 格式) | [7-zip.org](https://www.7-zip.org) 完整安装 | ~5MB |
 | **foremost** | 按 magic bytes 雕刻并分离嵌入文件 | [raddyfiy/foremost](https://github.com/raddyfiy/foremost) 第三方 fork | ~1MB |
+| **TrID** (手工部署) | 基于 signature pattern 识别文件类型（候选列表 + 概率） | [mark0.net/soft-trid-e.html](https://mark0.net/soft-trid-e.html) 手工部署 | ~6MB (含 defs 包) |
 
 ## Windows 限制（已知 gap）
 

@@ -270,7 +270,7 @@ steghide / zsteg / stegseek 在 Windows 上不可用：
 | Stego/Video | `ffmpeg_video`, `ffprobe` |
 | Misc/Archive | `sevenz_extract`, `unzip`, `john`, `zip_classify` (sevenz 探测类, GUI 不显示, per Owner 20:03) |
 | Misc/Brainteaser | `zbar` (QR) |
-| Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool` |
+| Shared | `binwalk`, `foremost`, `file`, `strings`, `xxd`, `exiftool`, `trid` (v0.5-trid-toolbar, TrID/32 v2.24 signature pattern 识别) |
 
 **auto-run 池** (拖入图片/zip/rar/其他文件, 自动跑, per AGENTS.md §1 铁律 7 = 纯探测不抢下一步):
 - picture: `lsb_detect`, `stegseek`, `exiftool`, `binwalk`, `strings`, `file` (6 tools, **v0.5-lsb-detector 替代 zsteg**)

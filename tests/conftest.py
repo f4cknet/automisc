@@ -16,6 +16,7 @@ from automisc.tools.shared import exiftool  # noqa: F401, E402
 from automisc.tools.shared import file  # noqa: F401, E402
 from automisc.tools.shared import foremost  # noqa: F401, E402
 from automisc.tools.shared import strings  # noqa: F401, E402
+from automisc.tools.shared import trid  # noqa: F401, E402  # v0.5-trid-toolbar 2026-07-01
 from automisc.tools.shared import xxd  # noqa: F401, E402
 # v0.1.0b-PR2 + v0.5-lsb-detector + v0.5-lsb-tool-unify + v0.5-lsb-tool-bitplane-preview-matrix
 # zsteg 已彻底删除 (per v0.5-lsb-tool-bitplane-preview-matrix Commit 4)
