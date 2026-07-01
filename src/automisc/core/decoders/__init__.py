@@ -36,6 +36,10 @@ from automisc.core.decoders import cipher_decoders  # noqa: F401, E402  # v0.5-c
 # 修法: 在这里也 side-effect import, 让 GUI 启动时 registry 必含这 2 个.
 from automisc.core.decoders import magic_sniffer  # noqa: F401, E402  # v0.5-lsb-byte-stream-extract
 from automisc.core.decoders import pyc_decompiler  # noqa: F401, E402  # v0.5-pyc-magic-sniffer
+# v0.5-sparse-grid-restore (per Owner 2026-07-01 拍板):
+# 主动在 __init__.py import, 复刻 fix_decoder_registry_pyc_magic 修法, 避免 GUI 路径
+# `from automisc.core import decoders` 触发不到 decoder 注册导致 "unknown decoder" bug.
+from automisc.core.decoders import sparse_grid_restore  # noqa: F401, E402  # v0.5-sparse-grid-restore
 
 __all__ = [
     "DecoderSpec",
@@ -52,4 +56,5 @@ __all__ = [
     "cipher_decoders",
     "magic_sniffer",  # v0.5-lsb-byte-stream-extract
     "pyc_decompiler",  # v0.5-pyc-magic-sniffer
-]
+    "sparse_grid_restore",  # v0.5-sparse-grid-restore
+] 

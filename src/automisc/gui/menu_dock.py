@@ -32,7 +32,12 @@ from PySide6.QtWidgets import QDockWidget, QTreeWidget, QTreeWidgetItem
 # 工具 → 分类映射（v0.1 frozen 22 adapter + v0.5 4 快捷 action + 21 decoder + 14 cipher/占位）
 # v0.5-cipher-decoders: cipher 和 占位从 core.decoders.registry 自动聚合到这里
 TOOL_CATEGORIES: dict[str, list[str]] = {
-    "共享基础工具 (PR1)": ["file", "strings", "binwalk", "foremost", "exiftool", "xxd", "trid"],  # v0.5-trid-toolbar 加 trid（基于 signature pattern 识别）
+    "共享基础工具 (PR1)": [
+        "file", "strings", "binwalk", "foremost", "exiftool", "xxd", "trid",
+        # v0.5-sparse-grid-restore (per Owner 2026-07-01 Q2 拍板): 塞入共享基础工具, 跟 file/strings 同级,
+        # 内部仍走 decoder (跟 trid 是 adapter 不同) — runtime dispatch 按 "decoder:" prefix, per menu_dock.py:311
+        "decoder:sparse_grid_restore",
+    ],  # v0.5-trid-toolbar 加 trid（基于 signature pattern 识别）; v0.5-sparse-grid-restore 加 sparse grid → ASCII
     "Stego/Image (PR2)": ["steghide"],  # v0.5-stegseek-remove: stegseek 删, 改 steghide (v0.5-lsb-tool-bitplane-preview-matrix: zsteg 已删, lsb_tool 替代)
     "Forensics/Network (PR3)": ["tshark", "tcpdump", "pcap_protocol_router"],  # v0.5-pcap-protocol-router
     "Stego/Audio+Video (PR4)": [
@@ -119,6 +124,10 @@ ACTION_DISPLAY_NAMES: dict[str, str] = {
     #   trid 输出 N 个候选 + 概率，跟 file 单行定性互补
     #   候选 vs 后缀 mismatch → sev=4 高亮
     "trid": "🔍 文件类型识别",
+    # v0.5-sparse-grid-restore (per Owner 2026-07-01 拍板):
+    #   GUI 显示名"🧩 稀疏网格还原" (A 命名, Q1=🧩 拼图意象呼应稀疏还原)
+    #   Q2=塞入共享基础工具分类, Q3=不进 auto-run, Q4=不 commit 实战数据
+    "decoder:sparse_grid_restore": "🧩 稀疏网格还原",
     "decoder:base64-image": "🔓 Base64 → 图片",
     # v0.5-cn-display (per Owner 22:39): 中文 display
     "decoder:hex-ascii": "🔢 16 进制转文本",

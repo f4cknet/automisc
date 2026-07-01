@@ -36,6 +36,8 @@ EXPECTED_TEXT_ONLY_DECODERS = [
     # 7 convert (per v0.5-hex-ascii-fix + v0.5-more-converts)
     "hex-ascii", "bin-ascii", "dec-bin", "bin-dec",
     "dec-hex", "hex-dec", "ascii-bin",
+    # v0.5-sparse-grid-restore (per Owner 2026-07-01): sparse (col, char) → ASCII 字符画, text input
+    "sparse_grid_restore",
     # 2 占位
     "placeholder-解密工具2", "placeholder-解密工具3",
 ]
